@@ -1,0 +1,3 @@
+FreeSansBoldOblique.ttf : GNU FreeFont (https://www.gnu.org/software/freefont/).
+Licence GPL v3 ou ultérieure, avec l'exception pour les polices : un document (ici les plaques de nom
+GRAY / SNOWMAN dessinées dans le jeu) qui utilise la police n'est pas, de ce fait, couvert par la GPL.

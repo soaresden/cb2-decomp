@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Rebuild the game's executable from the split assembly and check it matches the original byte for byte.
-usage: python3 build.py [main]   (run `python3 -m splat split config/main.yaml` first)"""
+"""Decompilation project: split the game's binaries with splat, rebuild them and check they match the originals.
+usage: python3 decomp.py split          # iso/*.BIN + iso/SCES_009.92 -> asm/ (splat)
+       python3 decomp.py check [main sbc2 ...]   # assemble, link, compare byte for byte (all binaries by default)"""
 import hashlib, os, subprocess, sys
 AS = ['mips-linux-gnu-as', '-EL', '-march=r3000', '-mtune=r3000', '-no-pad-sections', '-G0', '-Iinclude']
 def run(cmd): subprocess.run(cmd, check=True)
@@ -29,10 +30,17 @@ def build(name, target):
         n = min(len(a), len(b)); i = next((k for k in range(n) if a[k] != b[k]), n)
         print(f'  1re différence à 0x{i:x} (tailles {len(a)} / {len(b)})')
     return ok
+def split(names):
+    for n in names:
+        subprocess.run([sys.executable, '-m', 'splat', 'split', f'config/{n}.yaml'], check=True, stdout=subprocess.DEVNULL)
+        print('découpé :', n)
 if __name__ == '__main__':
+    os.chdir(os.path.dirname(os.path.abspath(__file__)))
     targets = {'main': 'iso/SCES_009.92'}
     targets.update({n: f'iso/{n.upper()}.BIN' for n in open('config/overlays.txt').read().split()})
-    names = sys.argv[1:] or list(targets)
+    cmd = sys.argv[1] if len(sys.argv) > 1 else 'check'
+    names = sys.argv[2:] or list(targets)
+    if cmd == 'split': split(names); sys.exit(0)
     res = [build(n, targets[n]) for n in names]
     print(f'{sum(res)}/{len(res)} identiques')
     sys.exit(0 if all(res) else 1)

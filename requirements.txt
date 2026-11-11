@@ -1,2 +1,6 @@
+# Remix (make_remix.py)
+numpy
+pillow
+# Décompilation (decomp.py)
 splat64[mips]==0.50.1
 spimdisasm==1.42.4

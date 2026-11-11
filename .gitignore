@@ -13,3 +13,6 @@ linker/
 build/
 __pycache__/
 .splache
+iso
+work/
+*.part
