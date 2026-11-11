@@ -1,0 +1,36 @@
+name: MODE_SEL.BIN (Cool Boarders 2, PAL)
+sha1: 704411b813ae5904bec4d95de202d03171b09f9f
+options:
+  basename: mode_sel
+  target_path: iso/MODE_SEL.BIN
+  base_path: ..
+  platform: psx
+  compiler: PSYQ
+  asm_path: asm/mode_sel
+  asset_path: assets/mode_sel
+  src_path: src/mode_sel
+  build_path: build
+  ld_script_path: linker/mode_sel.ld
+  symbol_addrs_path: config/symbols.mode_sel.txt
+  undefined_funcs_auto_path: linker/undefined_funcs_auto.mode_sel.txt
+  undefined_syms_auto_path: linker/undefined_syms_auto.mode_sel.txt
+  find_file_boundaries: yes
+  use_legacy_include_asm: no
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  migrate_rodata_to_functions: no
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  ld_bss_is_noload: yes
+  subalign: 4
+  ld_align_segment_vram_end: no
+  ld_align_section_vram_end: no
+segments:
+  - name: mode_sel
+    type: code
+    start: 0x0
+    vram: 0x8005AEA8
+    subsegments:
+      - [0x0, rodata]
+      - [0x4, asm]
+      - [0x152F0, data]
+  - [0x28420]

@@ -1,0 +1,36 @@
+name: ENDING.BIN (Cool Boarders 2, PAL)
+sha1: a5b1da56e9ac8baea913d9f9617f525124b76e62
+options:
+  basename: ending
+  target_path: iso/ENDING.BIN
+  base_path: ..
+  platform: psx
+  compiler: PSYQ
+  asm_path: asm/ending
+  asset_path: assets/ending
+  src_path: src/ending
+  build_path: build
+  ld_script_path: linker/ending.ld
+  symbol_addrs_path: config/symbols.ending.txt
+  undefined_funcs_auto_path: linker/undefined_funcs_auto.ending.txt
+  undefined_syms_auto_path: linker/undefined_syms_auto.ending.txt
+  find_file_boundaries: yes
+  use_legacy_include_asm: no
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  migrate_rodata_to_functions: no
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  ld_bss_is_noload: yes
+  subalign: 4
+  ld_align_segment_vram_end: no
+  ld_align_section_vram_end: no
+segments:
+  - name: ending
+    type: code
+    start: 0x0
+    vram: 0x8005AEA8
+    subsegments:
+      - [0x0, rodata]
+      - [0x4, asm]
+      - [0x8360, data]
+  - [0x1A6A4]

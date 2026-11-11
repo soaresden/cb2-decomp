@@ -1,0 +1,36 @@
+name: COMB.BIN (Cool Boarders 2, PAL)
+sha1: 1e186778415ef8f723a5149487ccad9e628eb3ef
+options:
+  basename: comb
+  target_path: iso/COMB.BIN
+  base_path: ..
+  platform: psx
+  compiler: PSYQ
+  asm_path: asm/comb
+  asset_path: assets/comb
+  src_path: src/comb
+  build_path: build
+  ld_script_path: linker/comb.ld
+  symbol_addrs_path: config/symbols.comb.txt
+  undefined_funcs_auto_path: linker/undefined_funcs_auto.comb.txt
+  undefined_syms_auto_path: linker/undefined_syms_auto.comb.txt
+  find_file_boundaries: yes
+  use_legacy_include_asm: no
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  migrate_rodata_to_functions: no
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  ld_bss_is_noload: yes
+  subalign: 4
+  ld_align_segment_vram_end: no
+  ld_align_section_vram_end: no
+segments:
+  - name: comb
+    type: code
+    start: 0x0
+    vram: 0x8005AEA8
+    subsegments:
+      - [0x0, rodata]
+      - [0x4, asm]
+      - [0x3D5C4, data]
+  - [0x4B448]

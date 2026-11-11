@@ -1,0 +1,36 @@
+name: OMT.BIN (Cool Boarders 2, PAL)
+sha1: fc244bf127a3012c726494ed47e362da7a044bcd
+options:
+  basename: omt
+  target_path: iso/OMT.BIN
+  base_path: ..
+  platform: psx
+  compiler: PSYQ
+  asm_path: asm/omt
+  asset_path: assets/omt
+  src_path: src/omt
+  build_path: build
+  ld_script_path: linker/omt.ld
+  symbol_addrs_path: config/symbols.omt.txt
+  undefined_funcs_auto_path: linker/undefined_funcs_auto.omt.txt
+  undefined_syms_auto_path: linker/undefined_syms_auto.omt.txt
+  find_file_boundaries: yes
+  use_legacy_include_asm: no
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  migrate_rodata_to_functions: no
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  ld_bss_is_noload: yes
+  subalign: 4
+  ld_align_segment_vram_end: no
+  ld_align_section_vram_end: no
+segments:
+  - name: omt
+    type: code
+    start: 0x0
+    vram: 0x8005AEA8
+    subsegments:
+      - [0x0, rodata]
+      - [0x4, asm]
+      - [0x37150, data]
+  - [0x41670]

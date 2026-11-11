@@ -1,0 +1,36 @@
+name: BP.BIN (Cool Boarders 2, PAL)
+sha1: d2d93f7dff6021912fa3a10c7d48567320847578
+options:
+  basename: bp
+  target_path: iso/BP.BIN
+  base_path: ..
+  platform: psx
+  compiler: PSYQ
+  asm_path: asm/bp
+  asset_path: assets/bp
+  src_path: src/bp
+  build_path: build
+  ld_script_path: linker/bp.ld
+  symbol_addrs_path: config/symbols.bp.txt
+  undefined_funcs_auto_path: linker/undefined_funcs_auto.bp.txt
+  undefined_syms_auto_path: linker/undefined_syms_auto.bp.txt
+  find_file_boundaries: yes
+  use_legacy_include_asm: no
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  migrate_rodata_to_functions: no
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  ld_bss_is_noload: yes
+  subalign: 4
+  ld_align_segment_vram_end: no
+  ld_align_section_vram_end: no
+segments:
+  - name: bp
+    type: code
+    start: 0x0
+    vram: 0x8005AEA8
+    subsegments:
+      - [0x0, rodata]
+      - [0x4, asm]
+      - [0x3ADAC, data]
+  - [0x453F8]

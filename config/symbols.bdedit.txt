@@ -1,0 +1,4 @@
+// Symboles de l'overlay BDEDIT.BIN (chargé à 0x8005AEA8 ; le 1er mot est le numéro de l'overlay)
+bdedit_id = 0x8005AEA8; // type:u32
+// appelée par main()
+bdedit_entry = 0x8005AEAC; // type:func

@@ -1,0 +1,36 @@
+name: TM.BIN (Cool Boarders 2, PAL)
+sha1: 64ced83a905547e86b9e5e8d1cd70280c615bf8b
+options:
+  basename: tm
+  target_path: iso/TM.BIN
+  base_path: ..
+  platform: psx
+  compiler: PSYQ
+  asm_path: asm/tm
+  asset_path: assets/tm
+  src_path: src/tm
+  build_path: build
+  ld_script_path: linker/tm.ld
+  symbol_addrs_path: config/symbols.tm.txt
+  undefined_funcs_auto_path: linker/undefined_funcs_auto.tm.txt
+  undefined_syms_auto_path: linker/undefined_syms_auto.tm.txt
+  find_file_boundaries: yes
+  use_legacy_include_asm: no
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  migrate_rodata_to_functions: no
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  ld_bss_is_noload: yes
+  subalign: 4
+  ld_align_segment_vram_end: no
+  ld_align_section_vram_end: no
+segments:
+  - name: tm
+    type: code
+    start: 0x0
+    vram: 0x8005AEA8
+    subsegments:
+      - [0x0, rodata]
+      - [0x4, asm]
+      - [0x37344, data]
+  - [0x47310]

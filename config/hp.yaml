@@ -1,0 +1,36 @@
+name: HP.BIN (Cool Boarders 2, PAL)
+sha1: cd8f3ec004386e82770120ad32d4386bb15747e0
+options:
+  basename: hp
+  target_path: iso/HP.BIN
+  base_path: ..
+  platform: psx
+  compiler: PSYQ
+  asm_path: asm/hp
+  asset_path: assets/hp
+  src_path: src/hp
+  build_path: build
+  ld_script_path: linker/hp.ld
+  symbol_addrs_path: config/symbols.hp.txt
+  undefined_funcs_auto_path: linker/undefined_funcs_auto.hp.txt
+  undefined_syms_auto_path: linker/undefined_syms_auto.hp.txt
+  find_file_boundaries: yes
+  use_legacy_include_asm: no
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  migrate_rodata_to_functions: no
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  ld_bss_is_noload: yes
+  subalign: 4
+  ld_align_segment_vram_end: no
+  ld_align_section_vram_end: no
+segments:
+  - name: hp
+    type: code
+    start: 0x0
+    vram: 0x8005AEA8
+    subsegments:
+      - [0x0, rodata]
+      - [0x4, asm]
+      - [0x36D48, data]
+  - [0x411A8]

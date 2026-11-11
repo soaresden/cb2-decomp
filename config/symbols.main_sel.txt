@@ -1,0 +1,6 @@
+// Symboles de l'overlay MAIN_SEL.BIN (chargé à 0x8005AEA8 ; le 1er mot est le numéro de l'overlay)
+main_sel_id = 0x8005AEA8; // type:u32
+// appelée par main()
+main_sel_entry = 0x8005AEAC; // type:func
+// curseur de l'écran de sélection du rider
+sel_riderCursor = 0x8007B310; // type:s16

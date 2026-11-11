@@ -1,0 +1,4 @@
+// Symboles de l'overlay INIT.BIN (chargé à 0x8005AEA8 ; le 1er mot est le numéro de l'overlay)
+init_id = 0x8005AEA8; // type:u32
+// appelée par main()
+init_entry = 0x8005AEAC; // type:func

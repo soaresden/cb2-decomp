@@ -1,0 +1,37 @@
+name: MAIN_SEL.BIN (Cool Boarders 2, PAL)
+sha1: ff0e5611fd7fa9c15b7d4501f1c202eb7645e2e1
+options:
+  basename: main_sel
+  target_path: iso/MAIN_SEL.BIN
+  base_path: ..
+  platform: psx
+  compiler: PSYQ
+  asm_path: asm/main_sel
+  asset_path: assets/main_sel
+  src_path: src/main_sel
+  build_path: build
+  ld_script_path: linker/main_sel.ld
+  symbol_addrs_path: config/symbols.main_sel.txt
+  undefined_funcs_auto_path: linker/undefined_funcs_auto.main_sel.txt
+  undefined_syms_auto_path: linker/undefined_syms_auto.main_sel.txt
+  find_file_boundaries: yes
+  use_legacy_include_asm: no
+  section_order: [".rodata", ".text", ".data", ".bss"]
+  migrate_rodata_to_functions: no
+  asm_jtbl_label_macro: jlabel
+  asm_data_macro: dlabel
+  ld_bss_is_noload: yes
+  subalign: 4
+  ld_align_segment_vram_end: no
+  ld_align_section_vram_end: no
+segments:
+  - name: main_sel
+    type: code
+    start: 0x0
+    vram: 0x8005AEA8
+    subsegments:
+      - [0x0, rodata]
+      - [0x4, asm]
+      - [0x1F340, data]
+      - [0x222E0, bin]   # 2 last bytes (file size is not a multiple of 4)
+  - [0x222E2]

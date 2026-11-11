@@ -1,0 +1,4 @@
+// Symboles de l'overlay HP.BIN (chargé à 0x8005AEA8 ; le 1er mot est le numéro de l'overlay)
+hp_id = 0x8005AEA8; // type:u32
+// appelée par main()
+hp_entry = 0x8005AEAC; // type:func

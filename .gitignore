@@ -1,0 +1,15 @@
+# Données du jeu : jamais dans le dépôt
+iso/
+assets/
+*.BIN
+*.bin
+*.chd
+*.cue
+*.iso
+SCES_009.92
+# Générés par splat / le build (dérivés du jeu)
+asm/
+linker/
+build/
+__pycache__/
+.splache

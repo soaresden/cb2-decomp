@@ -1,0 +1,160 @@
+// Symboles de l'exécutable principal SCES_009.92 (Cool Boarders 2 PAL, SCES-00992).
+// Format splat : nom = adresse; // type:func|u8|s16|u16|s32|u32 size:0x..
+
+// --- démarrage
+__start = 0x8001213C; // type:func
+__main = 0x80012134; // type:func
+// charge la table des fichiers puis boucle : chargement d'overlay + appel 0x8005AEAC
+main = 0x800121F8; // type:func
+
+// --- appels au BIOS (stubs A0/B0/C0 de la libapi)
+// A0(39h)
+InitHeap = 0x8003CB1C; // type:func
+// A0(44h)
+FlushCache = 0x8003CB2C; // type:func
+// A0(49h)
+GPU_cw = 0x8003CB3C; // type:func
+// A0(70h)
+_bu_init = 0x8003CB4C; // type:func
+// A0(72h)
+CdRemove = 0x8003CB64; // type:func
+// B0(08h)
+OpenEvent = 0x8003CB7C; // type:func
+// B0(09h)
+CloseEvent = 0x8003CB8C; // type:func
+// B0(0Bh)
+TestEvent = 0x8003CB9C; // type:func
+// B0(0Ch)
+EnableEvent = 0x8003CBAC; // type:func
+// B0(16h)
+PAD_dr = 0x8003CBBC; // type:func
+// B0(17h)
+ReturnFromException = 0x8003CBCC; // type:func
+// B0(18h)
+SetDefaultExitFromException = 0x8003CBDC; // type:func
+// B0(19h)
+SetCustomExitFromException = 0x8003CBEC; // type:func
+// B0(32h)
+open = 0x8003CC1C; // type:func
+// B0(33h)
+lseek = 0x8003CC2C; // type:func
+// B0(34h)
+read = 0x8003CC3C; // type:func
+// B0(35h)
+write = 0x8003CC4C; // type:func
+// B0(36h)
+close = 0x8003CC5C; // type:func
+// B0(41h)
+format = 0x8003CC6C; // type:func
+// B0(42h)
+firstfile = 0x8003CC7C; // type:func
+// B0(43h)
+nextfile = 0x8003CC8C; // type:func
+// B0(5Bh)
+ChangeClearPad = 0x8003CC9C; // type:func
+// C0(0Ah)
+ChangeClearRCnt = 0x8003CCAC; // type:func
+// B0(12h)
+InitPAD = 0x8003CFB4; // type:func
+// B0(13h)
+StartPAD = 0x8003CFC4; // type:func
+// B0(14h)
+StopPAD = 0x8003CFD4; // type:func
+// B0(15h)
+PAD_init = 0x8003CFE4; // type:func
+// C0(02h)
+SysEnqIntRP = 0x8003CFF4; // type:func
+// C0(03h)
+SysDeqIntRP = 0x8003D004; // type:func
+// B0(07h)
+DeliverEvent = 0x8003E3F0; // type:func
+// B0(47h)
+AddDrv = 0x8003E400; // type:func
+// B0(48h)
+DelDrv = 0x8003E410; // type:func
+// B0(0Dh)
+DisableEvent = 0x8003F200; // type:func
+// A0(ABh)
+_card_info = 0x800447E4; // type:func
+// A0(ACh)
+_card_load = 0x800447F4; // type:func
+// B0(4Eh)
+_card_write = 0x8004483C; // type:func
+// B0(50h)
+_new_card = 0x8004484C; // type:func
+// B0(4Ah)
+InitCARD = 0x80044918; // type:func
+// B0(4Bh)
+StartCARD = 0x80044928; // type:func
+// B0(4Ch)
+StopCARD = 0x80044938; // type:func
+// B0(38h)
+bios_B0_38 = 0x80044C70; // type:func
+// B0(3Fh)
+puts = 0x80044C88; // type:func
+// A0(13h)
+setjmp = 0x80044CA0; // type:func
+// A0(15h)
+strcat = 0x80044CB0; // type:func
+// A0(17h)
+strcmp = 0x80044CC0; // type:func
+// A0(18h)
+strncmp = 0x80044CD0; // type:func
+// A0(19h)
+strcpy = 0x80044CE0; // type:func
+// A0(1Bh)
+strlen = 0x80044CF0; // type:func
+// A0(28h)
+bzero = 0x80044D00; // type:func
+// A0(2Ah)
+memcpy = 0x80044D10; // type:func
+// A0(2Bh)
+memset = 0x80044D20; // type:func
+// A0(2Fh)
+rand = 0x80044D30; // type:func
+// A0(30h)
+srand = 0x80044D40; // type:func
+// A0(3Fh)
+printf = 0x80044D50; // type:func
+// A0(2Eh)
+memchr = 0x800455BC; // type:func
+
+// --- libgpu / libcd / libetc : fonctions nommées par leurs propres messages de debug
+ResetGraph = 0x800293F8; // type:func
+SetGraphReverse = 0x8002957C; // type:func
+SetGraphDebug = 0x80029690; // type:func
+SetGrapQue = 0x800296F4; // type:func
+DrawSyncCallback = 0x800297C0; // type:func
+SetDispMask = 0x8002981C; // type:func
+DrawSync = 0x800298B8; // type:func
+ClearOTag = 0x80029D08; // type:func
+ClearOTagR = 0x80029DC0; // type:func
+DrawOTag = 0x80029EB8; // type:func
+PutDrawEnv = 0x80029F2C; // type:func
+DrawOTagEnv = 0x8002A030; // type:func
+PutDispEnv = 0x8002A184; // type:func
+CdGetToc2 = 0x80040694; // type:func
+CdInit = 0x800408B8; // type:func
+CD_init = 0x800422C8; // type:func
+CdSearchFile = 0x80042814; // type:func
+CD_newmedia = 0x80042B00; // type:func
+CD_cachefile = 0x80042E88; // type:func
+
+// --- variables du jeu (passation du Remix)
+// copie des boutons de la manette du port 0 (bits actifs)
+g_padButtons = 0x8004FBF0;
+// 0 Yaggi, 1 Jin, 2 Cindy, 3 Irin, 4 Boss, 5 Gray, 6 Snowman
+g_rider = 0x80057408; // type:s16
+g_jacket = 0x8005740C; // type:s16
+// tenue alternative (cachée)
+g_hiddenOutfit = 0x8005742A; // type:s16
+g_mirror = 0x8005742E; // type:s16
+g_unlock_8005743E = 0x8005743E; // type:s16
+g_unlock_80057440 = 0x80057440; // type:s16
+g_unlockSpecialBoards = 0x80057442; // type:s16
+g_unlock_80057444 = 0x80057444; // type:s16
+g_unlock_80057446 = 0x80057446; // type:s16
+g_unlock_8005744A = 0x8005744A; // type:s16
+g_unlock_8005744C = 0x8005744C; // type:s16
+// entrées de 8 octets : MSF BCD + taille ; le jeu charge par index
+g_fileTable = 0x800583E8;
