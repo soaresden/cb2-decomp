@@ -5,6 +5,7 @@ Tout le code du projet **Cool Boarders 2 Remix** (PlayStation, version PAL **SCE
 - **`remix/`** : les sources du Remix (riders cachés jouables, contrôle en l'air, stats MAX, collisions…) ;
 - **`make_remix.py`** : **une commande** qui construit le Remix à partir de ton propre disque ;
 - **`batocera/`** : le patcheur pour Batocera (un fichier `.pygame`) ;
+- **`skins/`** : appliquer les skins et la planche perso faits sur le site, en ligne de commande ;
 - **`decomp.py`**, **`config/`** : la décompilation du jeu. Les 15 binaires (exécutable et 14 overlays) se reconstruisent
   déjà à l'identique depuis l'assembleur ; on les remplace par du C petit à petit.
 
@@ -39,6 +40,20 @@ Avec `--release`, la commande produit aussi tout ce qu'on distribue :
 | `patches.js` | le patch pour le site (à copier dans le dépôt `CB2Remix`) |
 
 Le patcheur Batocera de la version publiée se régénère aussi sans le disque : `python3 batocera/mkpygame.py`.
+
+## Skins et planches perso (sans navigateur)
+
+Les éditeurs restent sur le site : le Prêt-à-porter enregistre des skins `.cb2skin.json` ; l'Atelier exporte la planche
+en PNG 128×64. `skins/cb2skins.js` (Node.js, sans dépendance) les applique avec le même code que le site. Il faut aussi
+une copie du dépôt du site, à côté de celui-ci (`../CB2Remix`) ou indiquée avec `--site`.
+
+```
+# Remix + skins sur le jeu d'origine
+node skins/cb2skins.js "Cool Boarders 2 (Europe).chd" --remix --skin pere-noel.cb2skin.json --skin pop-star.cb2skin.json -o "CB2 Remix perso.chd"
+# planche perso dans une carte mémoire (nouvelle, ou --card ta_carte.srm pour l'ajouter à la tienne)
+node skins/cb2skins.js "Cool Boarders 2 (Europe).chd" --board planche.png -o carte.srm
+node skins/cb2skins.js "Cool Boarders 2 (Europe).chd" --board dessus.png --board-bottom dessous.png --style 1 --type 2 -o carte.srm
+```
 
 ## Modifier le Remix
 
@@ -90,3 +105,6 @@ ce qui parle directement au matériel de la PlayStation (affichage, son, CD). En
   (comparaison avec le patch publié). Les étapes qui touchent aux autres fichiers du disque (textures, sons, films) n'ont pas
   encore été relancées depuis le portage : le premier `make_remix.py --release` sur un vrai disque doit redonner exactement
   `remix/cb2remix.delta.gz`.
+- `skins/cb2skins.js` : décodeur PNG vérifié sur tous les formats 8 bits, carte mémoire de planche relue par `board.js`.
+  L'application des skins reprend le code du bouton « Créer le jeu modifié » du site, mais n'a pas encore tourné sur un vrai
+  disque.
