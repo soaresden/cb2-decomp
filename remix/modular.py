@@ -37,7 +37,7 @@ FEATURES = [   # id, French name, English name, description FR, description EN
      'Tenues cachées en vestes 4 à 6 sur l’écran WEAR, avec aperçu dans le menu, dans tous les modes (fin de la vidéo d’info raccourcie).',
      'Hidden outfits as jackets 4 to 6 on the WEAR screen, previewed in the menu, in every mode (end of the info movie cut).'),
     ('max', 'Stats MAX', 'MAX stats',
-     '○ sur l’écran BOARDER : toutes les stats au maximum, « MAX » sous le portrait.', '○ on the BOARDER screen: every stat maxed, “MAX” under the portrait.'),
+     '○ sur l’écran BOARDER : toutes les stats au maximum, « MAX » sous le portrait. Écran BOARD : ligne MAX sous SPECIAL, avec les 21 motifs.', '○ on the BOARDER screen: every stat maxed, “MAX” under the portrait. BOARD screen: a MAX line under SPECIAL, with all 21 designs.'),
     ('air', 'Figures en l’air', 'Air control',
      'La croix seule fait tourner (gauche/droite = spin, haut/bas = flip), Carré = rotations ×4, grabs « X to Y » en gardant R1.',
      'The d-pad alone rotates (left/right = spin, up/down = flip), Square = rotations x4, “X to Y” grabs while holding R1.'),
@@ -51,6 +51,9 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('lift', 'Arrivée express en Free Style', 'Quick finish in Free Style',
      'À l’arrivée, le temps compte comme d’habitude (classement, records, trophées) mais sans célébration ni replay : classement, START, résultats avec ton temps, X = RETRY et tu repars aussitôt d’en haut.',
      'At the finish the run counts as usual (ranking, records, trophies) but without the celebration and the replay: ranking, START, results with your time, X = RETRY and you start again from the top.'),
+    ('skipq', 'Compétition sans qualifications', 'Competition without qualifying',
+     'Chaque manche passe directement au Boarder Cross (pas d’épreuve de figures avant) et tu pars 4e sur 8, au milieu du départ en handicap.',
+     'Each round goes straight to the Boarder Cross (no trick event first) and you start 4th of 8, in the middle of the handicap start.'),
 ]
 INPUT = 'input'   # shared pad hook (needed by 'max' and 'air')
 
@@ -66,6 +69,7 @@ EXE_MAP = [   # (lo, hi, feature) in the executable
     (0x8004F920, 0x8004F93F, 'outfits'), (0x8004F96C, 0x8004F97F, 'outfits'), (0x8004F9E0, 0x8004F9EF, 'outfits'),
     (0x8001D140, 0x8001D140, 'outfits'), (0x8001003C, 0x8001003C, 'outfits'), (0x800100B8, 0x800100B8, 'outfits'),
     (0x800100B4, 0x800100B4, 'progress'),
+    (0x800291CC, 0x8002934B, 'skipq'),
 ]
 MODE_MAP = [(0x800643B4, 0x800643B4, 'progress'), (0x800832C8, 0x800836A8, 'progress')]
 MS_MAP = [*[(a, a, 'max') for a in (0x8006E0A8, 0x8006E0AC, 0x8006E120, 0x8006E124, 0x8006E1CC, 0x8006D478, 0x8006DC98, 0x8006E4B8, 0x8006D614, 0x8006D618,
@@ -74,7 +78,7 @@ MS_MAP = [*[(a, a, 'max') for a in (0x8006E0A8, 0x8006E0AC, 0x8006E120, 0x8006E1
           (0x800614B8, 0x800614B8, 'max'), (0x800626E4, 0x800626E4, 'max'), (0x80063FC8, 0x80063FCC, 'riders'), (0x80064044, 0x80064044, 'riders'),
           (0x800605B4, 0x80062180, 'outfits'), (0x800640EC, 0x80064210, 'outfits')]
 SBC_MAP = {'/FREE.BIN': [(0x8005D5A4, 0x8005D5A4, 'lift')],
-           '/SBC1.BIN': [(0x800832DC, 0x800832DC, 'riders'), (0x8008D8C8, 0x8008D910, 'riders')],
+           '/SBC1.BIN': [(0x8005B058, 0x8005B058, 'skipq'), (0x800832DC, 0x800832DC, 'riders'), (0x8008D8C8, 0x8008D910, 'riders')],
            '/SBC2.BIN': [(0x8005FF70, 0x8005FF70, 'ramming'), (0x80064D70, 0x80064D70, 'riders'), (0x800666EC, 0x800666F0, 'riders'),
                          (0x80066CB4, 0x80066CB8, 'riders'), (0x80090300, 0x80090420, 'riders'), (0x800847AC, 0x800847AC, 'riders'), (0x800902A8, 0x800902F0, 'riders')],
            '/TM.BIN': [(0x80075738, 0x80075758, 'bam'), (0x80074CFC, 0x80074CFC, 'bam'), (0x80094F18, 0x80095538, 'bam')]}
@@ -230,7 +234,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     def buf(p):
         if p not in files: files[p] = bytearray(orig(p))
         return files[p]
-    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', INPUT, 'input_noair') if f in feats]
+    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', INPUT, 'input_noair') if f in feats]
     for feat in order:
         for op in pkg['ops'][feat]:
             t = op[0]

@@ -292,6 +292,9 @@ def patches():
     # Free Style lift (lift.py): the finish counts as usual, no celebration / replay, straight to ranking -> RETRY
     import lift as _lf
     P+=_lf.patches()
+    # Competition: skip the qualifying stage (skipq.py): straight to the Boarder Cross, 4th start gap
+    import skipq as _sq
+    P+=_sq.patches(_ex,open(os.path.join(FS,'SBC1.BIN'),'rb').read())
     P+=[('/SCES_009.92',a,0,w) for a,w in ca]
     assert la['rm']==RM,hex(la['rm'])
     # mdf: flip wrapper (separate small cave): effective delta = a0 ? -s7 : s7, modulated, written back to s7
