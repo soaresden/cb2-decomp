@@ -30,6 +30,21 @@ python3 remix/usa.py PAL_fs USA_fs USA.chd remix/cb2remix_usa.delta.gz
 (`PAL_fs` / `USA_fs` : fichiers extraits des deux disques ; `make_remix.py --keep` laisse ceux du disque européen dans
 `work/fs`.)
 
+## En cours : 2e version (expérimentale, pas encore publiée)
+
+`remix.usa.phase2()` transpose en plus, sans erreur (449 mots) :
+
+| Fonction | État |
+|---|---|
+| contrôle en l'air (X seul fait tourner, vitesses spin/flip, carré ×4, grabs « X to Y ») | transposé ; accroche du flip refaite pour SBC1 / TM / OMT / BP (`lw v0` au lieu de `lw a0` aux USA) |
+| lecture de la manette (base des grabs et du ○ des stats MAX) | **testé** : l'exe US n'a pas le saut où le Remix s'accroche ; accroche refaite après le calcul des boutons + relais. Dans l'émulateur la copie des boutons suit la manette (Rond 0x20, Carré 0x80, Gauche 0x8000) et le jeu tourne |
+| stats MAX (○ sur l'écran BOARDER) | transposé, pas encore vérifié en jeu |
+| Boarder Cross : collisions | transposé, pas encore vérifié en jeu |
+| Big Air Master (colonne NEXT) | pas transposé : son code calcule ses adresses de tables par additions, et la zone libre US n'est pas la même |
+
+Construction du patch de test : `phase1()` + `phase2()` puis `build_delta()` (43 secteurs). À valider en jeu avant de le
+publier.
+
 ## Ce qui reste (essai de transposition de tout le Remix)
 
 Sur les 874 mots modifiés par le Remix européen :

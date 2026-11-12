@@ -150,3 +150,106 @@ if __name__ == '__main__':
     P = phase1(pal_fs, usa_fs, port_cached(pal_fs, usa_fs))
     for f, a, o, n in P: print(f'{f:16s} 0x{a:08X}  {o:08x} -> {n:08x}')
     if len(sys.argv) > 4: print('secteurs modifiés :', build_delta(sys.argv[3], P, sys.argv[4], open(os.path.join(ROOT, 'remix', 'VERSION')).read().strip()))
+
+# ------------------------------------------------------------------ phase 2: air control, MAX stats, Boarder Cross ramming, Big Air Master
+def _in(a, *ranges): return any(lo <= a <= hi for lo, hi in ranges)
+EXE_CAVES = {   # free zones of the PAL exe used by these features -> overlay their code jumps into
+    (0x80028BF4, 0x80028D3C): '/SBC2.BIN',     # kc: Boarder Cross ramming
+    (0x8002957C, 0x8002979F): '/MAIN_SEL.BIN', # maxd: MAX stats bars
+    (0x8002A030, 0x8002A180): '/MAIN_SEL.BIN', # padx, maxl, help strings
+    (0x8004F980, 0x8004F99F): '/SBC2.BIN',     # pad hook (exe only)
+    (0x8004F9A0, 0x8004F9DF): '/SBC2.BIN',     # Square = rotations x4
+    (0x8004FA10, 0x8004FBFF): '/SBC2.BIN',     # md / ax / rm / inj (air control)
+}
+OVL_CAVES = {}   # Big Air Master (TM.BIN 0x80094F18..) not ported yet: its code builds table addresses with addu
+SKIP = {   # features that also need the data steps of remix.apply() (riders in competition, outfits, plates, voices)
+    '/SCES_009.92': [(0x8001003C, 0x8001003C), (0x800100B8, 0x800100B8), (0x8001CEFC, 0x8001D140), (0x8004F800, 0x8004F97F), (0x8004F9E0, 0x8004F9FF)],
+    '/MAIN_SEL.BIN': [(0x8005B000, 0x800614B4), (0x800614BC, 0x800626E0), (0x800626E8, 0x8007FFFF)],
+    '/SBC1.BIN': [(0x800832DC, 0x800832DC), (0x8008D8C8, 0x8008D910)],
+    '/SBC2.BIN': [(0x800847AC, 0x800847AC), (0x800902A8, 0x80090348), (0x80066CB4, 0x80066CB8), (0x800666EC, 0x800666F0), (0x80064D70, 0x80064D70)],
+    '/TM.BIN': [(0x80074CFC, 0x80074CFC), (0x80094F18, 0x80095538)],
+    '/SCES_009.92 hooks': [],
+}
+PAD_HOOK = 0x8001B594        # PAL: 'j 0x8001B5A0' after the buttons of port 0 are read (a2)
+FLIP_SITES = {'/SBC1.BIN': 0x8006668C, '/TM.BIN': 0x80066380, '/OMT.BIN': 0x800663F4, '/BP.BIN': 0x800662EC}
+def phase2(pal_fs, usa_fs, port, log=print):
+    import importlib
+    os.environ['CB2_FS'] = pal_fs
+    remix = importlib.import_module('remix')
+    P = [x for x in remix.patches() if not _in(x[1], *SKIP.get(x[0], []))]
+    T = Translator(port, usa_fs); T.caves = {}; T.override = {}
+    special = []
+    # ---- the pad hook: the USA exe reads the buttons without a jump there ('sll v1,v1,8 / nor v0,v0,v1 / andi a2,v0,0xffff'
+    #      then falls through). Hook = 'j pad' in place of the andi, the andi in its delay slot, and the instruction it
+    #      displaced runs in a small trampoline that jumps back.
+    import struct as _s
+    U = open(os.path.join(usa_fs, 'SCUS_943.58'), 'rb').read(); W = _s.unpack_from('<%dI' % ((len(U) - 0x800) // 4), U, 0x800)
+    hk = [i for i in range(len(W) - 3) if W[i] == 0x00031a00 and W[i + 1] == 0x00431027 and W[i + 2] == 0x3046ffff]
+    if len(hk) != 1: raise ValueError('accroche manette US introuvable')
+    A = EXE + 4 * (hk[0] + 2); displaced = W[hk[0] + 3]
+    TRAMP = port.data(0x8004F800)                      # free zone (the PAL riders' caves, not used by this port)
+    for k in range(3):
+        if T.usa_word('/SCES_009.92', TRAMP + 4 * k): raise ValueError('zone libre US occupée à 0x%08X' % (TRAMP + 4 * k))
+    T.override[0x8001B5A0] = TRAMP                     # where the PAL hook code jumps back to
+    P = [x for x in P if not (x[0] == '/SCES_009.92' and x[1] == PAD_HOOK)]
+    pad_pal = [n for f, a, o, n in remix.patches() if f == '/SCES_009.92' and a == PAD_HOOK][0]
+    pad_tgt = ((pad_pal & 0x3ffffff) << 2) | 0x80000000
+    # ---- flip read of the trick overlays: 'lw a0,0x10(s?)' in Europe, 'lw v0,0x10(s?)' in the USA (ax returns both)
+    flips = []
+    for f, a in FLIP_SITES.items():
+        ws = [x for x in P if x[0] == f and x[1] in (a, a + 4)]
+        P = [x for x in P if not (x[0] == f and x[1] in (a, a + 4))]
+        d = open(os.path.join(usa_fs, f.lstrip('/')), 'rb').read(); WU = _s.unpack_from('<%dI' % (len(d) // 4), d)
+        hs = [i for i in range(len(WU) - 4) if (WU[i] & 0xfc1fffff) == 0x8c020014 and WU[i + 1] == 0 and (WU[i + 2] >> 16) == 0x1040 and (WU[i + 3] & 0xffff07ff) == 0x00400021]
+        if len(hs) != 1: raise ValueError('lecture du spin introuvable dans %s US' % f)
+        hf = [i for i in range(hs[0], hs[0] + 0x100) if (WU[i] & 0xfc1fffff) == 0x8c020010 and WU[i + 1] == 0 and (WU[i + 2] >> 16) == 0x1040]
+        if len(hf) != 1: raise ValueError('lecture du flip introuvable dans %s US' % f)
+        flips.append((f, USA_OVL + 4 * hf[0], WU[hf[0]], [n for ff, aa, o, n in sorted(ws, key=lambda x: x[1])]))
+    # ---- 1. where each free-zone block goes in the USA binaries
+    blocks = []   # (file, pal_start, [words], usa_start, ctx)
+    def zone(f, a):
+        if f == '/SCES_009.92':
+            for (lo, hi), ctx in EXE_CAVES.items():
+                if lo <= a <= hi: return (lo, hi), ctx
+        for lo, hi in OVL_CAVES.get(f, []):
+            if lo <= a <= hi: return (lo, hi), f
+        return None, None
+    cave_words = {}
+    for f, a, old, new in P:
+        z, ctx = zone(f, a)
+        if z: cave_words.setdefault((f, z, ctx), []).append((a, old, new))
+    for (f, (lo, hi), ctx), ws in cave_words.items():
+        ws.sort()
+        if f == '/SCES_009.92' and hi < 0x80045684:          # dead Sony functions: same function in the USA exe
+            base = T.code(f, lo); kind = 'fonction morte'
+        else:
+            base = port.data(lo, f=f if f != '/SCES_009.92' else None); kind = 'zone libre'
+        for a, old, new in ws:
+            ua = base + (a - lo); T.caves[a] = ua
+        blocks.append((f, lo, ws, base, ctx, kind))
+    out = []; errors = []
+    # ---- 2. the blocks, word by word (gaps keep the USA content)
+    for f, lo, ws, base, ctx, kind in blocks:
+        span = (ws[-1][0] - lo) // 4 + 1; words = [None] * span
+        for a, old, new in ws: words[(a - lo) // 4] = new
+        fill = [w if w is not None else T.usa_word(f, base + 4 * k) for k, w in enumerate(words)]
+        try: tr = T.block(f, lo, fill, base, ctx)
+        except Exception as e: errors.append('%s bloc 0x%08X : %s' % (f, lo, e)); continue
+        for a, old, new in ws:
+            k = (a - lo) // 4; ua = base + 4 * k; uo = T.usa_word(f, ua)
+            if kind == 'zone libre' and uo != 0: errors.append('%s 0x%08X : zone US non vide (%08x)' % (f, ua, uo)); continue
+            out.append((f, ua, uo, tr[k]))
+    # ---- 3. the game's own instructions
+    for f, a, old, new in P:
+        if a in T.caves: continue
+        try: out.append(T.single(f, a, old or 0, new))
+        except Exception as e: errors.append('%s 0x%08X : %s' % (f, a, e))
+    # pad hook + trampoline
+    pad_us = T.caves[pad_tgt]
+    out += [('/SCES_009.92', A, 0x3046ffff, (2 << 26) | ((pad_us >> 2) & 0x3ffffff)), ('/SCES_009.92', A + 4, displaced, 0x3046ffff),
+            ('/SCES_009.92', TRAMP, 0, displaced), ('/SCES_009.92', TRAMP + 4, 0, (2 << 26) | (((A + 8) >> 2) & 0x3ffffff)), ('/SCES_009.92', TRAMP + 8, 0, 0)]
+    # flip reads: 'jal ax' + 't5 = 1' in its delay slot (the load delay slot of the original)
+    for f, ua, uo, (n0, n1) in flips:
+        tgt = ((n0 & 0x3ffffff) << 2) | 0x80000000
+        out += [(f, ua, uo, (3 << 26) | ((T.caves[tgt] >> 2) & 0x3ffffff)), (f, ua + 4, 0, n1)]
+    return out, errors

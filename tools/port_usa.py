@@ -34,6 +34,7 @@ class Port:
     def __init__(s, pal_fs, usa_fs):
         s.cmap = {}            # (pal file, pal addr) -> usa addr
         s.pairs = collections.Counter()   # (pal data addr, usa data addr) seen in aligned code
+        s.fpairs = collections.defaultdict(collections.Counter)   # same, per overlay, for addresses in the overlay area
         s.W = {}
         for pf, uf, base, ubase, hdr in FILES:
             P = words(f'{pal_fs}/{pf}', hdr); U = words(f'{usa_fs}/{uf}', hdr); s.W[pf] = (P, U, base)
@@ -55,14 +56,20 @@ class Port:
                     if tag != 'equal': continue
                     for k in range(i2 - i1):
                         s.cmap[(pf, base + 4 * (a + i1 + k))] = ubase + 4 * (c + j1 + k)
-                    s._learn(P[a + i1:a + i2], U[c + j1:c + j2])
+                    s._learn(P[a + i1:a + i2], U[c + j1:c + j2], pf)
         # data map: sorted list of PAL addresses with their USA counterpart (most frequent pairing)
         best = {}
         for (pa, ua), n in s.pairs.items():
             if pa not in best or n > best[pa][1]: best[pa] = (ua, n)
         s.dkeys = sorted(best); s.dval = [best[k][0] for k in s.dkeys]
+        s.fkeys = {}
+        for f, c in s.fpairs.items():
+            b = {}
+            for (pa, ua), n in c.items():
+                if pa not in b or n > b[pa][1]: b[pa] = (ua, n)
+            ks = sorted(b); s.fkeys[f] = (ks, [b[k][0] for k in ks])
 
-    def _learn(s, P, U):
+    def _learn(s, P, U, f=None):
         hi_p, hi_u = {}, {}
         for x, y in zip(P, U):
             op = x >> 26; rs = (x >> 21) & 31; rt = (x >> 16) & 31
@@ -70,7 +77,9 @@ class Port:
             if op in (9, 0x20, 0x21, 0x23, 0x24, 0x25, 0x28, 0x29, 0x2b) and rs in hi_p and rs in hi_u:
                 sx = lambda v: (v & 0xffff) - ((v & 0x8000) << 1)
                 pa = (hi_p[rs] + sx(x)) & 0xffffffff; ua = (hi_u[rs] + sx(y)) & 0xffffffff
-                if 0x80010000 <= pa < 0x80200000: s.pairs[(pa, ua)] += 1
+                if 0x80010000 <= pa < 0x80200000:
+                    if pa >= OVL and f != 'SCES_009.92': s.fpairs[f][(pa, ua)] += 1
+                    else: s.pairs[(pa, ua)] += 1
                 if op == 9 and rt == rs: hi_p.pop(rs, None); hi_u.pop(rs, None)
             if op in (0, 8, 9, 10, 11, 12, 13, 0x20, 0x21, 0x23, 0x24, 0x25):
                 rd = ((x >> 11) & 31) if op == 0 else rt
@@ -79,15 +88,19 @@ class Port:
     def code(s, f, addr):
         return s.cmap.get((f, addr))
 
-    def data(s, addr, exact=False):
-        """USA address of a PAL variable: exact when seen in the code, else same offset from the nearest known one"""
-        i = bisect.bisect_right(s.dkeys, addr) - 1
-        if i >= 0 and s.dkeys[i] == addr: return s.dval[i]
+    def data(s, addr, exact=False, f=None):
+        """USA address of a PAL variable: exact when seen in the code, else same offset from the nearest known one.
+        Addresses in the overlay area need the overlay `f` (each overlay has its own variables there)."""
+        if addr >= OVL and f and f.lstrip('/') != 'SCES_009.92':
+            keys, vals = s.fkeys.get(f.lstrip('/'), ([], []))
+        else: keys, vals = s.dkeys, s.dval
+        i = bisect.bisect_right(keys, addr) - 1
+        if i >= 0 and keys[i] == addr: return vals[i]
         if exact: return None
-        cands = [j for j in (i, i + 1) if 0 <= j < len(s.dkeys)]
+        cands = [j for j in (i, i + 1) if 0 <= j < len(keys)]
         if not cands: return None
-        j = min(cands, key=lambda j: abs(s.dkeys[j] - addr))
-        return s.dval[j] + (addr - s.dkeys[j])
+        j = min(cands, key=lambda j: abs(keys[j] - addr))
+        return vals[j] + (addr - keys[j])
 
 if __name__ == '__main__':
     p = Port(sys.argv[1], sys.argv[2])
