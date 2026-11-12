@@ -3,7 +3,8 @@
 # Mets ce fichier dans /userdata/roms/pygame/ puis lance-le depuis le systeme Pygame.
 # Il cherche le Cool Boarders 2 (PAL, SCES-00992) d'origine dans /userdata/roms/psx (.chd ou .bin/.cue)
 # et ecrit "Cool Boarders 2 Remix (Europe).chd" (ou .bin + .cue) a cote. Rien n'est telecharge.
-# En ligne de commande : python3 CB2_Remix_Patcher.pygame source.chd destination.chd
+# En ligne de commande : python3 CB2_Remix_Patcher.pygame source.chd destination.chd [usa.chd]
+# Si le CHD de Cool Boarders 2 (USA) est aussi dans roms/psx, il propose de mettre ses musiques dans le Remix.
 import os, sys, gzip, base64, time
 
 VERSION = "__VER__"
@@ -20,8 +21,8 @@ def is_remix(disc):
     return any(exe[o + 4:o + 7])
 
 def find_sources(log):
-    """-> [(path, Disc)] originals, [paths] already patched"""
-    orig, done = [], []
+    """-> [(path, Disc)] originals, [paths] already patched, [(path, Disc)] USA discs (CHD)"""
+    orig, done, usa = [], [], []
     for d in SEARCH_DIRS:
         if not os.path.isdir(d): continue
         for root_, dirs, files in os.walk(d):
@@ -33,21 +34,26 @@ def find_sources(log):
                 if any(p == q for q, _ in orig) or p in done: continue
                 try:
                     disc = Disc(p)
+                    if '/SCUS_943.58' in disc.files and disc.kind == 'chd': usa.append((p, disc)); continue
                     if '/SCES_009.92' not in disc.files: continue
                 except Exception:
                     continue
                 if is_remix(disc): done.append(p)
                 else: orig.append((p, disc))
-    return orig, done
+    return orig, done, usa
 
-def patch(src, dst, log=print, progress=lambda f: None):
+def patch(src, dst, log=print, progress=lambda f: None, us=None):
     P = gzip.decompress(base64.b64decode(DELTA_B64))
     disc = src if isinstance(src, Disc) else Disc(src)
     if is_remix(disc): raise ValueError("ce disque a deja le Remix")
     log("Calcul du patch...")
     mods = apply_delta(disc, P, log=log)
     tmp = dst + '.part'
-    write_patched(disc, mods, tmp, log=log, progress=progress)
+    if us is not None:
+        log("Musiques de la version americaine...")
+        compose_soundtrack(disc, us, mods, tmp, log=lambda m: None, progress=progress)
+    else:
+        write_patched(disc, mods, tmp, log=log, progress=progress)
     os.replace(tmp, dst)
     if disc.kind == 'bin':   # matching .cue next to the new .bin
         base = os.path.splitext(disc.img.path)[0]
@@ -57,6 +63,19 @@ def patch(src, dst, log=print, progress=lambda f: None):
                 open(os.path.splitext(dst)[0] + '.cue', 'w', encoding='latin1').write(t)
                 break
     return len(mods)
+
+def choose(pygame, timeout=30):
+    """True = with the USA music. Gamepad: button 1 or 3 (B / circle side), keyboard: Space. Default after 30 s: Remix only."""
+    if not pygame:
+        try: return input("Musiques US ? (o/N) ").strip().lower().startswith('o')
+        except EOFError: return False
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        for ev in pygame.event.get():
+            if ev.type == pygame.JOYBUTTONDOWN: return ev.button in (1, 3)
+            if ev.type == pygame.KEYDOWN: return ev.key == pygame.K_SPACE
+        time.sleep(0.05)
+    return False
 
 def main():
     try:
@@ -86,20 +105,25 @@ def main():
                 pygame.draw.rect(scr, (90, 170, 255), (W // 20, H - H // 6, int(bw * state['p']), H // 24), border_radius=8)
             pygame.display.flip(); pygame.event.pump()
     say("Recherche de Cool Boarders 2 (PAL) d'origine...")
-    orig, done = find_sources(say)
+    orig, done, usa = find_sources(say)
     if not orig:
         if done: say("OK : le Remix est deja la : " + done[0])
         else: say("Erreur : Cool Boarders 2 (PAL) d'origine introuvable dans /userdata/roms/psx (.chd ou .bin)")
     else:
         s, disc = orig[0]; ext = '.chd' if disc.kind == 'chd' else '.bin'
-        dst = os.path.join(os.path.dirname(s), OUT_BASE + ext)
+        us = None
+        if usa and disc.kind == 'chd':   # the player also has the USA disc: offer its soundtrack
+            say("Version americaine trouvee : " + os.path.basename(usa[0][0]))
+            say("Bouton A (ou Entree) : Remix seul   |   Bouton B (ou Espace) : Remix + musiques US")
+            if choose(pygame): us = usa[0][1]
+        dst = os.path.join(os.path.dirname(s), OUT_BASE + (' (musiques US)' if us else '') + ext)
         say("Source : " + s); say("Creation : " + dst)
         last = [0]
         def prog(x):
             state['p'] = x
             if pygame and x - last[0] > 0.01: last[0] = x; draw()
         try:
-            n = patch(disc, dst, log=say, progress=prog)
+            n = patch(disc, dst, log=say, progress=prog, us=us)
             say("OK : termine (%d secteurs modifies). Mets a jour la liste des jeux." % n)
         except Exception as e:
             say("Erreur : " + str(e))
@@ -113,5 +137,6 @@ def main():
         pygame.quit()
 
 if __name__ == '__main__':
-    if len(sys.argv) == 3: patch(sys.argv[1], sys.argv[2])
+    if len(sys.argv) == 4: patch(sys.argv[1], sys.argv[2], us=Disc(sys.argv[3]))   # source.chd dest.chd usa.chd
+    elif len(sys.argv) == 3: patch(sys.argv[1], sys.argv[2])
     else: main()
