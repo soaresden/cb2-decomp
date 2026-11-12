@@ -1,26 +1,46 @@
-# Remontée en Free Style (en cours)
+# Remontée en Free Style (mod `lift`, Remix v21)
 
-Idée : un poteau juste avant l'arrivée ; on fonce dedans et on remonte tout en haut, posé juste devant le départ, pour
-enchaîner les descentes (pratique en time attack, sans repasser par les menus).
+Juste avant l'arrivée en Free Style, le joueur repart instantanément du haut de la piste, pour enchaîner les descentes
+sans repasser par les menus. C'est le « Restart » du menu pause du jeu, déclenché automatiquement : pas de
+chargement, porte de départ puis READY / GO (environ 5 s), chrono remis à zéro. Le temps de la descente n'est pas
+enregistré (on ne franchit pas l'arrivée).
 
-## Ce qu'on sait (émulateur, White Resort, Remix complet)
+## Ce qu'on a trouvé (FREE.BIN, White Resort)
 
-- Position du joueur (X, Y, Z ; Y vers le bas, Z décroît en descendant) : plusieurs copies dans le tas, p. ex.
-  0x8018D46C (puis 0x8018D4C4, 0x8018D574, 0x8019204C… ; 0x80191EB0… = historique décalé, traînée / fantôme).
-  Départ après « Restart » : (-306, 1694, -5354).
-- Chrono de la descente : 0x800A2D08 (BSS de FREE), remis à 0 par « Restart ».
-- Le menu pause (Continue / Restart / Select / Exit, chaînes à 0x80096540…, pointeurs rangés en 0x800A4178…) :
-  **« Restart » remet le joueur au départ instantanément, sans chargement**, avec la porte de départ et READY / GO.
-  C'est la routine à réutiliser.
-- Indicateur de pause probable : 0x8009ED34 (0 en course, 1 en pause) ; le curseur du menu pause n'est pas encore
-  trouvé (ni en mot de 16 ni de 32 bits dans les données de FREE : peut-être dans le tas ou en octet).
+| Adresse | Rôle |
+|---|---|
+| 0x800A3DA0 | pointeur vers la structure du joueur |
+| joueur +0x2C | position X, Y, Z (Y vers le bas) |
+| joueur +0xEC (+0x94) | tronçon de piste courant |
+| joueur +0xCB6 | checkpoints passés (1 au départ, 3 dans la dernière section, 4 = arrivée) |
+| joueur +0xE10 + 4 × n | temps de passage aux checkpoints |
+| 0x800A3D78 | tableau des tronçons (56 octets chacun : position X, Y, Z…) ; le mot juste avant = leur nombre (148 sur White Resort) |
+| 0x8009E234 | code de sortie de la boucle de course : 1 = Restart, 2 = Select, 3 = Exit (menu pause, table de sauts 0x80096590), 4 = TIME OVER, 5 = arrivée |
+| 0x800A2D08 | chrono affiché |
+| 0x8004F6C4 | compteur d'images global (exe) |
 
-## Plan
+L'arrivée est un objet de la piste (comme les checkpoints) : sa traversée fait passer +0xCB6 à 4, puis
+`func_8005FE2C` (mise à jour des checkpoints, appelée à chaque image à 0x8005D04C) écrit le code 5. Sur White Resort,
+elle est au tronçon 145 sur 148.
 
-1. Trouver le code qui exécute « Restart » (lecture du curseur de pause, puis appel de la remise à zéro).
-2. Crochet par image en Free Style : si le joueur dépasse un point juste avant l'arrivée (Z de la piste, par piste),
-   appeler cette remise à zéro, puis sauter le compte à rebours (garder la vitesse si possible).
-3. Repère visuel : réutiliser un objet existant de la piste (panneau, drapeau) plutôt qu'un modèle neuf ; à défaut,
-   un message à l'écran (« LIFT »).
-4. Time attack : le temps de la descente est-il enregistré si on ne franchit pas l'arrivée ? Sinon, déclencher la
-   remontée juste après la ligne d'arrivée.
+## Le mod
+
+`remix/lift.py` : à 0x8005D04C, l'appel à `func_8005FE2C` passe par une petite routine (68 octets, à la fin de
+FREE.BIN, dans le reste de son dernier secteur ; le début du tas de FREE, entrée 7 de la table de l'exe à 0x800100CC,
+passe après elle) :
+
+    si code de sortie == 0 et checkpoints == 3 et tronçon >= nombre de tronçons - 6 : code de sortie = 1
+
+puis saute à `func_8005FE2C`. Sur une piste dont l'arrivée serait plus haut que « fin − 6 », l'arrivée se déclenche
+avant et la course finit normalement.
+
+Vérifié dans l'émulateur avec une version de test déclenchée au tronçon 15 : retour au tronçon 1 à chaque passage, en
+boucle ; avec la vraie valeur, le Free Style se charge et la descente tourne (code chargé, crochet en place).
+
+## Pistes pour la suite
+
+- Sauter le compte à rebours : il n'est pas réglé par un simple compteur (rien ne change régulièrement dans les
+  données de FREE pendant READY / GO) ; probablement piloté par l'animation de la porte de départ.
+- Poteau visible : l'arrivée et les checkpoints sont des objets de piste (types 0x19… dans le code de collision,
+  table de sauts 0x80097428) ; ajouter un objet « poteau » demande de comprendre le format des objets des pistes.
+- Option « après l'arrivée » : laisser le code 5 (temps et record) puis enchaîner sur la remontée.

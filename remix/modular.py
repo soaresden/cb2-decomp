@@ -48,6 +48,9 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('progress', 'Progression dans le jeu', 'In-game progress',
      'SELECT maintenu sur l’écran des modes : riders cachés, Mirror, Hard, Hard + Mirror, planches SPECIAL, trophées et pourcentage.',
      'Hold SELECT on the mode select screen: hidden riders, Mirror, Hard, Hard + Mirror, SPECIAL boards, trophies and percentage.'),
+    ('lift', 'Remontée en Free Style', 'Free Style lift',
+     'Juste avant l’arrivée en Free Style, retour instantané en haut de la piste pour enchaîner les descentes (avec READY / GO).',
+     'Just before the Free Style finish, instant return to the top of the course to chain runs (with READY / GO).'),
 ]
 INPUT = 'input'   # shared pad hook (needed by 'max' and 'air')
 
@@ -61,13 +64,14 @@ EXE_MAP = [   # (lo, hi, feature) in the executable
     (0x8001CEFC, 0x8001CF00, 'riders'), (0x8001CFE0, 0x8001CFE0, 'riders'), (0x8001D078, 0x8001D078, 'riders'), (0x8001D104, 0x8001D10C, 'riders'),
     (0x8004F920, 0x8004F93F, 'outfits'), (0x8004F96C, 0x8004F97F, 'outfits'), (0x8004F9E0, 0x8004F9EF, 'outfits'),
     (0x8001D140, 0x8001D140, 'outfits'), (0x8001003C, 0x8001003C, 'outfits'), (0x800100B8, 0x800100B8, 'outfits'),
-    (0x800100B4, 0x800100B4, 'progress'),
+    (0x800100B4, 0x800100B4, 'progress'), (0x800100CC, 0x800100CC, 'lift'),
 ]
 MODE_MAP = [(0x800643B4, 0x800643B4, 'progress'), (0x800832C8, 0x800836A8, 'progress')]
 MS_MAP = [(0x80063EA8, 0x80063EA8, 'unlock'), (0x8005B0C4, 0x8005B0C4, 'special'), (0x80069D00, 0x8006C910, 'special'),
           (0x800614B8, 0x800614B8, 'max'), (0x800626E4, 0x800626E4, 'max'), (0x80063FC8, 0x80063FCC, 'riders'), (0x80064044, 0x80064044, 'riders'),
           (0x800605B4, 0x80062180, 'outfits'), (0x800640EC, 0x80064210, 'outfits')]
-SBC_MAP = {'/SBC1.BIN': [(0x800832DC, 0x800832DC, 'riders'), (0x8008D8C8, 0x8008D910, 'riders')],
+SBC_MAP = {'/FREE.BIN': [(0x8005D04C, 0x8005D04C, 'lift'), (0x800A4198, 0x800A4800, 'lift')],
+           '/SBC1.BIN': [(0x800832DC, 0x800832DC, 'riders'), (0x8008D8C8, 0x8008D910, 'riders')],
            '/SBC2.BIN': [(0x8005FF70, 0x8005FF70, 'ramming'), (0x80064D70, 0x80064D70, 'riders'), (0x800666EC, 0x800666F0, 'riders'),
                          (0x80066CB4, 0x80066CB8, 'riders'), (0x80090300, 0x80090420, 'riders'), (0x800847AC, 0x800847AC, 'riders'), (0x800902A8, 0x800902F0, 'riders')],
            '/TM.BIN': [(0x80075738, 0x80075758, 'bam'), (0x80074CFC, 0x80074CFC, 'bam'), (0x80094F18, 0x80095538, 'bam')]}
@@ -223,7 +227,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     def buf(p):
         if p not in files: files[p] = bytearray(orig(p))
         return files[p]
-    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', INPUT, 'input_noair') if f in feats]
+    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', INPUT, 'input_noair') if f in feats]
     for feat in order:
         for op in pkg['ops'][feat]:
             t = op[0]
