@@ -7,7 +7,7 @@
 
 Same algorithms as the web site's disc.js / chdpatch.js, so both produce the same files.
 """
-import lzma, struct, zlib
+import lzma, re, struct, zlib
 
 SEC, FRAME = 2352, 2448
 SYNC = bytes([0] + [255] * 10 + [0])
@@ -151,6 +151,99 @@ def _lzma_raw(src, size):
 
 def _inflate(src): return zlib.decompress(bytes(src), -15)
 
+
+# ------------------------------------------------------------------ FLAC (codec cdfl: CD audio, and some data hunks)
+class _FB:
+    def __init__(s, b): s.b = b; s.p = 0
+    def read(s, n):
+        v = 0
+        while n:
+            i = s.p >> 3
+            if i >= len(s.b): raise ValueError('FLAC : fin de données inattendue')
+            off = s.p & 7; take = min(8 - off, n)
+            v = (v << take) | ((s.b[i] >> (8 - off - take)) & ((1 << take) - 1)); s.p += take; n -= take
+        return v
+    def signed(s, n):
+        v = s.read(n); return v - (1 << n) if n and v >> (n - 1) else v
+    def unary(s):
+        q = 0
+        while True:
+            i = s.p >> 3
+            if i >= len(s.b): raise ValueError('FLAC : fin de données inattendue')
+            off = s.p & 7; byte = (s.b[i] << off) & 0xff
+            if byte:
+                z = 8 - byte.bit_length(); q += z; s.p += z + 1; return q
+            q += 8 - off; s.p += 8 - off
+_BS = [0, 192, 576, 1152, 2304, 4608, 0, 0, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768]
+_SS = [16, 8, 12, 0, 16, 20, 24, 0]
+def _residual(br, out, n, order):
+    method = br.read(2); pb = 4 if method == 0 else 5; esc = 15 if method == 0 else 31; po = br.read(4)
+    i = order
+    for p in range(1 << po):
+        cnt = (n >> po) - (order if p == 0 else 0); k = br.read(pb)
+        if k == esc:
+            bits = br.read(5)
+            for _ in range(cnt): out[i] = br.signed(bits); i += 1
+            continue
+        for _ in range(cnt):
+            u = (br.unary() << k) | (br.read(k) if k else 0); out[i] = -((u + 1) >> 1) if u & 1 else u >> 1; i += 1
+def _subframe(br, n, bps):
+    br.read(1); typ = br.read(6); wasted = 0
+    if br.read(1): wasted = br.unary() + 1
+    bps -= wasted; s = [0] * n
+    if typ == 0: s = [br.signed(bps)] * n
+    elif typ == 1: s = [br.signed(bps) for _ in range(n)]
+    elif 8 <= typ <= 12:
+        o = typ - 8
+        for i in range(o): s[i] = br.signed(bps)
+        _residual(br, s, n, o)
+        for i in range(o, n):
+            if o == 1: s[i] += s[i-1]
+            elif o == 2: s[i] += 2*s[i-1] - s[i-2]
+            elif o == 3: s[i] += 3*s[i-1] - 3*s[i-2] + s[i-3]
+            elif o == 4: s[i] += 4*s[i-1] - 6*s[i-2] + 4*s[i-3] - s[i-4]
+    elif typ >= 32:
+        o = typ - 31
+        for i in range(o): s[i] = br.signed(bps)
+        prec = br.read(4) + 1; shift = br.signed(5); c = [br.signed(prec) for _ in range(o)]
+        _residual(br, s, n, o)
+        for i in range(o, n):
+            acc = 0
+            for j in range(o): acc += c[j] * s[i-1-j]
+            s[i] += acc >> shift
+    else: raise ValueError('FLAC : sous-trame inconnue %d' % typ)
+    if wasted: s = [x << wasted for x in s]
+    return s
+def flac_decode(src, total):
+    """FLAC frames (no 'fLaC' header) -> (list of int16 samples L R L R ..., bytes consumed)"""
+    br = _FB(src); pcm = []
+    while len(pcm) < total * 2:
+        if br.read(14) != 0x3ffe: raise ValueError('FLAC : synchro de trame introuvable')
+        br.read(2); bsc = br.read(4); src_ = br.read(4); ch = br.read(4); ssc = br.read(3); br.read(1)
+        x = br.read(8); extra = 0
+        while x & 0x80: extra += 1; x = (x << 1) & 0xff
+        for _ in range(1, extra): br.read(8)
+        n = _BS[bsc]
+        if bsc == 6: n = br.read(8) + 1
+        elif bsc == 7: n = br.read(16) + 1
+        if src_ == 12: br.read(8)
+        elif src_ in (13, 14): br.read(16)
+        br.read(8)
+        if not n or ch > 10: raise ValueError('FLAC : en-tête de trame invalide')
+        bps = _SS[ssc] or 16; nch = ch + 1 if ch < 8 else 2
+        chans = [_subframe(br, n, bps + (1 if (ch == 8 and c == 1) or (ch == 9 and c == 0) or (ch == 10 and c == 1) else 0)) for c in range(nch)]
+        br.p = (br.p + 7) & ~7; br.read(16)
+        L = chans[0]; R = chans[1] if nch > 1 else chans[0]
+        if ch == 8: R = [a - b for a, b in zip(L, chans[1])]
+        elif ch == 9: L = [a + b for a, b in zip(chans[0], chans[1])]
+        elif ch == 10:
+            L = []; R = []
+            for m, sd in zip(chans[0], chans[1]):
+                m = (m << 1) | (sd & 1); L.append((m + sd) >> 1); R.append((m - sd) >> 1)
+        m = min(n, total - len(pcm) // 2)
+        for i in range(m): pcm.append(L[i]); pcm.append(R[i])
+    return pcm, br.p >> 3
+
 # ------------------------------------------------------------------ images
 class CHD:
     kind = 'chd'
@@ -181,7 +274,16 @@ class CHD:
             cbase = int.from_bytes(src[eccb:eccb + clb], 'big')
             if codec == 'cdlz': base = _lzma_raw(src[hdrb:hdrb + cbase], n * SEC)
             elif codec == 'cdzl': base = _inflate(src[hdrb:hdrb + cbase])
-            else: raise ValueError('codec CHD non géré : %s (recompresse le CHD avec chdman en cdlz/cdzl)' % codec)
+            elif codec == 'cdfl':   # FLAC, no ECC flags / length header; samples rebuilt as big-endian bytes
+                pcm, used = flac_decode(src, n * SEC // 4)
+                base = struct.pack('>%dh' % len(pcm), *pcm)
+                fr = bytearray(hb)
+                for k in range(n): fr[k * FRAME:k * FRAME + SEC] = base[k * SEC:(k + 1) * SEC]
+                out = (bytes(fr), bytes(eccb), src[used:], codec)
+                if len(s.cache) > 64: s.cache.clear()
+                s.cache[i] = out
+                return out
+            else: raise ValueError('codec CHD non géré : %s' % codec)
             fr = bytearray(hb)
             for k in range(n): fr[k * FRAME:k * FRAME + SEC] = base[k * SEC:(k + 1) * SEC]
             out = (bytes(fr), src[:eccb], src[hdrb + cbase:], codec)
@@ -345,3 +447,138 @@ def patch_hunks(img, hunks, dst, progress=lambda f: None):
                     blk = img._read(a, min(b, a + (1 << 22))); out.write(blk); a += len(blk); done += len(blk); progress(done / total)
             else: out.write(p); done += len(p); progress(done / total)
         out.write(mhdr); out.write(bits)
+
+# ------------------------------------------------------------------ soundtrack swap (music of another disc)
+def read_meta(img):
+    """CHD metadata entries -> [(tag, flags, data)] in file order"""
+    out = []; mo = struct.unpack('>Q', img.head[48:56])[0]
+    while mo:
+        h = img._read(mo, mo + 16); tag = h[:4]; flags = h[4]; ln = int.from_bytes(h[5:8], 'big'); nxt = struct.unpack('>Q', h[8:16])[0]
+        out.append((tag, flags, img._read(mo + 16, mo + 16 + ln))); mo = nxt
+    return out
+
+def cht2(data):
+    s = data.split(b'\0')[0].decode('latin1')
+    return {k: v for k, v in (x.split(':', 1) for x in s.split())}
+
+# Cool Boarders 2: which track of the USA disc plays where the European game expects BGMx (from the play calls of
+# both versions: menus 2 and 3 identical, 13/16/17/18 in Europe = 14/17/18/19 in the USA, the race tracks 4..12 in order)
+CB2_US_MUSIC = {k: (k if k <= 12 else k + 1) for k in range(2, 21)}
+
+def compose_soundtrack(eu, us, mods, dst, mapping=CB2_US_MUSIC, log=lambda m: None, progress=lambda f: None):
+    """New CHD = data track of `eu` (with the user-data sectors `mods` replaced, e.g. the Remix) + all audio tracks of
+    `us`, copied as they are (still compressed). The /CDDA/BGMx.DA records of `eu` are pointed at the `us` tracks given
+    by `mapping` (European BGM number -> USA track number, BGMA = 2). Both must be CHD (Disc objects)."""
+    A, B = eu.img, us.img
+    if A.kind != 'chd' or B.kind != 'chd': raise ValueError('les deux disques doivent être des CHD')
+    if A.hunkbytes != B.hunkbytes: raise ValueError('CHD de géométries différentes')
+    if A.codecs != B.codecs: raise ValueError('CHD compressés différemment (recompresse-les avec la même version de chdman)')
+    ma, mb = read_meta(A), read_meta(B)
+    ta = [(t, f, cht2(d)) for t, f, d in ma if t in (b'CHT2', b'CHTR')]; tb = [(t, f, cht2(d)) for t, f, d in mb if t in (b'CHT2', b'CHTR')]
+    a1 = int(ta[0][2]['FRAMES']); b1 = int(tb[0][2]['FRAMES'])
+    start = b1 + (-b1) % 4                                   # first CHD frame of the USA audio
+    fph = A.fph
+    if start % fph or a1 > b1: raise ValueError('disposition des pistes inattendue (piste de données US %d secteurs)' % b1)
+    H0 = start // fph                                        # first audio hunk
+    # ---- /CDDA records of the European disc -> USA tracks
+    us_rec = {p.split('/')[-1]: (l, s) for p, (l, s, d) in us.files.items() if p.startswith('/CDDA/')}
+    mods = dict(mods)
+    def user(l):
+        m = mods.get(l)
+        return bytearray(m[1] if isinstance(m, tuple) else m) if m is not None else bytearray(eu.user(l))
+    dlba = eu.files['/CDDA'][0]; dsec = -(-eu.files['/CDDA'][1] // 2048)
+    for k in range(dsec):
+        d = user(dlba + k); i = 0
+        while i < 2048 and d[i]:
+            L = d[i]; nl = d[i + 32]; name = d[i + 33:i + 33 + nl].decode('latin1').split(';')[0]
+            if name.startswith('BGM') and name.endswith('.DA'):
+                n = ord(name[3]) - ord('A') + 2; m = mapping.get(n)
+                src = 'BGM%s.DA' % chr(ord('A') + m - 2) if m else None
+                if src in us_rec:
+                    l, s = us_rec[src]
+                    d[i + 2:i + 10] = struct.pack('<I', l) + struct.pack('>I', l); d[i + 10:i + 18] = struct.pack('<I', s) + struct.pack('>I', s)
+                    log('%s -> piste US %s' % (name, src))
+            i += L
+        old = mods.get(dlba + k)
+        mods[dlba + k] = (old[0], bytes(d)) if isinstance(old, tuple) else bytes(d)
+    # ---- data hunks of the European disc: changed ones rebuilt (uncompressed), the rest copied as stored
+    empty = bytearray(SEC)
+    new = {}                                                 # hunk -> raw bytes
+    for l in sorted(mods):
+        hi, f = divmod(l, fph)
+        if hi not in new: new[hi] = A.raw_hunk(hi)
+        h = new[hi]; h[f * FRAME:f * FRAME + SEC] = _patch_sector(h[f * FRAME:f * FRAME + SEC], mods[l])
+    for hi in range(a1 // fph, H0):                          # hunks where the data track grows to the USA length
+        h = new.get(hi) or A.raw_hunk(hi); new[hi] = h
+        for f in range(fph):
+            fr = hi * fph + f
+            if fr < a1: continue
+            if fr < b1:                                       # empty mode 2 form 1 sector
+                s = bytearray(SEC); s[0:12] = SYNC; a = fr + 150
+                s[12:16] = bytes([(a // 4500) // 10 * 16 + (a // 4500) % 10, ((a // 75) % 60) // 10 * 16 + (a // 75) % 60 % 10, (a % 75) // 10 * 16 + a % 75 % 10, 2])
+                fix_sector(s); h[f * FRAME:f * FRAME + SEC] = s
+            else: h[f * FRAME:f * FRAME + SEC] = empty
+            h[f * FRAME + SEC:(f + 1) * FRAME] = bytes(FRAME - SEC)
+    # ---- the map: hunks 0..H0-1 from A, H0.. from B
+    N = B.M['n']; typ = [0] * N; ln = [0] * N; off = [0] * N; crc = [0] * N; parts = []
+    hdr = bytearray(A.head); first = len(hdr); cur = first
+    def root(M, t):
+        k = 0
+        while M['typ'][t] == 5 and k < 64: t = M['off'][t]; k += 1
+        return t
+    for i in range(N):
+        if i in new:
+            d = bytes(new[i]); typ[i] = 4; ln[i] = A.hunkbytes; off[i] = cur; crc[i] = crc16(d); parts.append(d); cur += len(d); continue
+        img, M, lo, hi_ = (A, A.M, 0, H0) if i < H0 else (B, B.M, H0, N)
+        t = M['typ'][i]; r = i
+        if t == 5:
+            r = root(M, M['off'][i])
+            if lo <= r < hi_ and r not in new and M['off'][i] < i and lo <= M['off'][i] < hi_:
+                typ[i] = 5; off[i] = M['off'][i]; continue
+            t = M['typ'][r]
+        typ[i] = t; ln[i] = M['ln'][r]; crc[i] = M['crc'][r]; off[i] = cur
+        parts.append((img, M['off'][r], M['off'][r] + M['ln'][r])); cur += M['ln'][r]
+    # ---- metadata: track 1 from the European disc (grown to the USA length), audio tracks from the USA disc
+    meta = []
+    t, f, _ = ta[0]
+    for tag, flags, data in ma:
+        if tag in (b'CHT2', b'CHTR'): continue
+        meta.append((tag, flags, data))
+    d1 = [d for tg, fl, d in ma if tg in (b'CHT2', b'CHTR')][0].split(b'\0')[0].decode('latin1')
+    d1 = re.sub(r'FRAMES:\d+', 'FRAMES:%d' % b1, d1).encode('latin1') + b'\0'
+    meta.append((t, f, d1))
+    meta += [(tg, fl, d) for tg, fl, d in mb if tg in (b'CHT2', b'CHTR')][1:]
+    metablob = bytearray(); metaoff = cur
+    for k, (tag, flags, data) in enumerate(meta):
+        nxt = 0 if k == len(meta) - 1 else metaoff + len(metablob) + 16 + len(data)
+        metablob += tag + bytes([flags]) + len(data).to_bytes(3, 'big') + nxt.to_bytes(8, 'big') + data
+    cur += len(metablob)
+    # ---- map encoding (16 codes of 4 bits, same as patch_hunks)
+    lb, sb = 0, 0
+    for i in range(N):
+        if typ[i] <= 3:
+            while ln[i] >= (1 << lb): lb += 1
+        if typ[i] == 5:
+            while off[i] >= (1 << sb): sb += 1
+    bw = _BW(); bw.write(1, 4); bw.write(4, 4); bw.write(13, 4)
+    for i in range(N): bw.write(typ[i], 4)
+    for i in range(N):
+        if typ[i] <= 3: bw.write(ln[i], lb); bw.write(crc[i], 16)
+        elif typ[i] == 4: bw.write(crc[i], 16)
+        else: bw.write(off[i], sb)
+    bits = bw.bytes()
+    mapcrc = crc16(_rawmap(typ, [A.hunkbytes if typ[i] == 4 else ln[i] for i in range(N)], off, crc))
+    mhdr = len(bits).to_bytes(4, 'big') + first.to_bytes(6, 'big') + mapcrc.to_bytes(2, 'big') + bytes([lb, sb, B.M['pb'], 0])
+    hdr[32:40] = (N * A.hunkbytes).to_bytes(8, 'big'); hdr[40:48] = cur.to_bytes(8, 'big'); hdr[48:56] = metaoff.to_bytes(8, 'big')
+    total = cur + 16 + len(bits); done = 0
+    with open(dst, 'wb') as out:
+        out.write(hdr)
+        for p in parts:
+            if isinstance(p, tuple):
+                img, a, b = p
+                while a < b:
+                    blk = img._read(a, min(b, a + (1 << 22))); out.write(blk); a += len(blk); done += len(blk)
+            else: out.write(p); done += len(p)
+            progress(done / total)
+        out.write(metablob); out.write(mhdr); out.write(bits)
+    log('%d blocs : %d du disque européen, %d du disque américain' % (N, H0, N - H0))

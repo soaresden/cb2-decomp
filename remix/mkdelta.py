@@ -58,6 +58,6 @@ def main(SRC,DST,out):
         for o in ops:
             if o[0]==0: body+=struct.pack('<BHI',0,o[1],o[2])
             else: body+=struct.pack('<BH',1,len(o[1]))+o[1]
-    gz=gzip.compress(bytes(body),9); open(out,'wb').write(gz)
+    gz=gzip.compress(bytes(body),9,mtime=0); open(out,'wb').write(gz)
     print('sectors',len(secs),'literal bytes',nlit,'copied bytes',ncopy,'patch',len(body),'gz',len(gz))
 if __name__=='__main__': main(*sys.argv[1:4])   # original.bin remix.bin out.delta.gz

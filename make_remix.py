@@ -3,6 +3,7 @@
 
     python3 make_remix.py "Cool Boarders 2 (Europe).chd"            -> build/Cool Boarders 2 Remix (Europe).chd
     python3 make_remix.py original.chd -o my_remix.chd --release     -> also the delta patch, the Batocera patcher
+    python3 make_remix.py original.chd --us-music "Cool Boarders 2 (USA).chd"   -> with the music of the USA version
                                                                         and patches.js for the web site
 
 Input: CHD (v5, cdlz/cdzl) or BIN (MODE2/2352, single file) of Cool Boarders 2 PAL (SCES-00992), unmodified.
@@ -21,10 +22,13 @@ def log(*a): print(*a, flush=True)
 
 def extract(disc, fs_dir, track_bin):
     """all ISO9660 files -> fs_dir, data track (as stored, MODE2/2352) -> track_bin; returns the sector count"""
-    n = struct.unpack_from('<I', disc.user(16), 80)[0]          # volume space size = data track length
+    n = struct.unpack_from('<I', disc.user(16), 80)[0]          # volume space size (BIN source)
+    if disc.kind == 'chd':                                      # CHD: length of track 1 from the track list
+        n = next(int(cb2disc.cht2(dt)['FRAMES']) for tg, _, dt in cb2disc.read_meta(disc.img) if tg in (b'CHT2', b'CHTR'))
     for p, (lba, size, is_dir) in sorted(disc.files.items()):
         dst = os.path.join(fs_dir, p.lstrip('/'))
         if is_dir: os.makedirs(dst, exist_ok=True); continue
+        if p.startswith('/CDDA/'): continue                      # entries pointing at the audio tracks
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         with open(dst, 'wb') as f: f.write(disc.read_file(p))
     with open(track_bin, 'wb') as f:
@@ -50,6 +54,7 @@ def main():
     ap.add_argument('-o', '--output', help='fichier de sortie (.chd si la source est un CHD, sinon .bin)')
     ap.add_argument('--release', action='store_true', help='produit aussi le patch delta, le patcheur Batocera et patches.js')
     ap.add_argument('--keep', action='store_true', help='garde work/ (fichiers extraits) pour une prochaine fois')
+    ap.add_argument('--us-music', metavar='USA.chd', help='met les musiques de ta version américaine (CHD de Cool Boarders 2 USA)')
     a = ap.parse_args()
     t0 = time.time()
     disc = cb2disc.Disc(a.source)
@@ -73,7 +78,13 @@ def main():
     log('   %d secteurs modifiés' % len(mods))
     log('3/3 Écriture de %s ...' % out)
     tmp = out + '.part'
-    cb2disc.write_patched(disc, mods, tmp, log=lambda m: log('   ' + m))
+    if a.us_music:
+        if disc.kind != 'chd': sys.exit('Les musiques US demandent un jeu européen en .chd.')
+        us = cb2disc.Disc(a.us_music)
+        if '/SCUS_943.58' not in us.files: sys.exit("%s n'est pas Cool Boarders 2 USA (SCUS-94358)." % a.us_music)
+        cb2disc.compose_soundtrack(disc, us, mods, tmp, log=lambda m: log('   ' + m))
+    else:
+        cb2disc.write_patched(disc, mods, tmp, log=lambda m: log('   ' + m))
     os.replace(tmp, out)
     if ext == '.bin':
         open(os.path.splitext(out)[0] + '.cue', 'w').write('FILE "%s" BINARY\n  TRACK 01 MODE2/2352\n    INDEX 01 00:00:00\n' % os.path.basename(out))
