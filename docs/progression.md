@@ -41,24 +41,24 @@ Onglet « Progression » : ouvre la carte mémoire (.srm de pcsx_rearmed sur Bat
 .psv), coche ce qui est gagné et donne le pourcentage (38 objectifs : 3 riders, Mirror, Hard, 3 planches, 30 trophées).
 À valider avec une vraie sauvegarde de joueur (l'ordre temps / figures / total des trophées surtout).
 
-## Page dans le jeu (mod `progress`, Remix v19)
+## Page dans le jeu (mod `progress`, Remix v20)
 
 Sur l'écran de sélection de mode, **maintenir SELECT** affiche un panneau en 3 colonnes (nom, état, ce qu'il faut
-faire) :
+faire), en anglais comme le reste du jeu :
 
 | Ligne | État | Aide affichée |
 |---|---|---|
-| PROGRESSION | xx % | |
-| BOSS | OK / -- | 1ER COMPET. MIRROR |
+| PROGRESS | xx % | |
+| BOSS | OK / -- | 1ST IN MIRROR COMP. |
 | GRAY | OK / -- | HALFPIPE 37.6/MASTER |
-| SNOWMAN | OK / -- | 1ER HARD/30 TROPHEES |
-| MIRROR | OK / -- | PODIUM COMPETITION |
-| HARD | OK / -- | PODIUM EN MIRROR |
-| HARD+MIRROR | OK / -- | L1+R1+X (AVEC HARD) |
-| PISTES | n/10 | PODIUM COMPETITION |
-| P. MIRROR | n/10 | PODIUM EN MIRROR |
-| SPECIAL | n/3 | RECORDS FREE STYLE |
-| TROPHEES | n/30 | BATS LE RECORD/PISTE |
+| SNOWMAN | OK / -- | 1ST HARD/30 TROPHIES |
+| MIRROR | OK / -- | COMPETITION PODIUM |
+| HARD | OK / -- | MIRROR COMP. PODIUM |
+| HARD+MIRROR | OK / -- | L1+R1+X (WITH HARD) |
+| COURSES | n/10 | COMPETITION PODIUM |
+| MIRROR CRS | n/10 | MIRROR COMP. PODIUM |
+| SPECIAL | n/3 | FREE STYLE RECORDS |
+| TROPHIES | n/30 | BEAT EACH RECORD |
 
 Pistes : `0x8005743C` = nombre de pistes ouvertes au Free Style (3 au départ, 10 après un podium en Compétition),
 `0x8005743E` = en Mirror (3 après ce podium, 10 après un podium en Compétition Mirror). Le pourcentage compte 40

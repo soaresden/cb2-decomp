@@ -13,18 +13,18 @@ TEXT, FONT, CLUT, PAD = 0x80012ca0, 0x80070648, 0x733e, 0x800832ba
 SELECT = 0x100
 OTOFF = 0
 X0, X1, X2, Y0, DY = -152, -68, -12, -96, 13   # label / state / hint columns; (0, 0) is near the centre of the screen
-# (label, address & 0xffff in 0x8005xxxx, mask, value string, hint): mask 1 with a value = title colour
-LINES = [('PROGRESSION', 0, 1, 'pct', ''),
-         ('BOSS', 0x7440, 0x10, None, '1ER COMPET. MIRROR'),
+# (label, address & 0xffff in 0x8005xxxx, mask, value string, hint) -- in English, like the game: mask 1 with a value = title colour
+LINES = [('PROGRESS', 0, 1, 'pct', ''),
+         ('BOSS', 0x7440, 0x10, None, '1ST IN MIRROR COMP.'),
          ('GRAY', 0x7440, 0x20, None, 'HALFPIPE 37.6/MASTER'),
-         ('SNOWMAN', 0x7440, 0x40, None, '1ER HARD/30 TROPHEES'),
-         ('MIRROR', 0x7444, 0xffff, None, 'PODIUM COMPETITION'),
-         ('HARD', 0x7446, 0xffff, None, 'PODIUM EN MIRROR'),
-         ('HARD+MIRROR', 0x7446, 0xffff, None, 'L1+R1+X (AVEC HARD)'),
-         ('PISTES', 0, 0, 'pis', 'PODIUM COMPETITION'),
-         ('P. MIRROR', 0, 0, 'pim', 'PODIUM EN MIRROR'),
-         ('SPECIAL', 0, 0, 'spc', 'RECORDS FREE STYLE'),
-         ('TROPHEES', 0, 0, 'tro', 'BATS LE RECORD/PISTE')]
+         ('SNOWMAN', 0x7440, 0x40, None, '1ST HARD/30 TROPHIES'),
+         ('MIRROR', 0x7444, 0xffff, None, 'COMPETITION PODIUM'),
+         ('HARD', 0x7446, 0xffff, None, 'MIRROR COMP. PODIUM'),
+         ('HARD+MIRROR', 0x7446, 0xffff, None, 'L1+R1+X (WITH HARD)'),
+         ('COURSES', 0, 0, 'pis', 'COMPETITION PODIUM'),
+         ('MIRROR CRS', 0, 0, 'pim', 'MIRROR COMP. PODIUM'),
+         ('SPECIAL', 0, 0, 'spc', 'FREE STYLE RECORDS'),
+         ('TROPHIES', 0, 0, 'tro', 'BEAT EACH RECORD')]
 VALUES = [('pct', b'  0%\0'), ('pis', b'  0/10\0'), ('pim', b'  0/10\0'), ('spc', b'  0/3\0'), ('tro', b'  0/30\0')]
 TOTAL = 40          # 3 riders + Mirror + Hard + all courses + all mirror courses + 3 boards + 30 trophies
 
