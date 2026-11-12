@@ -41,21 +41,37 @@ Onglet « Progression » : ouvre la carte mémoire (.srm de pcsx_rearmed sur Bat
 .psv), coche ce qui est gagné et donne le pourcentage (38 objectifs : 3 riders, Mirror, Hard, 3 planches, 30 trophées).
 À valider avec une vraie sauvegarde de joueur (l'ordre temps / figures / total des trophées surtout).
 
-## Page dans le jeu (mod `progress`, Remix v18)
+## Page dans le jeu (mod `progress`, Remix v19)
 
-Sur l'écran de sélection de mode, **maintenir SELECT** affiche un panneau : PROGRESSION xx %, BOSS, GRAY, SNOWMAN,
-MIRROR, HARD, HARD+MIRROR (OK / --), SPECIAL n/3, TROPHEES n/30. Le pourcentage compte les mêmes 38 objectifs que le
-site (Hard + Mirror affiché mais pas compté).
+Sur l'écran de sélection de mode, **maintenir SELECT** affiche un panneau en 3 colonnes (nom, état, ce qu'il faut
+faire) :
+
+| Ligne | État | Aide affichée |
+|---|---|---|
+| PROGRESSION | xx % | |
+| BOSS | OK / -- | 1ER COMPET. MIRROR |
+| GRAY | OK / -- | HALFPIPE 37.6/MASTER |
+| SNOWMAN | OK / -- | 1ER HARD/30 TROPHEES |
+| MIRROR | OK / -- | PODIUM COMPETITION |
+| HARD | OK / -- | PODIUM EN MIRROR |
+| HARD+MIRROR | OK / -- | L1+R1+X (AVEC HARD) |
+| PISTES | n/10 | PODIUM COMPETITION |
+| P. MIRROR | n/10 | PODIUM EN MIRROR |
+| SPECIAL | n/3 | RECORDS FREE STYLE |
+| TROPHEES | n/30 | BATS LE RECORD/PISTE |
+
+Pistes : `0x8005743C` = nombre de pistes ouvertes au Free Style (3 au départ, 10 après un podium en Compétition),
+`0x8005743E` = en Mirror (3 après ce podium, 10 après un podium en Compétition Mirror). Le pourcentage compte 40
+objectifs (Hard + Mirror affiché mais pas compté), comme l'onglet Progression du site.
 
 Comment c'est fait (`remix/progress.py`) :
-- le code (991 octets) est ajouté à la fin de `MODE_SEL.BIN`, dans le reste de son dernier secteur (le fichier garde
-  ses 81 secteurs ; sa taille dans le répertoire passe à 0x287FF — une taille de 81 × 2048 exactement fait lire un
-  secteur de trop au chargeur et plante) ;
+- le code et les textes (1,4 Ko) sont ajoutés à la fin de `MODE_SEL.BIN`, qui passe à 82 secteurs : le fichier va
+  dans les derniers secteurs du film du générique `STAFFE.STR` (coupé de 0,5 s), comme MAIN_SEL pour les tenues ;
+  sa taille ne doit pas tomber pile sur un multiple de 2048 (le chargeur lit alors un secteur de trop et le jeu plante) ;
 - le tas de MODE_SEL commençait juste après le fichier (table des débuts de tas des overlays dans l'exe,
-  0x800100B0 + 4 × index) : l'entrée de MODE_SEL passe de 0x800832C8 à 0x800836A8 ;
+  0x800100B0 + 4 × index) : l'entrée de MODE_SEL passe de 0x800832C8 à 0x80083EA8 ;
 - crochet : la fonction de la télé (`func_80064200`) appelle `func_8002E228` (numéro du tampon d'affichage) à
   0x800643B4 ; l'appel passe par la routine, qui rend le même résultat ;
 - texte : routine du jeu `func_80012CA0` (police du menu 8×12 en VRAM (512,48), descripteur 0x80070648), primitives
-  dans un tampon à part à 0x801F2000 / 0x801F3000 (au-dessus du tas, qui s'arrête à 0x801F1E00), insérées en tête de
-  l'OT (entrée 0, devant tout), fond = un TILE bleu nuit ;
-- coordonnées centrées sur l'écran (décalage de dessin du menu).
+  dans un tampon à part de 2 × 8 Ko à 0x801F2000 / 0x801F4000 (au-dessus du tas, qui s'arrête à 0x801F1E00), insérées
+  en tête de l'OT (entrée 0, devant tout), fond = un TILE bleu nuit ; coordonnées centrées sur l'écran.

@@ -528,7 +528,12 @@ def apply(src,dst,verbose=True):
     # progress page code at the end of MODE_SEL (same sectors, larger size)
     import progress as _pg
     m2=get('/MODE_SEL.BIN'); assert _pg.ORG==OVL+len(m2); org_,blob_,_=_pg.block(); m2+=blob_
-    im.set_record('/MODE_SEL.BIN',size=len(m2))
+    n2=(len(m2)+2047)//2048
+    if n2>(im.files['/MODE_SEL.BIN'][1]+2047)//2048:     # one more sector: moves to the end of the credits movie (cut)
+        slba,ssz,_=im.files['/MOVIE/STAFFE.STR']; sn=ssz//2048; mlba=slba+sn-n2
+        im.set_record('/MOVIE/STAFFE.STR',size=(sn-n2)*2048)
+        write_blob(im,mlba,bytes(m2)); im.set_record('/MODE_SEL.BIN',lba=mlba,size=len(m2)); del files['/MODE_SEL.BIN']
+    else: im.set_record('/MODE_SEL.BIN',size=len(m2))
     for p,d in files.items():
         lba,size,_=im.files[p]; assert len(d)==size; im.write_user(lba,0,bytes(d))
     im.f.close()

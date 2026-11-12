@@ -1,6 +1,6 @@
 # Remix modulaire : un interrupteur par mod, et un code de configuration
 
-`remix/modular.py` découpe le Remix (v18) en 10 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
+`remix/modular.py` découpe le Remix (v19) en 10 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
 patcheur Batocera utilisent le même paquet (`remix/cb2remix_mods.json.gz`, 31 Ko) et donnent **le même fichier, à l'octet
 près**.
 
@@ -15,14 +15,14 @@ près**.
 | `air` | Figures en l'air | overlays de course |
 | `ramming` | Chocs en Boarder Cross | exe 0x80028BF4–0x80028D3C, SBC2 |
 | `bam` | Big Air Master | TM |
-| `progress` | Progression dans le jeu (SELECT sur l'écran des modes) | fin de MODE_SEL (taille 0x287FF), crochet 0x800643B4, début du tas de MODE_SEL (exe 0x800100B4) — voir `progression.md` |
+| `progress` | Progression dans le jeu (SELECT sur l'écran des modes) | fin de MODE_SEL (82 secteurs : déplacé à la fin de STAFFE.STR, coupé), crochet 0x800643B4, début du tas de MODE_SEL (exe 0x800100B4) — voir `progression.md` |
 
 `max` et `air` partagent la lecture de la manette (`input`, ajoutée automatiquement). Sans `air`, les sauts du code
 partagé vers la partie « contrôle en l'air » retournent directement au jeu (`input_noair`).
 
 ## Vérifications
 
-- tous les mods = build de référence (v18 : 727 secteurs identiques) ; aucun mod = disque d'origine ;
+- tous les mods = build de référence (v19 : 805 secteurs identiques) ; aucun mod = disque d'origine ;
 - moteur JS (`disc.js` `applyMods`) = moteur Python sur plusieurs combinaisons ;
 - émulateur (Beetle PSX) : chaque mod seul et « tous sauf un » (18 images) démarrent, passent les menus et jouent une
   manche de compétition ;

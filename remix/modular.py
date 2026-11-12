@@ -141,7 +141,7 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     L |= set(range(F['/ENDING/S_CHR/ED_CHRCG.DAT'][0], F['/ETC'][0])) | set(range(F['/ETC'][0] + 1, F['/LOAD'][0])) | set(range(65645, 65795))
     def span(l, sz): return set(range(l, l + -(-sz // 2048)))
     for p, (lba, size, isdir) in sorted(O.files.items()):
-        if isdir or p.startswith('/CDDA/') or p.startswith('/MOVIE/') or p == '/MAIN_SEL.BIN': continue
+        if isdir or p.startswith('/CDDA/') or p.startswith('/MOVIE/') or p in ('/MAIN_SEL.BIN', '/MODE_SEL.BIN'): continue
         rl, rs, _ = R.files[p]
         grown = rl == lba and rs > size and -(-rs // 2048) == -(-size // 2048)
         if ((rl, rs) != (lba, size) and not grown) or span(lba, size) & L: continue   # moved / overwritten files: sectors below
@@ -164,6 +164,16 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
             while j < len(a) and (a[j] != b[j] or (j + 8 < len(a) and a[j:j + 8] != b[j:j + 8])): j += 1
             feat = feat_of_file.get(p) or classify(p, (i + EXE - 0x800) if p == '/SCES_009.92' else i + OVL)
             pkg['ops'][feat].append(['bs', p, i, segments(bytes(b[i:j]), bytes(O.read_file(p)))]); i = j
+    # MODE_SEL moved (progress page, one more sector): words of the other mods are in pkg, the page is appended
+    if R.files['/MODE_SEL.BIN'][0] != O.files['/MODE_SEL.BIN'][0]:
+        a = bytearray(O.read_file('/MODE_SEL.BIN')); r = R.read_file('/MODE_SEL.BIN')
+        for (f, o), w in words.items():
+            if f == '/MODE_SEL.BIN': struct.pack_into('<I', a, o, w)
+        assert bytes(a) == r[:len(a)], 'MODE_SEL : différences inattendues'
+        pkg['ops']['progress'].append(['append', '/MODE_SEL.BIN', r[len(a):].hex()])
+        grown_files.add('/MODE_SEL.BIN'); grown_files.add('/MOVIE/STAFFE.STR')
+        ml, msz, _ = R.files['/MODE_SEL.BIN']; moved_extra = set(range(ml, ml + -(-msz // 2048)))
+    else: moved_extra = set()
     # MAIN_SEL: other mods' words are in pkg already; the outfits block is appended
     ms_o = O.read_file('/MAIN_SEL.BIN'); ms_r = R.read_file('/MAIN_SEL.BIN')
     a = bytearray(ms_o)
@@ -191,7 +201,7 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
         if isdir or p.startswith('/CDDA/'): continue
         if (R.files.get(p, (None, None))[:2] == (lba, size) or p in grown_files) and not span(lba, size) & L: covered |= span(lba, size)
     rec = records(O); covered |= {s for s, _ in rec.values()}
-    ms_l, ms_s, _ = R.files['/MAIN_SEL.BIN']; covered |= set(range(ms_l, ms_l + -(-ms_s // 2048)))
+    ms_l, ms_s, _ = R.files['/MAIN_SEL.BIN']; covered |= set(range(ms_l, ms_l + -(-ms_s // 2048))) | moved_extra
     for lba, (sub, ops) in sorted(entries.items()):
         if lba not in covered: pkg['ops']['riders'].append(['sec', lba, sub, ops])
     return pkg
@@ -239,6 +249,13 @@ def apply(disc, pkg, feats, log=lambda m: None):
         blob = bytes(ms) + bytes((-len(ms)) % 2048)
         for k in range(nms): mods[ml + k] = (bytes([0, 0, 0x89 if k == nms - 1 else 0x08, 0]) * 2, blob[k * 2048:(k + 1) * 2048])
         del files['/MAIN_SEL.BIN']
+    md = files.get('/MODE_SEL.BIN')
+    if md is not None and -(-len(md) // 2048) > -(-loc['/MODE_SEL.BIN'][1] // 2048):
+        n2 = -(-len(md) // 2048); sl, ss = loc['/MOVIE/STAFFE.STR']; sn = ss // 2048; ml = sl + sn - n2
+        recs['/MOVIE/STAFFE.STR'] = (sl, (sn - n2) * 2048); recs['/MODE_SEL.BIN'] = (ml, len(md))
+        blob = bytes(md) + bytes((-len(md)) % 2048)
+        for k in range(n2): mods[ml + k] = (bytes([0, 0, 0x89 if k == n2 - 1 else 0x08, 0]) * 2, blob[k * 2048:(k + 1) * 2048])
+        del files['/MODE_SEL.BIN']
     for p, b in files.items():
         lba, size = loc[p]
         if len(b) != size:
