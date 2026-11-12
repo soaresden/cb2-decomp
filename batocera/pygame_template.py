@@ -10,6 +10,18 @@
 # En ligne de commande : python3 CB2_Remix_Patcher.pygame source.chd destination.chd --code CB2-XXXX-XXXX [--us usa.chd]
 import os, sys, gzip, base64, time, json
 
+# journal (a cote de ce fichier) : demarrage, etapes, erreurs -- a envoyer si le patcheur se ferme tout seul
+LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cb2remix_log.txt')
+def _log(*a):
+    try:
+        with open(LOG_FILE, 'a', encoding='utf8') as f: f.write(time.strftime('%Y-%m-%d %H:%M:%S ') + ' '.join(str(x) for x in a) + '\n')
+    except Exception: pass
+def _hook(t, v, tb):
+    import traceback; _log('CRASH', ''.join(traceback.format_exception(t, v, tb)))
+    sys.__excepthook__(t, v, tb)
+sys.excepthook = _hook
+_log('start v__VER__', 'python', sys.version.split()[0], sys.platform, sys.argv)
+
 VERSION = "__VER__"
 DELTA_B64 = "__DELTA__"
 DELTA_US_B64 = "__DELTA_US__"     # Remix for the USA version (phase 1)
@@ -103,7 +115,7 @@ def menu(pygame, scr, fonts, cfg, has_us):
     """switch screen: up/down, A (or Enter) = tick, START (or Space) = build, B = back to the full Remix. -> cfg"""
     big, small = fonts; W, H = scr.get_size()
     rows = [('mod', f) for f in M['IDS']] + ([('us', None)] if has_us else []) + [('preset', i) for i in range(len(PRESETS))] + [('go', None)]
-    cur = len(rows) - 1; last_axis = 0
+    cur = len(rows) - 1; last_axis = 0; t_in = time.time(); pygame.event.clear()
     while True:
         scr.fill((16, 22, 30))
         scr.blit(big.render("Cool Boarders 2 Remix v" + VERSION, True, (240, 240, 250)), (W // 20, H // 30))
@@ -119,6 +131,8 @@ def menu(pygame, scr, fonts, cfg, has_us):
             scr.blit(small.render(txt, True, col), (W // 20 + (0 if k in ('mod', 'us') else W // 40), y + i * lh))
         pygame.display.flip()
         for ev in pygame.event.get():
+            if time.time() - t_in < 0.8: continue
+            if ev.type in (pygame.KEYDOWN, pygame.JOYBUTTONDOWN): _log('menu input', ev)
             mv = 0; act = None
             if ev.type == pygame.KEYDOWN:
                 mv = {pygame.K_UP: -1, pygame.K_DOWN: 1}.get(ev.key, 0)
@@ -160,13 +174,16 @@ def main():
         pygame = None
     lines = []; state = {'p': None}
     def say(t):
-        lines.append(t); print(t)
+        lines.append(t); print(t); _log(t)
         if pygame: draw()
     if pygame:
         pygame.init(); pygame.joystick.init()
         for i in range(pygame.joystick.get_count()): pygame.joystick.Joystick(i).init()
-        info = pygame.display.Info()
-        scr = pygame.display.set_mode((info.current_w or 1280, info.current_h or 720), pygame.FULLSCREEN)
+        info = pygame.display.Info(); _log('pygame', pygame.version.ver, 'screen', info.current_w, info.current_h, 'pads', pygame.joystick.get_count())
+        scr = None
+        for size, flags in (((info.current_w or 1280, info.current_h or 720), pygame.FULLSCREEN), ((0, 0), pygame.FULLSCREEN), ((640, 480), 0)):
+            try: scr = pygame.display.set_mode(size, flags); break
+            except Exception as e: _log('set_mode', size, flags, e)
         pygame.mouse.set_visible(False)
         W, H = scr.get_size(); big = pygame.font.Font(None, max(36, H // 14)); small = pygame.font.Font(None, max(24, H // 26))
         def draw():
@@ -220,19 +237,31 @@ def main():
             say(T("Erreur : ", "Error: ") + str(e))
     say(T("Appuie sur un bouton pour quitter.", "Press a button to quit."))
     if pygame:
-        t0 = time.time()
+        t0 = time.time(); pygame.event.clear()
         while time.time() - t0 < 600:
             for ev in pygame.event.get():
-                if ev.type in (pygame.QUIT, pygame.KEYDOWN, pygame.JOYBUTTONDOWN): pygame.quit(); return
+                if time.time() - t0 < 1.5: continue
+                if ev.type in (pygame.QUIT, pygame.KEYDOWN, pygame.JOYBUTTONDOWN): _log('quit by', ev); pygame.quit(); return
             time.sleep(0.05)
         pygame.quit()
 
 if __name__ == '__main__':
     a = sys.argv[1:]
-    if len(a) >= 2:      # source dest [--code CB2-...] [--us usa.chd]  (or the old form: source dest usa.chd)
+    if len(a) >= 2 and os.path.isfile(a[0]) and a[0].lower().endswith(('.chd', '.bin')) and a[1].lower().endswith(('.chd', '.bin')):      # source dest [--code CB2-...] [--us usa.chd]  (or the old form: source dest usa.chd)
         code = a[a.index('--code') + 1] if '--code' in a else None
         usp = a[a.index('--us') + 1] if '--us' in a else (a[2] if len(a) == 3 else None)
         cfg = M['decode_config'](code) if code else None
         if cfg and usp is None: cfg['us_music'] = False
         patch(a[0], a[1], us=Disc(usp) if usp else None, cfg=cfg)
-    else: main()
+    else:
+        try: main()
+        except Exception:
+            import traceback; err = traceback.format_exc(); _log('CRASH', err)
+            try:
+                import pygame
+                scr = pygame.display.get_surface() or pygame.display.set_mode((640, 480))
+                f = pygame.font.Font(None, 26); scr.fill((40, 10, 10)); y = 10
+                for l in (['Erreur / Error (cb2remix_log.txt) :'] + err.strip().split('\n'))[-22:]:
+                    scr.blit(f.render(l[:110], True, (255, 200, 190)), (10, y)); y += 22
+                pygame.display.flip(); time.sleep(60)
+            except Exception: pass
