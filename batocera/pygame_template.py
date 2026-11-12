@@ -9,6 +9,7 @@ import os, sys, gzip, base64, time
 
 VERSION = "__VER__"
 DELTA_B64 = "__DELTA__"
+DELTA_US_B64 = "__DELTA_US__"     # Remix for the USA version (phase 1)
 OUT_BASE = "Cool Boarders 2 Remix (Europe)"
 SEARCH_DIRS = ["/userdata/roms/psx", "/userdata/roms", os.path.dirname(os.path.abspath(__file__))]
 
@@ -17,6 +18,8 @@ __DISC__
 # ================================================================
 
 def is_remix(disc):
+    if '/SCUS_943.58' in disc.files:   # USA: the Hard + Mirror code of the US Remix
+        exe = disc.read_file('/SCUS_943.58'); o = 0x800 + 0x8004f538 - 0x80010000; return any(exe[o:o + 4])
     exe = disc.read_file('/SCES_009.92'); o = 0x800 + 0x8004f900 - 0x80010000
     return any(exe[o + 4:o + 7])
 
@@ -43,8 +46,8 @@ def find_sources(log):
     return orig, done, usa
 
 def patch(src, dst, log=print, progress=lambda f: None, us=None):
-    P = gzip.decompress(base64.b64decode(DELTA_B64))
     disc = src if isinstance(src, Disc) else Disc(src)
+    P = gzip.decompress(base64.b64decode(DELTA_US_B64 if '/SCUS_943.58' in disc.files else DELTA_B64))
     if is_remix(disc): raise ValueError("ce disque a deja le Remix")
     log("Calcul du patch...")
     mods = apply_delta(disc, P, log=log)
@@ -106,16 +109,26 @@ def main():
             pygame.display.flip(); pygame.event.pump()
     say("Recherche de Cool Boarders 2 (PAL) d'origine...")
     orig, done, usa = find_sources(say)
-    if not orig:
+    usa_orig = [(p, d) for p, d in usa if not is_remix(d)]
+    if not orig and usa_orig:      # only the USA version: the US Remix
+        s, disc = usa_orig[0]; dst = os.path.join(os.path.dirname(s), "Cool Boarders 2 Remix (USA).chd")
+        say("Source (USA) : " + s); say("Creation : " + dst)
+        say("Remix US, 1re version : tout debloque + Hard/Mirror (L1+R1+X)")
+        try:
+            n = patch(disc, dst, log=say, progress=lambda x: (state.__setitem__('p', x), pygame and draw()))
+            say("OK : termine (%d secteurs modifies). Mets a jour la liste des jeux." % n)
+        except Exception as e:
+            say("Erreur : " + str(e))
+    elif not orig:
         if done: say("OK : le Remix est deja la : " + done[0])
         else: say("Erreur : Cool Boarders 2 (PAL) d'origine introuvable dans /userdata/roms/psx (.chd ou .bin)")
     else:
         s, disc = orig[0]; ext = '.chd' if disc.kind == 'chd' else '.bin'
         us = None
-        if usa and disc.kind == 'chd':   # the player also has the USA disc: offer its soundtrack
-            say("Version americaine trouvee : " + os.path.basename(usa[0][0]))
+        if usa_orig and disc.kind == 'chd':   # the player also has the USA disc: offer its soundtrack
+            say("Version americaine trouvee : " + os.path.basename(usa_orig[0][0]))
             say("Bouton A (ou Entree) : Remix seul   |   Bouton B (ou Espace) : Remix + musiques US")
-            if choose(pygame): us = usa[0][1]
+            if choose(pygame): us = usa_orig[0][1]
         dst = os.path.join(os.path.dirname(s), OUT_BASE + (' (musiques US)' if us else '') + ext)
         say("Source : " + s); say("Creation : " + dst)
         last = [0]

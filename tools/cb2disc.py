@@ -347,6 +347,14 @@ class Disc:
         return bytes(out)
 
 # ------------------------------------------------------------------ Remix delta (CB2D v1)
+def boot_exe(disc):
+    """path of the executable named by SYSTEM.CNF (SCES_009.92 in Europe, SCUS_943.58 in the USA)"""
+    try:
+        m = re.search(rb'BOOT\s*=\s*cdrom:\\?([^;\s]+)', disc.read_file('/SYSTEM.CNF'), re.I)
+        if m: return '/' + m.group(1).decode('latin1').lstrip('\\')
+    except KeyError: pass
+    return '/SCES_009.92'
+
 class SourceError(ValueError):
     """the disc is not the original game the patch expects"""
 
@@ -354,8 +362,8 @@ def apply_delta(disc, P, log=lambda m: None):
     """-> {lba: (subheader 8 bytes, user data 2048 bytes)}"""
     if P[:4] != b'CB2D': raise ValueError('patch invalide')
     crc, size, n = struct.unpack_from('<III', P, 8)
-    exe = disc.read_file('/SCES_009.92')
-    if len(exe) != size or zlib.crc32(exe) != crc: raise SourceError("ce disque n'est pas le Cool Boarders 2 (PAL) d'origine")
+    exe = disc.read_file(boot_exe(disc))
+    if len(exe) != size or zlib.crc32(exe) != crc: raise SourceError("ce disque n'est pas le Cool Boarders 2 d'origine attendu par ce patch")
     o = 20; mods = {}
     for i in range(n):
         lba = struct.unpack_from('<I', P, o)[0]; sub = P[o + 4:o + 12]; nops = struct.unpack_from('<H', P, o + 12)[0]; o += 14

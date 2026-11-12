@@ -10,7 +10,9 @@ out = sys.argv[3] if len(sys.argv) > 3 else os.path.join(ROOT, 'build', 'CB2_Rem
 tpl = open(os.path.join(ROOT, 'batocera', 'pygame_template.py'), encoding='utf8').read()
 disc = open(os.path.join(ROOT, 'tools', 'cb2disc.py'), encoding='utf8').read()
 b64 = base64.b64encode(open(delta, 'rb').read()).decode()
-page = tpl.replace('__DISC__', disc).replace('__DELTA__', b64).replace('__VER__', ver)
+us = os.path.join(ROOT, 'remix', 'cb2remix_usa.delta.gz')
+b64us = base64.b64encode(open(us, 'rb').read()).decode() if os.path.exists(us) else ''
+page = tpl.replace('__DISC__', disc).replace('__DELTA_US__', b64us).replace('__DELTA__', b64).replace('__VER__', ver)
 os.makedirs(os.path.dirname(out), exist_ok=True)
 open(out, 'w', encoding='utf8').write(page)
 print(out, len(page), 'octets')
