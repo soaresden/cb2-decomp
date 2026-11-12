@@ -28,7 +28,7 @@ partagé vers la partie « contrôle en l'air » retournent directement au jeu (
 - émulateur (Beetle PSX) : chaque mod seul et « tous sauf un » (18 images) démarrent, passent les menus et jouent une
   manche de compétition ;
 - « 100 % à gagner » (tout sauf `unlock` et `special`) : 4 riders seulement sur une nouvelle partie (0x80057440 = 0xF),
-  miroir et hard verrouillés, ○ : MAX présent.
+  miroir et hard verrouillés, ○ : MAX présent (rider), ligne MAX sur l'écran BOARD.
 
 ## Le paquet
 
@@ -80,11 +80,20 @@ Sur l'écran de sélection de mode, la télé affiche des aides en images (textu
 - l'affiche sur Competition comme la ligne HARD (0x800647DC : `j 0x80064820` → `j 0x800647E4`), donc seulement quand le
   Hard est débloqué : en « 100 % à gagner », le Hard + Mirror se débloque avec le Hard.
 
-## Planche MAX (dans le mod `max`, v23)
+## Planche MAX (dans le mod `max`, v23, ligne MAX en v24)
 
-○ sur l'écran BOARD bascule la planche MAX (texte « O : MAX / O : NORMAL » en bas à gauche, comme pour le rider).
-La table des planches (10 octets par planche : vitesse max, réactivité, stabilité × 3 variantes selon le mode ;
+Écran BOARD : une ligne **MAX** sous SPECIAL (sous TYPE-3 tant que la SPECIAL du style est verrouillée). Bas sur la
+dernière ligne la choisit (le jeu, lui, ne bouge pas), Haut la quitte (Haut est retiré de la manette tant que MAX est
+choisie, puis jusqu'à ce qu'il soit relâché, pour que le curseur du jeu reste en place). « MAX » est le début du
+graphisme MAXSPEED de l'écran, recadré, orange quand la ligne est choisie ; le libellé du type n'est plus surligné
+(le test « planche d'origine » de la boucle des libellés répond oui) ; les barres passent à 10/10/10.
+Écran DESIGN : avec MAX, Gauche / Droite parcourent les **21 motifs** du jeu (0-17 : les 6 de chaque style, 18-20 : les
+SPECIAL) au lieu des 6 du style, le carrousel montre les voisins dans toute la liste, « MAX : 21 DESIGNS » en bas.
+Le numéro de motif est global dans le jeu : une course charge le motif n de BOARD.DAT quelle que soit la planche
+(vérifié dans l'émulateur), voir docs/boards.md.
+
+Course : la table des planches (10 octets par planche : vitesse max, réactivité, stabilité × 3 variantes selon le mode ;
 0x800988B0 dans FREE, une copie dans chacun des 9 modes de course) reçoit, à l'entrée du mode de course (exe
 0x8001228C, appel du point d'entrée de l'overlay), à la ligne de la planche du joueur (0x8005740A), les meilleures
-valeurs du jeu : 165/157/196, 100/110/80, 80/88/80. Code dans `func_8002815C` (fonction morte de l'exe). Un
-concurrent de l'ordinateur qui aurait la même planche en profite aussi.
+valeurs du jeu : 165/157/196, 100/110/80, 80/88/80. Code dans `func_8002815C` et `func_8001B774` (fonctions mortes de
+l'exe), voir remix/boardmax.py. Un concurrent de l'ordinateur qui aurait la même planche en profite aussi.
