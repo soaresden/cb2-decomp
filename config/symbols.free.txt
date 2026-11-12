@@ -2,3 +2,9 @@
 free_id = 0x8005AEA8; // type:u32
 // appelée par main()
 free_entry = 0x8005AEAC; // type:func
+
+// --- fonctions repérées grâce aux accroches du Remix
+// figures en l'air : vitesses de rotation spin (+0x7A4) et flip (+0x7A8) du rider
+free_playerAirControl = 0x800671A8; // type:func
+// prépare les riders de la course : pointeur vers les paramètres du rider (remplacé par les valeurs MAX dans le Remix)
+free_initRacers = 0x800643B8; // type:func

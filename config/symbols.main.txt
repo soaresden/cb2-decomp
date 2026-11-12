@@ -158,3 +158,11 @@ g_unlock_8005744A = 0x8005744A; // type:s16
 g_unlock_8005744C = 0x8005744C; // type:s16
 // entrées de 8 octets : MSF BCD + taille ; le jeu charge par index
 g_fileTable = 0x800583E8;
+
+// --- fonctions repérées grâce aux accroches du Remix
+// lit les manettes ; copie les boutons du port 0 dans g_padButtons (accroche du Remix à 0x8001B594)
+ReadPads = 0x8001B51C; // type:func
+// charge modèle, texture, paquet basse définition et variante ENEMY1 de chaque rider d'une course (accroches du Remix 0x8001CEFC..0x8001D140)
+LoadRaceRiders = 0x8001CD40; // type:func
+// envoie une image en VRAM (a0 = description, largeur en +0x10) ; nom probable
+UploadImage = 0x8001F0B4; // type:func

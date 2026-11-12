@@ -4,3 +4,9 @@ main_sel_id = 0x8005AEA8; // type:u32
 main_sel_entry = 0x8005AEAC; // type:func
 // curseur de l'écran de sélection du rider
 sel_riderCursor = 0x8007B310; // type:s16
+
+// --- fonctions repérées grâce aux accroches du Remix
+// barres de stats de l'écran BOARDER
+sel_drawBoarderStats = 0x80061020; // type:func
+// portrait et textes de l'écran BOARDER
+sel_drawBoarderInfo = 0x800625E4; // type:func

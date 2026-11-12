@@ -2,3 +2,9 @@
 tm_id = 0x8005AEA8; // type:u32
 // appelée par main()
 tm_entry = 0x8005AEAC; // type:func
+
+// --- fonctions repérées grâce aux accroches du Remix
+// figures en l'air : vitesses de rotation spin (+0x7A4) et flip (+0x7A8) du rider
+tm_playerAirControl = 0x80065384; // type:func
+// prépare les riders de la course : pointeur vers les paramètres du rider (remplacé par les valeurs MAX dans le Remix)
+tm_initRacers = 0x8006399C; // type:func

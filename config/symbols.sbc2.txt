@@ -2,3 +2,21 @@
 sbc2_id = 0x8005AEA8; // type:u32
 // appelée par main()
 sbc2_entry = 0x8005AEAC; // type:func
+
+// --- fonctions repérées grâce aux accroches du Remix
+// collisions entre riders : appelle sbc2_racerBumpResponse pour chaque rider d'une paire qui se touche
+sbc2_racerCollisions = 0x8005FC98; // type:func
+// réaction d'un rider à un choc (a1/a2 = vecteurs de déplacement des deux riders)
+sbc2_racerBumpResponse = 0x80073714; // type:func
+// envoie les textures des riders (free-ride du joueur en x = 512 + 32 * rider)
+sbc2_loadRacerTextures = 0x80064C9C; // type:func
+// choisit le modèle de chaque rider dans le paquet chargé
+sbc2_loadRacerModels = 0x800666A4; // type:func
+// charge les banques de voix SBC2ND0-3 selon le rider
+sbc2_loadVoiceBanks = 0x80066BE0; // type:func
+// plaques de nom de l'écran de résultats
+sbc2_drawResultsNamePlates = 0x800846B8; // type:func
+// figures en l'air : vitesses de rotation spin (+0x7A4) et flip (+0x7A8) du rider
+sbc2_playerAirControl = 0x8006738C; // type:func
+// prépare les riders de la course : pointeur vers les paramètres du rider (remplacé par les valeurs MAX dans le Remix)
+sbc2_initRacers = 0x80065944; // type:func

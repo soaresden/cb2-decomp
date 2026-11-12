@@ -2,3 +2,7 @@
 hp_id = 0x8005AEA8; // type:u32
 // appelée par main()
 hp_entry = 0x8005AEAC; // type:func
+
+// --- fonctions repérées grâce aux accroches du Remix
+// prépare les riders de la course : pointeur vers les paramètres du rider (remplacé par les valeurs MAX dans le Remix)
+hp_initRacers = 0x80063A70; // type:func
