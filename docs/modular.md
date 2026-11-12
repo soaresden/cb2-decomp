@@ -1,6 +1,6 @@
 # Remix modulaire : un interrupteur par mod, et un code de configuration
 
-`remix/modular.py` découpe le Remix (v17) en 9 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
+`remix/modular.py` découpe le Remix (v18) en 10 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
 patcheur Batocera utilisent le même paquet (`remix/cb2remix_mods.json.gz`, 31 Ko) et donnent **le même fichier, à l'octet
 près**.
 
@@ -15,13 +15,14 @@ près**.
 | `air` | Figures en l'air | overlays de course |
 | `ramming` | Chocs en Boarder Cross | exe 0x80028BF4–0x80028D3C, SBC2 |
 | `bam` | Big Air Master | TM |
+| `progress` | Progression dans le jeu (SELECT sur l'écran des modes) | fin de MODE_SEL (taille 0x287FF), crochet 0x800643B4, début du tas de MODE_SEL (exe 0x800100B4) — voir `progression.md` |
 
 `max` et `air` partagent la lecture de la manette (`input`, ajoutée automatiquement). Sans `air`, les sauts du code
 partagé vers la partie « contrôle en l'air » retournent directement au jeu (`input_noair`).
 
 ## Vérifications
 
-- tous les mods = build de référence (v17 : 725 secteurs identiques) ; aucun mod = disque d'origine ;
+- tous les mods = build de référence (v18 : 727 secteurs identiques) ; aucun mod = disque d'origine ;
 - moteur JS (`disc.js` `applyMods`) = moteur Python sur plusieurs combinaisons ;
 - émulateur (Beetle PSX) : chaque mod seul et « tous sauf un » (18 images) démarrent, passent les menus et jouent une
   manche de compétition ;
@@ -48,14 +49,15 @@ python3 remix/modular.py PAL.chd "Remix v16.chd" PAL_fs remix/cb2remix.delta.gz 
 `CB2-XXXX-XXXX` : 1 octet de version, 2 octets de mods (bit i = i-ème mod du tableau ci-dessus), 1 octet d'options
 (bit 0 : musiques US ; bits 1-3 réservés : intro, 60 Hz), 2 octets de tenues du Prêt-à-porter (bit i = entrée i de
 `skins/index.json` du site), octets nuls de fin retirés, puis 1 octet de contrôle (crc32 & 255), en base32 Crockford.
-Exemples : `CB2-07ZG-3G8` = Remix complet, `CB2-07Y0-20G` = 100 % à gagner, `CB2-040B-W` = aucun mod.
+Exemples : `CB2-07ZG-7V8` = Remix complet, `CB2-07Y0-6BG` = 100 % à gagner (avec la page de progression), `CB2-040B-W` =
+aucun mod. Les codes d'avant la v18 (sans le bit `progress`) restent valables.
 
 Le code est écrit dans le disque construit (descripteur de volume, secteur 16, octet 900, zone inutilisée par le jeu) :
 le site et le patcheur reconnaissent un jeu déjà patché et affichent son code.
 
 ```
-python3 make_remix.py original.chd --config CB2-07Y0-20G      # (les tenues : avec le site)
-python3 CB2_Remix_Patcher.pygame source.chd dest.chd --code CB2-07Y0-20G [--us usa.chd]
+python3 make_remix.py original.chd --config CB2-07Y0-6BG      # (les tenues : avec le site)
+python3 CB2_Remix_Patcher.pygame source.chd dest.chd --code CB2-07Y0-6BG [--us usa.chd]
 ```
 
 Sur Batocera, le patcheur ouvre un écran d'interrupteurs (croix haut/bas, A = cocher, START = construire) et part du

@@ -59,7 +59,7 @@ Chaque mod du Remix s'active ou se désactive (site, onglet Patchs ; patcheur Ba
 tiennent dans un code `CB2-XXXX-XXXX` qui reconstruit exactement le même jeu :
 
 ```
-python3 make_remix.py original.chd --config CB2-07Y0-20G     # « 100 % à gagner » : rien débloqué d'avance
+python3 make_remix.py original.chd --config CB2-07Y0-6BG     # « 100 % à gagner » : rien débloqué d'avance
 ```
 
 Détails : [docs/modular.md](docs/modular.md). Sauvegarde, conditions de déblocage et 100 % : [docs/progression.md](docs/progression.md).

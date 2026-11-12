@@ -255,6 +255,11 @@ def patches():
     # TV hint of the mode select screen: its 3rd slot (GHOST L2+X, never shown) is shown like HARD on Competition,
     # with the label 'H+M L1+R1+X' (HM_LABEL, drawn in /TITLE/MODE_SEL.FBD by apply())
     P+=[('/MODE_SEL.BIN',0x800647dc,0x08019208,0x080191f9)]
+    # in-game progress page (progress.py): SELECT held on the mode select screen. MODE_SEL grows by the page's code
+    # (rest of its last sector): its heap now starts after it (exe table of overlay heap starts, entry 1)
+    import progress as _pg
+    _o,_b,_h=_pg.block()
+    P+=[('/MODE_SEL.BIN',_pg.HOOK,_pg.HOOK_OLD,_h),('/SCES_009.92',0x800100b4,0x800832c8,_pg.LIMIT)]
     P+=[('/SCES_009.92',a,0,w) for a,w in ca]
     assert la['rm']==RM,hex(la['rm'])
     # mdf: flip wrapper (separate small cave): effective delta = a0 ? -s7 : s7, modulated, written back to s7
@@ -520,6 +525,10 @@ def apply(src,dst,verbose=True):
     slba,ssz,_=im.files['/MOVIE/SBCMOVE.STR']; sn=ssz//2048; mlba=slba+sn-nms
     im.set_record('/MOVIE/SBCMOVE.STR',size=(sn-nms)*2048)
     write_blob(im,mlba,bytes(ms)); im.set_record('/MAIN_SEL.BIN',lba=mlba,size=len(ms)); del files['/MAIN_SEL.BIN']
+    # progress page code at the end of MODE_SEL (same sectors, larger size)
+    import progress as _pg
+    m2=get('/MODE_SEL.BIN'); assert _pg.ORG==OVL+len(m2); org_,blob_,_=_pg.block(); m2+=blob_
+    im.set_record('/MODE_SEL.BIN',size=len(m2))
     for p,d in files.items():
         lba,size,_=im.files[p]; assert len(d)==size; im.write_user(lba,0,bytes(d))
     im.f.close()

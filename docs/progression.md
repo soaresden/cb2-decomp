@@ -41,7 +41,21 @@ Onglet « Progression » : ouvre la carte mémoire (.srm de pcsx_rearmed sur Bat
 .psv), coche ce qui est gagné et donne le pourcentage (38 objectifs : 3 riders, Mirror, Hard, 3 planches, 30 trophées).
 À valider avec une vraie sauvegarde de joueur (l'ordre temps / figures / total des trophées surtout).
 
-## Une page dans le jeu ?
+## Page dans le jeu (mod `progress`, Remix v18)
 
-Faisable, mais c'est un vrai chantier : il faut un nouvel écran dans MAIN_SEL (texte et cases), appelé depuis un menu
-existant, dans les zones libres de l'overlay. Le site couvre le besoin en attendant.
+Sur l'écran de sélection de mode, **maintenir SELECT** affiche un panneau : PROGRESSION xx %, BOSS, GRAY, SNOWMAN,
+MIRROR, HARD, HARD+MIRROR (OK / --), SPECIAL n/3, TROPHEES n/30. Le pourcentage compte les mêmes 38 objectifs que le
+site (Hard + Mirror affiché mais pas compté).
+
+Comment c'est fait (`remix/progress.py`) :
+- le code (991 octets) est ajouté à la fin de `MODE_SEL.BIN`, dans le reste de son dernier secteur (le fichier garde
+  ses 81 secteurs ; sa taille dans le répertoire passe à 0x287FF — une taille de 81 × 2048 exactement fait lire un
+  secteur de trop au chargeur et plante) ;
+- le tas de MODE_SEL commençait juste après le fichier (table des débuts de tas des overlays dans l'exe,
+  0x800100B0 + 4 × index) : l'entrée de MODE_SEL passe de 0x800832C8 à 0x800836A8 ;
+- crochet : la fonction de la télé (`func_80064200`) appelle `func_8002E228` (numéro du tampon d'affichage) à
+  0x800643B4 ; l'appel passe par la routine, qui rend le même résultat ;
+- texte : routine du jeu `func_80012CA0` (police du menu 8×12 en VRAM (512,48), descripteur 0x80070648), primitives
+  dans un tampon à part à 0x801F2000 / 0x801F3000 (au-dessus du tas, qui s'arrête à 0x801F1E00), insérées en tête de
+  l'OT (entrée 0, devant tout), fond = un TILE bleu nuit ;
+- coordonnées centrées sur l'écran (décalage de dessin du menu).

@@ -48,6 +48,8 @@ def asm(lines,org,syms=None):
         elif m=='sltu': w=Rr(0x2b,a[1],a[2],a[0])
         elif m=='mult': w=Rr(0x18,a[0],a[1],'zero')
         elif m=='mflo': w=Rr(0x12,'zero','zero',a[0])
+        elif m=='mfhi': w=Rr(0x10,'zero','zero',a[0])
+        elif m=='divu': w=Rr(0x1b,a[0],a[1],'zero')
         elif m=='sllv': w=Rr(4,a[2],a[1],a[0])
         elif m=='srlv': w=Rr(6,a[2],a[1],a[0])
         elif m=='nor': w=Rr(0x27,a[1],a[2],a[0])

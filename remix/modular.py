@@ -45,6 +45,9 @@ FEATURES = [   # id, French name, English name, description FR, description EN
      'Fonce dans un adversaire : le plus rapide des deux reste debout.', 'Ram an opponent: the faster of the two stays up.'),
     ('bam', 'Big Air Master', 'Big Air Master',
      'Touches toujours affichées et figures suivantes (NEXT) à droite.', 'Keys always shown and the next tricks (NEXT) on the right.'),
+    ('progress', 'Progression dans le jeu', 'In-game progress',
+     'SELECT maintenu sur l’écran des modes : riders cachés, Mirror, Hard, Hard + Mirror, planches SPECIAL, trophées et pourcentage.',
+     'Hold SELECT on the mode select screen: hidden riders, Mirror, Hard, Hard + Mirror, SPECIAL boards, trophies and percentage.'),
 ]
 INPUT = 'input'   # shared pad hook (needed by 'max' and 'air')
 
@@ -58,7 +61,9 @@ EXE_MAP = [   # (lo, hi, feature) in the executable
     (0x8001CEFC, 0x8001CF00, 'riders'), (0x8001CFE0, 0x8001CFE0, 'riders'), (0x8001D078, 0x8001D078, 'riders'), (0x8001D104, 0x8001D10C, 'riders'),
     (0x8004F920, 0x8004F93F, 'outfits'), (0x8004F96C, 0x8004F97F, 'outfits'), (0x8004F9E0, 0x8004F9EF, 'outfits'),
     (0x8001D140, 0x8001D140, 'outfits'), (0x8001003C, 0x8001003C, 'outfits'), (0x800100B8, 0x800100B8, 'outfits'),
+    (0x800100B4, 0x800100B4, 'progress'),
 ]
+MODE_MAP = [(0x800643B4, 0x800643B4, 'progress'), (0x800832C8, 0x800836A8, 'progress')]
 MS_MAP = [(0x80063EA8, 0x80063EA8, 'unlock'), (0x8005B0C4, 0x8005B0C4, 'special'), (0x80069D00, 0x8006C910, 'special'),
           (0x800614B8, 0x800614B8, 'max'), (0x800626E4, 0x800626E4, 'max'), (0x80063FC8, 0x80063FCC, 'riders'), (0x80064044, 0x80064044, 'riders'),
           (0x800605B4, 0x80062180, 'outfits'), (0x800640EC, 0x80064210, 'outfits')]
@@ -71,7 +76,7 @@ MAXC = {('/SBC1.BIN', 0x80063F04), ('/SBC2.BIN', 0x80065BE4), ('/VS.BIN', 0x8006
 RACE = {'/SBC1.BIN', '/SBC2.BIN', '/VS.BIN', '/OMT.BIN', '/BP.BIN', '/HP.BIN', '/FREE.BIN', '/TM.BIN', '/COMB.BIN'}
 
 def classify(f, a):
-    tables = {'/SCES_009.92': EXE_MAP, '/MAIN_SEL.BIN': MS_MAP}.get(f, []) + SBC_MAP.get(f, [])
+    tables = {'/SCES_009.92': EXE_MAP, '/MAIN_SEL.BIN': MS_MAP, '/MODE_SEL.BIN': MODE_MAP}.get(f, []) + SBC_MAP.get(f, [])
     for lo, hi, feat in tables:
         if lo <= a <= hi: return feat
     if f == '/INIT.BIN': return 'unlock'
@@ -120,7 +125,7 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     pkg['ops'][INPUT] = []; pkg['ops']['input_noair'] = []
     exe = O.read_file('/SCES_009.92'); import zlib; pkg['exe_crc'] = zlib.crc32(exe); pkg['exe_size'] = len(exe)
     for fid, nfr, nen, dfr, den in FEATURES: pkg['features'].append({'id': fid, 'fr': nfr, 'en': nen, 'dfr': dfr, 'den': den})
-    words = {}
+    words = {}; grown_files = set()
     for f, a, old, new in remix.patches():
         feat = classify(f, a); o = file_off(f, a)
         cur = struct.unpack_from('<I', O.read_file(f), o)[0]
@@ -138,8 +143,13 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     for p, (lba, size, isdir) in sorted(O.files.items()):
         if isdir or p.startswith('/CDDA/') or p.startswith('/MOVIE/') or p == '/MAIN_SEL.BIN': continue
         rl, rs, _ = R.files[p]
-        if (rl, rs) != (lba, size) or span(lba, size) & L: continue   # moved / overwritten files: sectors below
-        a = bytearray(O.read_file(p)); b = R.read_file(p)
+        grown = rl == lba and rs > size and -(-rs // 2048) == -(-size // 2048)
+        if ((rl, rs) != (lba, size) and not grown) or span(lba, size) & L: continue   # moved / overwritten files: sectors below
+        if grown:
+            tail = R.read_file(p)[size:]; base = (EXE - 0x800) if p == '/SCES_009.92' else OVL
+            gf = classify(p, base + size); pkg['ops'][gf].append(['append', p, tail.hex()]); pkg['ops'][gf].append(['rec', p, rl, rs])
+            grown_files.add(p)
+        a = bytearray(O.read_file(p)); b = R.read_file(p)[:size]
         for (f, o), w in words.items():
             if f == p: struct.pack_into('<I', a, o, w)
         if a == b: continue
@@ -164,7 +174,7 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     # directory records (MAIN_SEL / SBCMOVE are computed by apply() for 'outfits')
     for p in R.files:
         if p in ('/MAIN_SEL.BIN', '/MOVIE/SBCMOVE.STR'): continue
-        if p in O.files and O.files[p][:2] != R.files[p][:2]:
+        if p in O.files and O.files[p][:2] != R.files[p][:2] and p not in grown_files:
             pkg['ops']['riders'].append(['rec', p, R.files[p][0], R.files[p][1]])
     # sectors: everything else the reference changes (new blobs in free sectors, Boss voice bank at the end of the
     # intro movie, moved small files) -> 'riders', taken from the published delta (copies from the player's disc)
@@ -179,7 +189,7 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     covered = set()
     for p, (lba, size, isdir) in O.files.items():           # sectors of files rebuilt by apply()
         if isdir or p.startswith('/CDDA/'): continue
-        if R.files.get(p, (None, None))[:2] == (lba, size) and not span(lba, size) & L: covered |= span(lba, size)
+        if (R.files.get(p, (None, None))[:2] == (lba, size) or p in grown_files) and not span(lba, size) & L: covered |= span(lba, size)
     rec = records(O); covered |= {s for s, _ in rec.values()}
     ms_l, ms_s, _ = R.files['/MAIN_SEL.BIN']; covered |= set(range(ms_l, ms_l + -(-ms_s // 2048)))
     for lba, (sub, ops) in sorted(entries.items()):
@@ -203,7 +213,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     def buf(p):
         if p not in files: files[p] = bytearray(orig(p))
         return files[p]
-    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', INPUT, 'input_noair') if f in feats]
+    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', INPUT, 'input_noair') if f in feats]
     for feat in order:
         for op in pkg['ops'][feat]:
             t = op[0]
@@ -231,6 +241,9 @@ def apply(disc, pkg, feats, log=lambda m: None):
         del files['/MAIN_SEL.BIN']
     for p, b in files.items():
         lba, size = loc[p]
+        if len(b) != size:
+            assert -(-len(b) // 2048) == -(-size // 2048), p
+            recs.setdefault(p, (lba, len(b)))
         for k in range(-(-len(b) // 2048)):
             orig = disc.user(lba + k); new = bytes(b[k * 2048:(k + 1) * 2048]); new += orig[len(new):]
             if new != orig: mods[lba + k] = (disc.img.sector(lba + k)[16:24], new)
