@@ -41,6 +41,18 @@ Avec `--release`, la commande produit aussi tout ce qu'on distribue :
 
 Le patcheur Batocera de la version publiée se régénère aussi sans le disque : `python3 batocera/mkpygame.py`.
 
+### Musiques de la version américaine
+
+Avec ton CD américain en CHD, le Remix peut prendre les musiques US (20 pistes, recopiées telles quelles) :
+`python3 make_remix.py "Cool Boarders 2 (Europe).chd" --us-music "Cool Boarders 2 (USA).chd"`. Même option sur le site
+(onglet Patchs) et dans le patcheur Batocera (s'il trouve les deux CHD, bouton B = avec les musiques US). Le jeu cherche
+ses musiques par les fichiers `/CDDA/BGMx.DA` : ils sont redirigés vers les pistes US qui jouent au même moment
+(correspondance tirée des appels de musique des deux versions, voir `docs/pal_vs_usa.md`).
+
+### Remix pour la version américaine
+
+Première version (tout débloqué, planches SPECIAL, Hard + Mirror) : voir `docs/remix_usa.md`.
+
 ## Skins et planches perso (sans navigateur)
 
 Les éditeurs restent sur le site : le Prêt-à-porter enregistre des skins `.cb2skin.json` ; l'Atelier exporte la planche
