@@ -12,7 +12,12 @@ disc = open(os.path.join(ROOT, 'tools', 'cb2disc.py'), encoding='utf8').read()
 b64 = base64.b64encode(open(delta, 'rb').read()).decode()
 us = os.path.join(ROOT, 'remix', 'cb2remix_usa.delta.gz')
 b64us = base64.b64encode(open(us, 'rb').read()).decode() if os.path.exists(us) else ''
-page = tpl.replace('__DISC__', disc).replace('__DELTA_US__', b64us).replace('__DELTA__', b64).replace('__VER__', ver)
+msrc = open(os.path.join(ROOT, 'remix', 'modular.py'), encoding='utf8').read()
+msrc = msrc[msrc.index('# ==== embeddable part'):msrc.index("if __name__ == '__main__':")]
+assert "'''" not in msrc
+mods = os.path.join(ROOT, 'remix', 'cb2remix_mods.json.gz')
+b64m = base64.b64encode(open(mods, 'rb').read()).decode()
+page = tpl.replace('__MODULAR__', msrc).replace('__MODS__', b64m).replace('__DISC__', disc).replace('__DELTA_US__', b64us).replace('__DELTA__', b64).replace('__VER__', ver)
 os.makedirs(os.path.dirname(out), exist_ok=True)
 open(out, 'w', encoding='utf8').write(page)
 print(out, len(page), 'octets')

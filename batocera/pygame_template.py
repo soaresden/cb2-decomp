@@ -5,19 +5,30 @@
 # et ecrit "Cool Boarders 2 Remix (Europe).chd" (ou .bin + .cue) a cote. Rien n'est telecharge.
 # En ligne de commande : python3 CB2_Remix_Patcher.pygame source.chd destination.chd [usa.chd]
 # Si le CHD de Cool Boarders 2 (USA) est aussi dans roms/psx, il propose de mettre ses musiques dans le Remix.
-import os, sys, gzip, base64, time
+# Interrupteurs : un ecran liste les mods (croix haut/bas, A = cocher, START = construire). Le code de configuration
+# du site (CB2-XXXX-XXXX) peut etre mis dans cb2remix_code.txt a cote de ce fichier : il sert de reglage de depart.
+# En ligne de commande : python3 CB2_Remix_Patcher.pygame source.chd destination.chd --code CB2-XXXX-XXXX [--us usa.chd]
+import os, sys, gzip, base64, time, json
 
 VERSION = "__VER__"
 DELTA_B64 = "__DELTA__"
 DELTA_US_B64 = "__DELTA_US__"     # Remix for the USA version (phase 1)
+MODS_B64 = "__MODS__"             # modular Remix package (remix/modular.py)
 OUT_BASE = "Cool Boarders 2 Remix (Europe)"
 SEARCH_DIRS = ["/userdata/roms/psx", "/userdata/roms", os.path.dirname(os.path.abspath(__file__))]
 
 # ================================================================ disc access (tools/cb2disc.py of cb2-decomp)
 __DISC__
+# ================================================================ modular Remix (remix/modular.py of cb2-decomp)
+MODULAR_SRC = r'''__MODULAR__'''
+import types; M = {'cb2disc': types.SimpleNamespace(**globals()), '__name__': 'modular'}
+exec(compile("import base64, gzip, json, os, struct, sys, zlib\n" + MODULAR_SRC, 'modular', 'exec'), M)
+PKG = json.loads(gzip.decompress(base64.b64decode(MODS_B64)))
+CODE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'cb2remix_code.txt')
 # ================================================================
 
 def is_remix(disc):
+    if M['read_config'](disc): return True
     if '/SCUS_943.58' in disc.files:   # USA: the Hard + Mirror code of the US Remix
         exe = disc.read_file('/SCUS_943.58'); o = 0x800 + 0x8004f538 - 0x80010000; return any(exe[o:o + 4])
     exe = disc.read_file('/SCES_009.92'); o = 0x800 + 0x8004f900 - 0x80010000
@@ -45,12 +56,16 @@ def find_sources(log):
                 else: orig.append((p, disc))
     return orig, done, usa
 
-def patch(src, dst, log=print, progress=lambda f: None, us=None):
+def patch(src, dst, log=print, progress=lambda f: None, us=None, cfg=None):
+    """cfg: decode_config() result (European disc); None = the whole Remix"""
     disc = src if isinstance(src, Disc) else Disc(src)
-    P = gzip.decompress(base64.b64decode(DELTA_US_B64 if '/SCUS_943.58' in disc.files else DELTA_B64))
     if is_remix(disc): raise ValueError("ce disque a deja le Remix")
     log("Calcul du patch...")
-    mods = apply_delta(disc, P, log=log)
+    if '/SCUS_943.58' in disc.files: mods = apply_delta(disc, gzip.decompress(base64.b64decode(DELTA_US_B64)), log=log)
+    else:
+        cfg = cfg or {'mods': M['IDS'], 'us_music': us is not None, 'skins': []}
+        mods = M['apply'](disc, PKG, cfg['mods'])
+        M['mark'](disc, mods, M['encode_config'](cfg['mods'], cfg['us_music'], cfg['skins']))
     tmp = dst + '.part'
     if us is not None:
         log("Musiques de la version americaine...")
@@ -66,6 +81,56 @@ def patch(src, dst, log=print, progress=lambda f: None, us=None):
                 open(os.path.splitext(dst)[0] + '.cue', 'w', encoding='latin1').write(t)
                 break
     return len(mods)
+
+NAMES = {f[0]: f[1].replace('\u2019', "'") for f in M['FEATURES']}
+PRESETS = [('Remix complet', list(M['IDS'])), ('100 % a gagner', [f for f in M['IDS'] if f not in ('unlock', 'special')]), ('Aucun mod', [])]
+
+def start_config():
+    for src in (CODE_FILE,):
+        try: return M['decode_config'](open(src).read().strip())
+        except Exception: pass
+    return {'mods': list(M['IDS']), 'us_music': False, 'skins': []}
+
+def menu(pygame, scr, fonts, cfg, has_us):
+    """switch screen: up/down, A (or Enter) = tick, START (or Space) = build, B = back to the full Remix. -> cfg"""
+    big, small = fonts; W, H = scr.get_size()
+    rows = [('mod', f) for f in M['IDS']] + ([('us', None)] if has_us else []) + [('preset', i) for i in range(len(PRESETS))] + [('go', None)]
+    cur = len(rows) - 1; last_axis = 0
+    while True:
+        scr.fill((16, 22, 30))
+        scr.blit(big.render("Cool Boarders 2 Remix v" + VERSION, True, (240, 240, 250)), (W // 20, H // 30))
+        code = M['encode_config'](cfg['mods'], cfg['us_music'], cfg['skins'])
+        scr.blit(small.render("Code : " + code + "    (A = cocher, START = construire)", True, (143, 211, 255)), (W // 20, H // 30 + big.get_height()))
+        y = H // 30 + big.get_height() + small.get_height() + H // 40; lh = (H - y - H // 30) // len(rows)
+        for i, (k, v) in enumerate(rows):
+            if k == 'mod': txt = ('[x] ' if v in cfg['mods'] else '[ ] ') + NAMES[v]
+            elif k == 'us': txt = ('[x] ' if cfg['us_music'] else '[ ] ') + 'Musiques de la version americaine'
+            elif k == 'preset': txt = '>> ' + PRESETS[v][0]
+            else: txt = '>>> CONSTRUIRE LE JEU <<<'
+            col = (255, 160, 80) if i == cur else (200, 210, 225)
+            scr.blit(small.render(txt, True, col), (W // 20 + (0 if k in ('mod', 'us') else W // 40), y + i * lh))
+        pygame.display.flip()
+        for ev in pygame.event.get():
+            mv = 0; act = None
+            if ev.type == pygame.KEYDOWN:
+                mv = {pygame.K_UP: -1, pygame.K_DOWN: 1}.get(ev.key, 0)
+                act = 'ok' if ev.key in (pygame.K_RETURN, pygame.K_a) else 'go' if ev.key == pygame.K_SPACE else None
+            elif ev.type == pygame.JOYHATMOTION: mv = -ev.value[1]
+            elif ev.type == pygame.JOYAXISMOTION and ev.axis == 1:
+                a = -1 if ev.value < -0.6 else 1 if ev.value > 0.6 else 0
+                if a != last_axis: mv = a
+                last_axis = a
+            elif ev.type == pygame.JOYBUTTONDOWN:
+                act = 'go' if ev.button in (7, 9, 11) else 'ok' if ev.button in (0, 2) else None
+            cur = (cur + mv) % len(rows)
+            if act == 'go': return cfg
+            if act == 'ok':
+                k, v = rows[cur]
+                if k == 'mod': cfg['mods'] = [f for f in M['IDS'] if (f in cfg['mods']) != (f == v)]
+                elif k == 'us': cfg['us_music'] = not cfg['us_music']
+                elif k == 'preset': cfg['mods'] = list(PRESETS[v][1])
+                else: return cfg
+        time.sleep(0.03)
 
 def choose(pygame, timeout=30):
     """True = with the USA music. Gamepad: button 1 or 3 (B / circle side), keyboard: Space. Default after 30 s: Remix only."""
@@ -124,19 +189,24 @@ def main():
         else: say("Erreur : Cool Boarders 2 (PAL) d'origine introuvable dans /userdata/roms/psx (.chd ou .bin)")
     else:
         s, disc = orig[0]; ext = '.chd' if disc.kind == 'chd' else '.bin'
-        us = None
-        if usa_orig and disc.kind == 'chd':   # the player also has the USA disc: offer its soundtrack
-            say("Version americaine trouvee : " + os.path.basename(usa_orig[0][0]))
-            say("Bouton A (ou Entree) : Remix seul   |   Bouton B (ou Espace) : Remix + musiques US")
-            if choose(pygame): us = usa_orig[0][1]
-        dst = os.path.join(os.path.dirname(s), OUT_BASE + (' (musiques US)' if us else '') + ext)
+        has_us = bool(usa_orig) and disc.kind == 'chd'
+        cfg = start_config()
+        if pygame: cfg = menu(pygame, scr, (big, small), cfg, has_us); lines.clear()
+        us = usa_orig[0][1] if has_us and cfg['us_music'] else None
+        if cfg['us_music'] and us is None: cfg['us_music'] = False; say("(musiques US : il faut le CHD americain dans roms/psx)")
+        code = M['encode_config'](cfg['mods'], cfg['us_music'], cfg['skins'])
+        if cfg['skins']: say("(les tenues du code se mettent avec le site : ignorees ici)")
+        try: open(CODE_FILE, 'w').write(code + '\n')
+        except Exception: pass
+        dst = os.path.join(os.path.dirname(s), OUT_BASE.replace('Remix', 'Remix ' + code[4:]) + ext)
+        say("Code : " + code + "  (" + (', '.join(NAMES[f] for f in cfg['mods']) or 'aucun mod') + ")")
         say("Source : " + s); say("Creation : " + dst)
         last = [0]
         def prog(x):
             state['p'] = x
             if pygame and x - last[0] > 0.01: last[0] = x; draw()
         try:
-            n = patch(disc, dst, log=say, progress=prog, us=us)
+            n = patch(disc, dst, log=say, progress=prog, us=us, cfg=cfg)
             say("OK : termine (%d secteurs modifies). Mets a jour la liste des jeux." % n)
         except Exception as e:
             say("Erreur : " + str(e))
@@ -150,6 +220,11 @@ def main():
         pygame.quit()
 
 if __name__ == '__main__':
-    if len(sys.argv) == 4: patch(sys.argv[1], sys.argv[2], us=Disc(sys.argv[3]))   # source.chd dest.chd usa.chd
-    elif len(sys.argv) == 3: patch(sys.argv[1], sys.argv[2])
+    a = sys.argv[1:]
+    if len(a) >= 2:      # source dest [--code CB2-...] [--us usa.chd]  (or the old form: source dest usa.chd)
+        code = a[a.index('--code') + 1] if '--code' in a else None
+        usp = a[a.index('--us') + 1] if '--us' in a else (a[2] if len(a) == 3 else None)
+        cfg = M['decode_config'](code) if code else None
+        if cfg and usp is None: cfg['us_music'] = False
+        patch(a[0], a[1], us=Disc(usp) if usp else None, cfg=cfg)
     else: main()

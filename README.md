@@ -53,6 +53,17 @@ ses musiques par les fichiers `/CDDA/BGMx.DA` : ils sont redirigés vers les pis
 
 Première version (tout débloqué, planches SPECIAL, Hard + Mirror) : voir `docs/remix_usa.md`.
 
+## Choisir ses mods (code de configuration)
+
+Chaque mod du Remix s'active ou se désactive (site, onglet Patchs ; patcheur Batocera ; `make_remix.py`). Les choix
+tiennent dans un code `CB2-XXXX-XXXX` qui reconstruit exactement le même jeu :
+
+```
+python3 make_remix.py original.chd --config CB2-07Y0-20G     # « 100 % à gagner » : rien débloqué d'avance
+```
+
+Détails : [docs/modular.md](docs/modular.md). Sauvegarde, conditions de déblocage et 100 % : [docs/progression.md](docs/progression.md).
+
 ## Skins et planches perso (sans navigateur)
 
 Les éditeurs restent sur le site : le Prêt-à-porter enregistre des skins `.cb2skin.json` ; l'Atelier exporte la planche
