@@ -252,6 +252,9 @@ def patches():
     ch,lh_=asm(hm,0x8004f878); assert ch[-1][0]<0x8004f8a0
     P+=[('/SCES_009.92',a_,0,w) for a_,w in ch]; la['hm']=lh_['hm']
     P+=[('/MODE_SEL.BIN',0x8005b81c,0x08016e16,(2<<26)|((la['hm']>>2)&0x3ffffff))]
+    # TV hint of the mode select screen: its 3rd slot (GHOST L2+X, never shown) is shown like HARD on Competition,
+    # with the label 'H+M L1+R1+X' (HM_LABEL, drawn in /TITLE/MODE_SEL.FBD by apply())
+    P+=[('/MODE_SEL.BIN',0x800647dc,0x08019208,0x080191f9)]
     P+=[('/SCES_009.92',a,0,w) for a,w in ca]
     assert la['rm']==RM,hex(la['rm'])
     # mdf: flip wrapper (separate small cave): effective delta = a0 ? -s7 : s7, modulated, written back to s7
@@ -446,6 +449,32 @@ def layout(im,blobs):
     a=blob('snow',blobs[1],a,loaddir)
     a=blob('gray',blobs[0],tail,65795)
     return pos
+# 'H+M L1+R1+X' label for the TV hint: glyphs of the HARD and MIRROR hints copied over the unused GHOST hint.
+# 4-bit image of MODE_SEL.FBD (20-byte header, 512 halfwords wide = VRAM x 512..1023); the hints are in the texture
+# page (704,256), at u 0x50, v 0x60 (HARD) / 0x78 (MIRROR) / 0x90 (GHOST), 80x24 pixels, transparent index 12.
+_PX0=(704-512)*4+0x50
+def _hm_blits():
+    H,M=256+0x60,256+0x78; parts=[(H,8,15),(H,51,58),(M,5,13),None,(H,40,58),(M,40,50),(H,51,58),(H,59,75)]
+    out=[]; x=2
+    for p in parts:
+        if p is None: x+=2; continue
+        sy,a,b=p; out.append([_PX0+a,sy,b-a,24,_PX0+x,256+0x90]); x+=b-a
+    return out
+HM_LABEL=['px4','/TITLE/MODE_SEL.FBD',20,512,[_PX0,256+0x90,80,24,12],12,_hm_blits()]
+def px4(d,op):
+    """['px4', file, header, width (halfwords), [x,y,w,h,fill] cleared first, transparent index, [[sx,sy,w,h,dx,dy]...]]:
+    copies the non-transparent 4-bit pixels of rectangles of the original image (d is modified in place)"""
+    _,_,hdr,W,(cx,cy,cw,ch,fill),tr,blits=op
+    import numpy as _n
+    img=_n.frombuffer(bytes(d[hdr:hdr+W*2*512]),'<u2').reshape(-1,W)
+    pix=_n.zeros((img.shape[0],W*4),_n.uint8)
+    for k in range(4): pix[:,k::4]=(img>>(4*k))&15
+    src=pix.copy(); pix[cy:cy+ch,cx:cx+cw]=fill
+    for sx,sy,w,h,dx,dy in blits:
+        g=src[sy:sy+h,sx:sx+w]; m=g!=tr; pix[dy:dy+h,dx:dx+w][m]=g[m]
+    o=_n.zeros(img.shape,_n.uint16)
+    for k in range(4): o|=(pix[:,k::4].astype(_n.uint16)&15)<<(4*k)
+    d[hdr:hdr+o.size*2]=o.tobytes()
 def apply(src,dst,verbose=True):
     im=Img(src,dst)
     blobs=bundles()
@@ -459,6 +488,7 @@ def apply(src,dst,verbose=True):
         assert old is None or cur==old,(p,hex(a),hex(cur),hex(old))
         d[o:o+4]=struct.pack('<I',new)
     # Boss <-> Jicchi identities (player Boss = rider 4 is shown as BOSS; the CPU rider 7 becomes Jicchi)
+    px4(get(HM_LABEL[1]),HM_LABEL)
     e=get('/DATA/CHR/ENEMY1.FBD'); e[:]=swap_boss_jicchi(e)
     for f in ['/SBC1.BIN','/SBC2.BIN','/OMT.BIN','/COMB.BIN']:
         d=get(f); nd,ok=swap_name_plates(d); assert ok,f; d[:]=nd

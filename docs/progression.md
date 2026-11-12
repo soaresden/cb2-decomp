@@ -21,6 +21,10 @@ Suivent les records (0x800582F8…, 10 × 0xC0 octets de classements par piste, 
 
 - **Mirror** et pistes : podium (top 3) en Compétition (`ENDING` `func_8005D208`) ;
 - **Hard** et les 10 pistes : podium en Compétition Mirror ;
+- **Hard + Mirror** (ajouté par le Remix, L1 + R1 + ✕) : disponible dès que le Hard l'est (le jeu exige le Hard
+  débloqué pour L1 + ✕, et le Hard suppose le Mirror) ; gagner en Hard + Mirror ne débloque rien de plus (le jeu ne
+  l'enregistre pas). 0x80057438 et 0x8005743A sont sauvegardés mais jamais lus par le jeu : place libre pour
+  enregistrer un jour une victoire en Hard + Mirror ;
 - **Boss** : 1re place en Compétition Mirror ;
 - **Snowman** : 1re place en Compétition après avoir débloqué le Hard, **ou** les 30 trophées du Free Style (FREE) ;
 - **Gray** : half-pipe ≥ 376 (37,6 points, HP `sltiu s2, 0x178`), **ou** toutes les figures du Big Air Master (TM) ;

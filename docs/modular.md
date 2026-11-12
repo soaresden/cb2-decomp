@@ -1,6 +1,6 @@
 # Remix modulaire : un interrupteur par mod, et un code de configuration
 
-`remix/modular.py` découpe le Remix v16 en 9 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
+`remix/modular.py` découpe le Remix (v17) en 9 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
 patcheur Batocera utilisent le même paquet (`remix/cb2remix_mods.json.gz`, 31 Ko) et donnent **le même fichier, à l'octet
 près**.
 
@@ -8,7 +8,7 @@ près**.
 |---|---|---|
 | `unlock` | Tout débloqué | INIT (valeurs de départ), MAIN_SEL 0x80063EA8 (riders sélectionnables avec une ancienne sauvegarde) |
 | `special` | Planches SPECIAL partout | MAIN_SEL 0x8005B0C4 + lectures de 0x80057442 |
-| `hardmirror` | Hard + Mirror | exe 0x8004F878–0x8004F89F, MODE_SEL |
+| `hardmirror` | Hard + Mirror | exe 0x8004F878–0x8004F89F, MODE_SEL (dont 0x800647DC : 3e ligne de la télé), étiquette « H+M L1+R1+X » dans `TITLE/MODE_SEL.FBD` |
 | `riders` | Boss, Gray et Snowman en championnat | caves de l'exe, MAIN_SEL, SBC1/SBC2, ENEMY1, EFCT_SBC (plaques), LOCTBL, paquets de modèles, voix de Boss (fin du film d'intro coupée) |
 | `outfits` | Tenues cachées de Cindy et Irin | MAIN_SEL (grandit : déplacé à la fin de SBCMOVE.STR, coupée), exe |
 | `max` | Stats MAX | MAIN_SEL + écrans de course |
@@ -21,7 +21,7 @@ partagé vers la partie « contrôle en l'air » retournent directement au jeu (
 
 ## Vérifications
 
-- tous les mods = build v16 (713 secteurs identiques) ; aucun mod = disque d'origine ;
+- tous les mods = build de référence (v17 : 725 secteurs identiques) ; aucun mod = disque d'origine ;
 - moteur JS (`disc.js` `applyMods`) = moteur Python sur plusieurs combinaisons ;
 - émulateur (Beetle PSX) : chaque mod seul et « tous sauf un » (18 images) démarrent, passent les menus et jouent une
   manche de compétition ;
@@ -32,7 +32,8 @@ partagé vers la partie « contrôle en l'air » retournent directement au jeu (
 
 Opérations par mod, relatives au disque d'origine : mots de 32 bits (`w`, avec la valeur d'origine vérifiée), octets
 (`bs` : copiés depuis le fichier d'origine ou nouveaux), ajout à la fin d'un fichier (`append`), entrées de répertoire
-(`rec`), secteurs entiers (`sec`, copies depuis le disque + octets nouveaux). Aucune donnée du jeu n'y est stockée : ce qui
+(`rec`), secteurs entiers (`sec`, copies depuis le disque + octets nouveaux), image 4 bits recomposée à partir de
+rectangles de l'image d'origine (`px4`). Aucune donnée du jeu n'y est stockée : ce qui
 vient du jeu est copié depuis le disque du joueur.
 
 Régénération (après un changement du Remix) : `make_remix.py --release` (écrit aussi `build/patches.js` avec
@@ -65,3 +66,13 @@ code de `cb2remix_code.txt` (à côté du .pygame) s'il existe ; il y enregistre
 Les films d'intro européen (`OPMOVIEE.STR`) et américain (`OPMOVIEA.STR`) ont exactement la même taille : c'est le
 même film ré-encodé. Le choix de l'intro n'apporte donc rien ; le champ est réservé dans le code (pour « sans intro »
 plus tard : le film est lancé par INIT, table de 4 chemins à 0x8005F700).
+
+## Télé du menu : Hard + Mirror (v17)
+
+Sur l'écran de sélection de mode, la télé affiche des aides en images (texture page (704,256) de `TITLE/MODE_SEL.FBD`,
+80×24 pixels) : « HARD L1+X » (si le Hard est débloqué), « MIRROR R1+X » (si le Mirror l'est) et une troisième,
+« GHOST L2+X », que le jeu n'affiche jamais (`func_80064798`, case 2 : toujours éteinte). La v17 :
+- redessine cette 3e image en « H+M L1+R1+X » avec les lettres des deux autres (recette `remix.HM_LABEL`, appliquée au
+  fichier du joueur : aucun pixel du jeu n'est stocké) ;
+- l'affiche sur Competition comme la ligne HARD (0x800647DC : `j 0x80064820` → `j 0x800647E4`), donc seulement quand le
+  Hard est débloqué : en « 100 % à gagner », le Hard + Mirror se débloque avec le Hard.

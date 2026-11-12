@@ -11,6 +11,7 @@ Operations
   ['b', file, offset, hexbytes]      bytes of a file
   ['bs', file, offset, segs]         bytes of a file: [[0, len, src] copied from the original file at src | [1, hex]]
   ['append', file, hexbytes]         bytes added at the end of a file (MAIN_SEL grows: it then moves, see below)
+  ['px4', file, hdr, W, clear, tr, blits]  4-bit image: rectangles of the original copied (see px4)
   ['rec', path, lba, size]           directory record of a file
   ['sec', lba, subheader_hex, ops]   whole sector: ops = [[0, len, src_addr] copy from the original disc | [1, hex]]
 """
@@ -142,6 +143,10 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
         for (f, o), w in words.items():
             if f == p: struct.pack_into('<I', a, o, w)
         if a == b: continue
+        if p == '/TITLE/MODE_SEL.FBD':
+            import remix as _rx
+            c = bytearray(O.read_file(p)); px4(c, _rx.HM_LABEL); assert bytes(c) == b, 'étiquette H+M différente'
+            pkg['ops']['hardmirror'].append(list(_rx.HM_LABEL)); continue
         i = 0
         while i < len(a):
             if a[i] == b[i]: i += 1; continue
@@ -211,6 +216,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
                 b = buf(op[1]); src = orig(op[1]); d = b''.join(src[x[2]:x[2] + x[1]] if x[0] == 0 else bytes.fromhex(x[1]) for x in op[3])
                 b[op[2]:op[2] + len(d)] = d
             elif t == 'append': buf(op[1]).extend(bytes.fromhex(op[2]))
+            elif t == 'px4': px4(buf(op[1]), op)
             elif t == 'rec': recs[op[1]] = (op[2], op[3])
             elif t == 'sec': secs[op[1]] = (bytes.fromhex(op[2]), op[3])
     mods = {}
@@ -240,6 +246,26 @@ def apply(disc, pkg, feats, log=lambda m: None):
             d[so + 2:so + 10] = struct.pack('<I', l) + struct.pack('>I', l); d[so + 10:so + 18] = struct.pack('<I', s) + struct.pack('>I', s)
             mods[sl] = (m[0] if m else disc.img.sector(sl)[16:24], bytes(d))
     return mods
+
+def px4(d, op):
+    """['px4', file, header, width (halfwords), [x, y, w, h, fill], transparent, [[sx, sy, w, h, dx, dy]...]]:
+    copies the non-transparent 4-bit pixels of rectangles of the original image into it (d: bytearray, in place)"""
+    _, _, hdr, W, (cx, cy, cw, ch, fill), tr, blits = op
+    rows = (len(d) - hdr) // (W * 2)
+    def get(x, y): v = d[hdr + y * W * 2 + x // 2]; return (v >> 4) if x & 1 else (v & 15)
+    def put(x, y, c):
+        i = hdr + y * W * 2 + x // 2; d[i] = (d[i] & 15) | (c << 4) if x & 1 else (d[i] & 0xf0) | c
+    src = {}
+    for sx, sy, w, h, dx, dy in blits:
+        for y in range(h):
+            for x in range(w): src[(sx + x, sy + y)] = get(sx + x, sy + y)
+    for y in range(ch):
+        for x in range(cw): put(cx + x, cy + y, fill)
+    for sx, sy, w, h, dx, dy in blits:
+        for y in range(h):
+            for x in range(w):
+                c = src[(sx + x, sy + y)]
+                if c != tr: put(dx + x, dy + y, c)
 
 def mark(disc, mods, text):
     """write the configuration code in the volume descriptor (application-use area, unused by the game)"""
