@@ -48,7 +48,7 @@ python3 remix/modular.py PAL.chd "Remix v16.chd" PAL_fs remix/cb2remix.delta.gz 
 ## Code de configuration
 
 `CB2-XXXX-XXXX` : 1 octet de version, 2 octets de mods (bit i = i-ème mod du tableau ci-dessus), 1 octet d'options
-(bit 0 : musiques US ; bits 1-3 réservés : intro, 60 Hz), 2 octets de tenues du Prêt-à-porter (bit i = entrée i de
+(bit 0 : musiques US ; bits 1-3 réservés : intro, 60 Hz), jusqu’à 8 octets de tenues du Prêt-à-porter (bit i = entrée i de
 `skins/index.json` du site), octets nuls de fin retirés, puis 1 octet de contrôle (crc32 & 255), en base32 Crockford.
 Exemples : `CB2-07ZG-FX0` = Remix complet, `CB2-07Y0-EDR` = 100 % à gagner (avec la page de progression et l'arrivée express), `CB2-040B-W` =
 aucun mod. Les codes d'avant la v18 (sans le bit `progress`) restent valables.

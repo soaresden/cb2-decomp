@@ -315,14 +315,14 @@ def load(path): return json.loads(gzip.decompress(open(path, 'rb').read()))
 
 # ------------------------------------------------------------------------------------------------ configuration code
 # bytes: [1] version, [2] mods (bit i = FEATURES[i], 16 bits LE), [1] options (bit 0 = USA music, bits 1-2 intro
-# (reserved), bit 3 = 60 Hz (reserved)), [2] ready-to-wear skins (bit i = entry i of the site's skins/index.json);
+# (reserved), bit 3 = 60 Hz (reserved)), [up to 8] ready-to-wear skins (bit i = entry i of the site's skins/index.json);
 # trailing zero bytes dropped, then 1 check byte (crc32 & 255); Crockford base32, "CB2-XXXX-XXXX".
 B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 IDS = [f[0] for f in FEATURES]
 
 def encode_config(mods, us_music=False, skins=()):
-    m = sum(1 << IDS.index(f) for f in mods); s = sum(1 << i for i in skins)
-    b = bytearray([1, m & 255, m >> 8, 1 if us_music else 0, s & 255, s >> 8])
+    m = sum(1 << IDS.index(f) for f in mods); s = sum(1 << i for i in skins if 0 <= i < 64)
+    b = bytearray([1, m & 255, m >> 8, 1 if us_music else 0]) + s.to_bytes(8, 'little')
     while len(b) > 2 and b[-1] == 0: b.pop()
     import zlib; b.append(zlib.crc32(bytes(b)) & 255)
     n = int.from_bytes(b, 'big'); nb = len(b) * 8; k = -(-nb // 5); n <<= k * 5 - nb
@@ -338,8 +338,8 @@ def decode_config(code):
     for c in s: n = n * 32 + B32.index(c)
     nb = len(s) * 5 // 8; n >>= len(s) * 5 - nb * 8; b = n.to_bytes(nb, 'big')
     if len(b) < 2 or zlib.crc32(b[:-1]) & 255 != b[-1] or b[0] != 1: raise ValueError('code invalide')
-    b = b[:-1] + bytes(6); m = b[1] | b[2] << 8; s = b[4] | b[5] << 8
-    return {'mods': [f for i, f in enumerate(IDS) if m >> i & 1], 'us_music': bool(b[3] & 1), 'skins': [i for i in range(16) if s >> i & 1]}
+    b = b[:-1] + bytes(12); m = b[1] | b[2] << 8; s = int.from_bytes(b[4:12], 'little')
+    return {'mods': [f for i, f in enumerate(IDS) if m >> i & 1], 'us_music': bool(b[3] & 1), 'skins': [i for i in range(64) if s >> i & 1]}
 
 if __name__ == '__main__':
     # usage: modular.py PAL.chd REFERENCE.chd PAL_fs remix/cb2remix.delta.gz out.json.gz
