@@ -1,6 +1,6 @@
 # Remix modulaire : un interrupteur par mod, et un code de configuration
 
-`remix/modular.py` découpe le Remix (v21) en 11 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
+`remix/modular.py` découpe le Remix (v22) en 11 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
 patcheur Batocera utilisent le même paquet (`remix/cb2remix_mods.json.gz`, 31 Ko) et donnent **le même fichier, à l'octet
 près**.
 
@@ -15,7 +15,7 @@ près**.
 | `air` | Figures en l'air | overlays de course |
 | `ramming` | Chocs en Boarder Cross | exe 0x80028BF4–0x80028D3C, SBC2 |
 | `bam` | Big Air Master | TM |
-| `lift` | Remontée en Free Style (juste avant l'arrivée) | fin de FREE.BIN, crochet 0x8005D04C, début du tas de FREE (exe 0x800100CC) — voir `freestyle_lift.md` |
+| `lift` | Arrivée express en Free Style (pas de célébration ni de replay, résultats puis RETRY) | FREE 0x8005D5A4 — voir `freestyle_lift.md` |
 | `progress` | Progression dans le jeu (SELECT sur l'écran des modes) | fin de MODE_SEL (82 secteurs : déplacé à la fin de STAFFE.STR, coupé), crochet 0x800643B4, début du tas de MODE_SEL (exe 0x800100B4) — voir `progression.md` |
 
 `max` et `air` partagent la lecture de la manette (`input`, ajoutée automatiquement). Sans `air`, les sauts du code
@@ -23,7 +23,7 @@ partagé vers la partie « contrôle en l'air » retournent directement au jeu (
 
 ## Vérifications
 
-- tous les mods = build de référence (v21 : 807 secteurs identiques) ; aucun mod = disque d'origine ;
+- tous les mods = build de référence (v22 : 806 secteurs identiques) ; aucun mod = disque d'origine ;
 - moteur JS (`disc.js` `applyMods`) = moteur Python sur plusieurs combinaisons ;
 - émulateur (Beetle PSX) : chaque mod seul et « tous sauf un » (18 images) démarrent, passent les menus et jouent une
   manche de compétition ;
@@ -50,7 +50,7 @@ python3 remix/modular.py PAL.chd "Remix v16.chd" PAL_fs remix/cb2remix.delta.gz 
 `CB2-XXXX-XXXX` : 1 octet de version, 2 octets de mods (bit i = i-ème mod du tableau ci-dessus), 1 octet d'options
 (bit 0 : musiques US ; bits 1-3 réservés : intro, 60 Hz), 2 octets de tenues du Prêt-à-porter (bit i = entrée i de
 `skins/index.json` du site), octets nuls de fin retirés, puis 1 octet de contrôle (crc32 & 255), en base32 Crockford.
-Exemples : `CB2-07ZG-FX0` = Remix complet, `CB2-07Y0-EDR` = 100 % à gagner (avec la page de progression et la remontée), `CB2-040B-W` =
+Exemples : `CB2-07ZG-FX0` = Remix complet, `CB2-07Y0-EDR` = 100 % à gagner (avec la page de progression et l'arrivée express), `CB2-040B-W` =
 aucun mod. Les codes d'avant la v18 (sans le bit `progress`) restent valables.
 
 Le code est écrit dans le disque construit (descripteur de volume, secteur 16, octet 900, zone inutilisée par le jeu) :

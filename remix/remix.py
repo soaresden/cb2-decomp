@@ -260,10 +260,9 @@ def patches():
     import progress as _pg
     _o,_b,_h=_pg.block()
     P+=[('/MODE_SEL.BIN',_pg.HOOK,_pg.HOOK_OLD,_h),('/SCES_009.92',0x800100b4,0x800832c8,_pg.LIMIT)]
-    # Free Style lift (lift.py): just before the finish, back to the top (the game's own instant restart)
+    # Free Style lift (lift.py): the finish counts as usual, no celebration / replay, straight to ranking -> RETRY
     import lift as _lf
-    _lo,_lb,_lh,_lheap=_lf.block()
-    P+=[('/FREE.BIN',_lf.HOOK,_lf.HOOK_OLD,_lh),('/SCES_009.92',_lf.HEAP_ENTRY,_lf.HEAP_OLD,_lheap)]
+    P+=_lf.patches()
     P+=[('/SCES_009.92',a,0,w) for a,w in ca]
     assert la['rm']==RM,hex(la['rm'])
     # mdf: flip wrapper (separate small cave): effective delta = a0 ? -s7 : s7, modulated, written back to s7
@@ -529,9 +528,6 @@ def apply(src,dst,verbose=True):
     slba,ssz,_=im.files['/MOVIE/SBCMOVE.STR']; sn=ssz//2048; mlba=slba+sn-nms
     im.set_record('/MOVIE/SBCMOVE.STR',size=(sn-nms)*2048)
     write_blob(im,mlba,bytes(ms)); im.set_record('/MAIN_SEL.BIN',lba=mlba,size=len(ms)); del files['/MAIN_SEL.BIN']
-    # lift code at the end of FREE (same sectors, larger size)
-    import lift as _lf
-    f2=get('/FREE.BIN'); assert _lf.ORG==OVL+len(f2); f2+=_lf.block()[1]; im.set_record('/FREE.BIN',size=len(f2))
     # progress page code at the end of MODE_SEL (same sectors, larger size)
     import progress as _pg
     m2=get('/MODE_SEL.BIN'); assert _pg.ORG==OVL+len(m2); org_,blob_,_=_pg.block(); m2+=blob_
