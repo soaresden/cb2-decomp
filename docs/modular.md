@@ -1,6 +1,6 @@
 # Remix modulaire : un interrupteur par mod, et un code de configuration
 
-`remix/modular.py` découpe le Remix (v22) en 11 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
+`remix/modular.py` découpe le Remix (v23) en 11 mods indépendants. Le site (onglet Patchs), `make_remix.py --config` et le
 patcheur Batocera utilisent le même paquet (`remix/cb2remix_mods.json.gz`, 31 Ko) et donnent **le même fichier, à l'octet
 près**.
 
@@ -79,3 +79,12 @@ Sur l'écran de sélection de mode, la télé affiche des aides en images (textu
   fichier du joueur : aucun pixel du jeu n'est stocké) ;
 - l'affiche sur Competition comme la ligne HARD (0x800647DC : `j 0x80064820` → `j 0x800647E4`), donc seulement quand le
   Hard est débloqué : en « 100 % à gagner », le Hard + Mirror se débloque avec le Hard.
+
+## Planche MAX (dans le mod `max`, v23)
+
+○ sur l'écran BOARD bascule la planche MAX (texte « O : MAX / O : NORMAL » en bas à gauche, comme pour le rider).
+La table des planches (10 octets par planche : vitesse max, réactivité, stabilité × 3 variantes selon le mode ;
+0x800988B0 dans FREE, une copie dans chacun des 9 modes de course) reçoit, à l'entrée du mode de course (exe
+0x8001228C, appel du point d'entrée de l'overlay), à la ligne de la planche du joueur (0x8005740A), les meilleures
+valeurs du jeu : 165/157/196, 100/110/80, 80/88/80. Code dans `func_8002815C` (fonction morte de l'exe). Un
+concurrent de l'ordinateur qui aurait la même planche en profite aussi.

@@ -58,6 +58,7 @@ def _r(*xs): return xs
 EXE_MAP = [   # (lo, hi, feature) in the executable
     (0x8001B594, 0x8001B594, INPUT), (0x8004F980, 0x8004F99F, INPUT), (0x8004FA10, 0x8004FBFF, INPUT), (0x8004F9A0, 0x8004F9DF, INPUT),
     (0x8004F8CC, 0x8004F8FF, INPUT), (0x8002957C, 0x8002979F, INPUT), (0x8002A030, 0x8002A180, INPUT),
+    (0x8002815C, 0x80028413, 'max'), (0x8001228C, 0x8001228C, 'max'),
     (0x80028BF4, 0x80028D3C, 'ramming'),
     (0x8004F878, 0x8004F89F, 'hardmirror'),
     (0x8004F800, 0x8004F877, 'riders'), (0x8004F8A0, 0x8004F8CB, 'riders'), (0x8004F900, 0x8004F91F, 'riders'), (0x8004F940, 0x8004F96B, 'riders'),
@@ -67,7 +68,7 @@ EXE_MAP = [   # (lo, hi, feature) in the executable
     (0x800100B4, 0x800100B4, 'progress'),
 ]
 MODE_MAP = [(0x800643B4, 0x800643B4, 'progress'), (0x800832C8, 0x800836A8, 'progress')]
-MS_MAP = [(0x80063EA8, 0x80063EA8, 'unlock'), (0x8005B0C4, 0x8005B0C4, 'special'), (0x80069D00, 0x8006C910, 'special'),
+MS_MAP = [(0x8006B68C, 0x8006B68C, 'max'), (0x8006BE3C, 0x8006BE3C, 'max'), (0x8006CAAC, 0x8006CAAC, 'max'), (0x80063EA8, 0x80063EA8, 'unlock'), (0x8005B0C4, 0x8005B0C4, 'special'), (0x80069D00, 0x8006C910, 'special'),
           (0x800614B8, 0x800614B8, 'max'), (0x800626E4, 0x800626E4, 'max'), (0x80063FC8, 0x80063FCC, 'riders'), (0x80064044, 0x80064044, 'riders'),
           (0x800605B4, 0x80062180, 'outfits'), (0x800640EC, 0x80064210, 'outfits')]
 SBC_MAP = {'/FREE.BIN': [(0x8005D5A4, 0x8005D5A4, 'lift')],

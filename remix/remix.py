@@ -115,6 +115,38 @@ def patches():
                    ('/HP.BIN',0x80063d0c,'s0'),('/FREE.BIN',0x8006465c,'s0'),('/TM.BIN',0x80063c38,'s0'),('/COMB.BIN',0x80064b88,'s0')):
         P.append((f,a_,0x00431021,JL(lmx['maxc_'+b])))
     P+=[('/MAIN_SEL.BIN',0x800614b8,0x84a40000,JL(lmx['maxd'])),('/MAIN_SEL.BIN',0x800626e4,0x0c01731e,JL(lmx['maxl']))]
+    # ---- board MAX (Circle on the BOARD screen): when on, every race overlay gets, right after it is loaded, the row
+    # of the player's board (0x8005740A) in its board table (10 bytes per board: max speed, response, stability x 3
+    # variants) replaced by the highest values of the game. Code in another dead function of the exe (func_8002815C, never referenced)
+    BZ=0x8002815c; BT=[0x800980ec,0x8008c9fc,0x8008f3dc,0x800988b0,0x8009a9d8,0x800943d4,0x800944e4,0x80093e70,0x80098074]
+    BMAX=bytes([165,157,196,100,110,80,80,88,80])
+    hb=(BZ+0x8000)>>16; lob=lambda a: a-(hb<<16)
+    # ovh: in place of the main loop's call of the overlay entry (exe 0x8001228c, overlay fully loaded by then):
+    # if board MAX is on, find which race overlay is in (its board table starts with board 0 = 104, _, 123) and
+    # overwrite the row of the player's board, then enter the overlay (a0 untouched, ra = the main loop)
+    BX=['ovh:',f'lui at, {hb}','lw t0, FLAGB_LO(at)','lui t3, 0x8005','beqz t0, go','lh t3, 0x740a(t3)','addiu t1, at, TBL_LO','sltiu t2, t3, 14','beqz t2, go','nop',
+        'o1:','lw t2, 0(t1)','nop','beqz t2, go','addiu t1, t1, 4','lbu t4, 0(t2)','lbu t5, 2(t2)','addiu t6, zero, 104','bne t4, t6, o1','addiu t6, zero, 123','bne t5, t6, o1','nop',
+        'sll t4, t3, 2','addu t4, t4, t3','sll t4, t4, 1','addu t2, t2, t4','addiu t5, at, ROW_LO','addiu t6, zero, 9',
+        'o2:','lbu t7, 0(t5)','addiu t6, t6, -1','sb t7, 0(t2)','addiu t5, t5, 1','bnez t6, o2','addiu t2, t2, 1',
+        'go:','j 0x8005aeac','nop',
+        # BOARD screen: Circle toggles the board MAX (pad eaten there like on the BOARDER screen), hint text
+        'maxb:','addiu sp, sp, -0x30','sw ra, 0x2c(sp)','lw t0, 0x40(sp)','nop','jal 0x8005cc78','sw t0, 0x10(sp)',
+        'lui at, 0x8005','lw t1, -0x410(at)','lui at, 0x8003','addiu t2, zero, 8',f'sw t2, {lo(ACT)}(at)','andi t1, t1, 0x20',
+        f'lui at, {hb}','lw t3, EDGEB_LO(at)','sw t1, EDGEB_LO(at)','beqz t1, mb1','nop','bnez t3, mb1','nop',
+        'lw t4, FLAGB_LO(at)','nop','xori t4, t4, 1','sw t4, FLAGB_LO(at)',
+        'mb1:',f'lui at, {hb}','lw t4, FLAGB_LO(at)','lui at, 0x8003',f'addiu a2, at, {lo(STR1)}','beqz t4, mb2','nop',f'addiu a2, at, {lo(STR2)}',
+        'mb2:','move a0, s5','move a1, v0',f'addiu t0, zero, {HINT_Y}','sw t0, 0x10(sp)','sw zero, 0x14(sp)',f'addiu t0, zero, {HINT_F}','sw t0, 0x18(sp)',
+        'jal 0x8005e784',f'addiu a3, zero, {HINT_X}','lw ra, 0x2c(sp)','nop','jr ra','addiu sp, sp, 0x30']
+    def _bx(code_end):
+        d={'FLAGB_LO':lob(code_end),'EDGEB_LO':lob(code_end+4),'TBL_LO':lob(code_end+8),'ROW_LO':lob(code_end+8+40)}
+        return [x.replace('FLAGB_LO',str(d['FLAGB_LO'])).replace('EDGEB_LO',str(d['EDGEB_LO'])).replace('TBL_LO',str(d['TBL_LO'])).replace('ROW_LO',str(d['ROW_LO'])) for x in BX]
+    cb,_=asm(_bx(BZ+0x400),BZ); cend=(cb[-1][0]+4+3)&~3
+    cb,lbx=asm(_bx(cend),BZ)
+    bdata=struct.pack('<II',0,0)+b''.join(struct.pack('<I',t) for t in BT)+bytes(4)+BMAX+bytes(3)
+    words=[(a_,w_) for a_,w_ in cb]+[(cend+i,struct.unpack_from('<I',bdata,i)[0]) for i in range(0,len(bdata),4)]
+    assert words[-1][0]<0x80028414,hex(words[-1][0])
+    for a_,w_ in words: P.append(('/SCES_009.92',a_,struct.unpack_from('<I',_ex,a_-0x8000f800)[0],w_))
+    P+=[('/SCES_009.92',0x8001228c,0x0c016bab,JL(lbx['ovh']))]+[('/MAIN_SEL.BIN',a_,0x0c01731e,JL(lbx['maxb'])) for a_ in (0x8006b68c,0x8006be3c,0x8006caac)]
     c4,l4=asm(['pad:','bnez a0, pd','lui at, 0x8005','j %d'%lmx['padx'],'sw a2, -0x410(at)','pd:','j %d'%RM,'nop'],CAVE_PAD)
     assert c4[-1][0]<0x8004f9a0
     # Square held in the air: rotations x4 (the old 'mdr' tail of md lives here)
