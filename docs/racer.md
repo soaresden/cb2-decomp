@@ -110,3 +110,20 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
   champ +0xCB6 du rider. Ce champ est remis à 0 avec le rider (0x800650A8) et augmente de 1 à chaque (re)départ d'une
   descente (`func_8005C1C8`, qui vide aussi l'entrée +0xE10 + 4 n) ; une autre branche (0x80072074) le fait passer de
   1 à 2. C'est donc un compteur de descentes / essais plutôt que de chutes ; ce qu'il change en jeu n'est pas trouvé.
+
+## Icônes des classements (records) — enquête
+
+- Les classements de fin de course (RANKING : TIME / TRICK / TOTAL) dessinent l'icône du rider du record par une table
+  de 7 mots `clut << 16 | v << 8 | u`, identique dans FREE (0x80097D60), HP (0x800934F4), BP (0x80097524) et OMT
+  (0x80093878) : icônes 16 × 16 en 4 bits, page de texture (448, 256), u 0xC0..0xF0, v 0x30 / 0x40, palettes ligne 463
+  (x 928..1008) et 464 (x 0). Le record ne garde que le numéro du rider (0..6) : un record de Kelly s'affiche avec Cindy.
+- Pour Jicchi / Nick / Kelly il faudrait des numéros 7..9 dans les records et trois icônes de plus, mais la page de
+  texture et les lignes de palettes sont pleines pendant les courses : il faut d'abord trouver de la place (VRAM) dans
+  chaque mode.
+
+## Écran large (widescreen hack de l'émulateur)
+
+- Avec `beetle_psx_widescreen_hack`, l'image s'élargit mais le décor n'est dessiné que dans le champ du 4:3 : bords
+  vides ou blancs (Free Style à gauche, half-pipe des deux côtés). Les bornes d'écran ne sont pas comparées en
+  coordonnées écran (pas de test x contre ±160 / 320 trouvé) : le décor est choisi plus tôt (blocs de piste selon la
+  caméra). Pas de correctif pour l'instant ; jouer en 4:3 reste conseillé.
