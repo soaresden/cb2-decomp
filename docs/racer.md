@@ -56,3 +56,15 @@ boutons de la manette (`g_padButtons`, bits actifs : 0x10 Triangle, 0x20 Rond, 0
 - Les rendre jouables demande : une place dans la liste de l'écran BOARDER (nom, portrait, stats), des numéros de rider
   au-delà de 6 acceptés par les tables indexées par rider (stats, animations, voix, plaques de nom…), et un modèle +
   une texture de joueur (le modèle basse définition de l'ordinateur, ou un corps FRM/FRFM avec sa texture agrandie).
+
+### Fichiers du rider du joueur (Free Style et modes à un joueur) — `func_8001D1B8` (exe)
+
+- Arguments : contexte, structure du menu (0x80057408 : +0 rider, +4 veste, +6 pantalon, +0xA / +0xE / +0x10 joueur 2).
+- Modèle : table 0x80011158 = numéros de fichiers 156..162 (FR/1P FRM1, FRM2, FRFM1, FRFM2, BOSS, GRAY, SNOW), indexée par
+  le rider (copiée sur la pile : 7 entrées seulement, un rider 7 lirait n'importe quoi) ; 0x80011174 = 170..174 (VS/1P).
+- Texture : fichier 180 + rider × 9 + veste × 3 + pantalon (FR/FBD FRM1_00..FRM2_22, FR/FBD2 FRFM1/2) ; Boss, Gray et
+  Snowman (FR/FBD3 BOSS0/1, GRAY0/1, SNOW0/1) passent par un autre chemin.
+- Table des fichiers de l'INIT (0x8005F6C8, 323 chemins) : 140..143 PLAYER0..3.DAT, 144 ENEMY1.FBD, 156..169 FR/1P et
+  FR/2P (*.PMD), 170..179 VS/1P et VS/2P, 180..227 textures FR, 228 BOARD.DAT, 229..236 TOD_MAN0..7, 237 TOD_SM.
+- Une texture de joueur (FR/FBD, 17 428 octets = 20 + 2 lignes de CLUT + 128 × 256 en 4 bits) a la même taille qu'une
+  colonne de rider de l'ordinateur dans ENEMY1.FBD : la texture de Jicchi / Nick / Kelly peut servir telle quelle.
