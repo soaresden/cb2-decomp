@@ -7,7 +7,11 @@
 
 Same algorithms as the web site's disc.js / chdpatch.js, so both produce the same files.
 """
-import lzma, re, struct, zlib
+import re, struct, zlib
+try:
+    import lzma
+except ImportError:      # some Python builds (e.g. Batocera's) have no _lzma: pure-Python decoder below
+    lzma = None
 
 SEC, FRAME = 2352, 2448
 SYNC = bytes([0] + [255] * 10 + [0])
@@ -144,10 +148,100 @@ def decode_map(logical, hunkbytes, m):
     return dict(n=n, first=first, lb=lb, sb=sb, pb=pb, typ=typ, ln=ln, off=off, crc=crc)
 
 def _lzma_raw(src, size):
+    if lzma is None: return _lzma_raw_py(bytes(src), size)
     d = lzma.LZMADecompressor(lzma.FORMAT_RAW, filters=[{'id': lzma.FILTER_LZMA1, 'lc': 3, 'lp': 0, 'pb': 2, 'dict_size': 1 << 24}])
     out = d.decompress(bytes(src), max_length=size)
     if len(out) != size: raise ValueError('bloc LZMA incomplet')
     return out
+
+def _lzma_raw_py(src, size, lc=3, lp=0, pb=2):
+    """raw LZMA1 stream (no header) -> size bytes, after the reference LzmaSpec.cpp (same as the site's lzma.js)"""
+    out = bytearray(size); op = 0
+    st = [0xFFFFFFFF, int.from_bytes(src[1:5], 'big'), 5]       # range, code, input position
+    n_src = len(src)
+    def bit(probs, i):
+        rng, code, p = st; v = probs[i]; bound = (rng >> 11) * v
+        if code < bound:
+            probs[i] = v + ((2048 - v) >> 5); rng = bound; b = 0
+        else:
+            probs[i] = v - (v >> 5); code -= bound; rng -= bound; b = 1
+        if rng < 0x1000000:
+            rng = (rng << 8) & 0xFFFFFFFF; code = ((code << 8) | (src[p] if p < n_src else 0)) & 0xFFFFFFFF; p += 1
+        st[0] = rng; st[1] = code; st[2] = p
+        return b
+    def direct(n):
+        rng, code, p = st; res = 0
+        for _ in range(n):
+            rng >>= 1
+            if code >= rng: code -= rng; res = (res << 1) | 1
+            else: res <<= 1
+            if rng < 0x1000000:
+                rng = (rng << 8) & 0xFFFFFFFF; code = ((code << 8) | (src[p] if p < n_src else 0)) & 0xFFFFFFFF; p += 1
+        st[0] = rng; st[1] = code; st[2] = p
+        return res
+    def tree(probs, base, nb):
+        m = 1
+        for _ in range(nb): m = (m << 1) + bit(probs, base + m)
+        return m - (1 << nb)
+    def tree_rev(probs, base, nb):
+        m = 1; sym = 0
+        for i in range(nb):
+            b = bit(probs, base + m); m = (m << 1) + b; sym |= b << i
+        return sym
+    P = lambda n: [1024] * n
+    literal = P(0x300 << (lc + lp)); pos_slot = P(4 << 6); pos_dec = P(1 + 114); align = P(16)
+    is_match = P(12 << 4); is_rep = P(12); g0 = P(12); g1 = P(12); g2 = P(12); rep0_long = P(12 << 4)
+    lens = [(P(2), P(16 << 3), P(16 << 3), P(256)) for _ in range(2)]
+    def length(k, ps):
+        ch, lo, mi, hi = lens[k]
+        if bit(ch, 0) == 0: return tree(lo, ps << 3, 3)
+        if bit(ch, 1) == 0: return 8 + tree(mi, ps << 3, 3)
+        return 16 + tree(hi, 0, 8)
+    rep0 = rep1 = rep2 = rep3 = 0; state = 0; pbm = (1 << pb) - 1; lpm = (1 << lp) - 1
+    while op < size:
+        ps = op & pbm
+        if bit(is_match, (state << 4) + ps) == 0:
+            prev = out[op - 1] if op else 0
+            base = 0x300 * (((op & lpm) << lc) + (prev >> (8 - lc))); sym = 1
+            if state >= 7:
+                mb_ = out[op - rep0 - 1]
+                while sym < 0x100:
+                    mb = (mb_ >> 7) & 1; mb_ <<= 1
+                    b = bit(literal, base + ((1 + mb) << 8) + sym); sym = (sym << 1) | b
+                    if mb != b: break
+            while sym < 0x100: sym = (sym << 1) | bit(literal, base + sym)
+            out[op] = sym - 0x100; op += 1
+            state = 0 if state < 4 else state - 3 if state < 10 else state - 6
+            continue
+        if bit(is_rep, state):
+            if bit(g0, state) == 0:
+                if bit(rep0_long, (state << 4) + ps) == 0:
+                    state = 9 if state < 7 else 11; out[op] = out[op - rep0 - 1]; op += 1; continue
+            else:
+                if bit(g1, state) == 0: dist = rep1
+                else:
+                    if bit(g2, state) == 0: dist = rep2
+                    else: dist = rep3; rep3 = rep2
+                    rep2 = rep1
+                rep1 = rep0; rep0 = dist
+            ln = length(1, ps); state = 8 if state < 7 else 11
+        else:
+            rep3 = rep2; rep2 = rep1; rep1 = rep0
+            ln = length(0, ps); state = 7 if state < 7 else 10
+            slot = tree(pos_slot, min(ln, 3) << 6, 6)
+            if slot < 4: rep0 = slot
+            else:
+                nd = (slot >> 1) - 1; dist = (2 | (slot & 1)) << nd
+                if slot < 14: dist += tree_rev(pos_dec, dist - slot, nd)
+                else: dist += (direct(nd - 4) << 4) + tree_rev(align, 0, 4)
+                rep0 = dist
+                if rep0 == 0xFFFFFFFF: break
+        ln += 2; s0 = op - rep0 - 1
+        if s0 < 0: raise ValueError('bloc LZMA incorrect')
+        end = min(op + ln, size)
+        while op < end: out[op] = out[s0]; op += 1; s0 += 1
+    if op != size: raise ValueError('bloc LZMA incomplet')
+    return bytes(out)
 
 def _inflate(src): return zlib.decompress(bytes(src), -15)
 
