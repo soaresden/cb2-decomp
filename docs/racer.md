@@ -68,3 +68,14 @@ boutons de la manette (`g_padButtons`, bits actifs : 0x10 Triangle, 0x20 Rond, 0
   FR/2P (*.PMD), 170..179 VS/1P et VS/2P, 180..227 textures FR, 228 BOARD.DAT, 229..236 TOD_MAN0..7, 237 TOD_SM.
 - Une texture de joueur (FR/FBD, 17 428 octets = 20 + 2 lignes de CLUT + 128 × 256 en 4 bits) a la même taille qu'une
   colonne de rider de l'ordinateur dans ENEMY1.FBD : la texture de Jicchi / Nick / Kelly peut servir telle quelle.
+
+### Riders de l'ordinateur convertis en joueur (`remix/cpurider.py`, v25 — essai)
+
+- `PLAYERk.DAT` (k = 0..3) : 8 modèles, un par place de la Compétition (YAGGI JIN CINDY IRIN JICCHI NICK KELLY BOSS) ;
+  place k = modèle détaillé du joueur k, les autres = modèles simplifiés des adversaires.
+- Textures des adversaires : place 0-1 page 8, 2-3 page 9 (ENEMY1, x 512..639), 4-5 page 6 (ENEMY2.FBD, x 384..447),
+  6-7 page 7 (ENEMY1, x 448..511) ; moitié gauche (u 0..127) pour les places paires, droite pour les impaires ;
+  palettes 493/494, 495/496, 497/498, 499/500, 503/504 (Jicchi), 505/506 (Nick), 507/508 (Kelly), 501/502.
+- Conversion : page → 9, u − 128 pour une moitié droite, palettes → 493/494 ; texture = 2 lignes de palette + la
+  colonne de 128 × 256, au format de FR/FBD/FRM1_00.FBD. Essai : Jicchi à la place du modèle et des textures de Yaggi
+  roule normalement en Free Style avec les animations de Yaggi (capture dans l'émulateur).
