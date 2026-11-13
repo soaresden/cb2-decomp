@@ -54,6 +54,9 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('skipq', 'Qualifications au choix', 'Optional qualifying',
      'Sur l’écran « 1st STAGE » : START = jouer les qualifications, SELECT + START = les passer et partir 4e sur 8, au milieu du départ en handicap du Boarder Cross.',
      'On the “1st STAGE” screen: START = play the qualifying, SELECT + START = skip it and start 4th of 8, in the middle of the Boarder Cross handicap start.'),
+    ('crew', 'Jicchi, Nick et Kelly jouables', 'Jicchi, Nick and Kelly playable',
+     'Les trois riders de l’ordinateur rejoignent l’écran BOARDER après Irin, avec leur portrait (tiré de la vidéo de la Compétition), leur modèle et leurs stats de course. Free Style, Big Air, Halfpipe et Board Park (pas en Compétition ni en VS). Fin du film d’intro raccourcie d’une demi-seconde.',
+     'The three CPU riders join the BOARDER screen after Irin, with their portrait (from the Competition movie), their model and their race stats. Free Style, Big Air, Halfpipe and Board Park (not in Competition or VS). End of the intro movie half a second shorter.'),
 ]
 INPUT = 'input'   # shared pad hook (needed by 'max' and 'air')
 BRAND = 'brand'   # "REMIX" on the title screen: with any mod (already inside the moved title files when 'riders' is on)
@@ -208,6 +211,9 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
         if p in ('/MAIN_SEL.BIN', '/MOVIE/SBCMOVE.STR'): continue
         if p in O.files and O.files[p][:2] != R.files[p][:2] and p not in grown_files:
             pkg['ops']['riders'].append(['rec', p, R.files[p][0], R.files[p][1]])
+    # Jicchi, Nick and Kelly: computed here (not in the reference build), portraits drawn by the patcher itself
+    import crew as _cw
+    pkg['ops']['crew'] = _cw.ops(O)
     # sectors: everything else the reference changes (new blobs in free sectors, Boss voice bank at the end of the
     # intro movie, moved small files) -> 'riders', taken from the published delta (copies from the player's disc)
     P = gzip.decompress(open(delta_gz, 'rb').read()); n = struct.unpack_from('<I', P, 16)[0]; o = 20; entries = {}
@@ -246,7 +252,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     def buf(p):
         if p not in files: files[p] = bytearray(orig(p))
         return files[p]
-    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', INPUT, 'input_noair', BRAND) if f in feats]
+    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'crew', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', INPUT, 'input_noair', BRAND) if f in feats]
     for feat in order:
         for op in pkg['ops'][feat]:
             t = op[0]
@@ -262,6 +268,8 @@ def apply(disc, pkg, feats, log=lambda m: None):
             elif t == 'px4': px4(buf(op[1]), op)
             elif t == 'rec': recs[op[1]] = (op[2], op[3])
             elif t == 'sec': secs[op[1]] = (bytes.fromhex(op[2]), op[3])
+            elif t == 'face':
+                ml_, ms_, _ = disc.files[op[2]]; face_op(buf(op[1]), lambda k: disc.user(ml_ + k), ms_ // 2048, op)
     mods = {}
     loc = {p: (l, s) for p, (l, s, d) in disc.files.items()}
     # MAIN_SEL grown by 'outfits': it moves to the last sectors of the info movie, which is cut accordingly
@@ -299,6 +307,206 @@ def apply(disc, pkg, feats, log=lambda m: None):
             d[so + 2:so + 10] = struct.pack('<I', l) + struct.pack('>I', l); d[so + 10:so + 18] = struct.pack('<I', s) + struct.pack('>I', s)
             mods[sl] = (m[0] if m else disc.img.sector(sl)[16:24], bytes(d))
     return mods
+
+# ------------------------------------------------------------------------------------------------ PS1 movie frames (mod crew)
+# STR (MDEC bitstream version 2) -> RGB, integer only: the site (disc.js) decodes exactly the same pixels.
+MZZ = [0, 1, 8, 16, 9, 2, 3, 10, 17, 24, 32, 25, 18, 11, 4, 5, 12, 19, 26, 33, 40, 48, 41, 34, 27, 20, 13, 6, 7, 14, 21,
+      28, 35, 42, 49, 56, 57, 50, 43, 36, 29, 22, 15, 23, 30, 37, 44, 51, 58, 59, 52, 45, 38, 31, 39, 46, 53, 60, 61,
+      54, 47, 55, 62, 63]
+MQT = [2, 16, 19, 22, 26, 27, 29, 34, 16, 16, 22, 24, 27, 29, 34, 37, 19, 22, 26, 27, 29, 34, 34, 38, 22, 22, 26, 27,
+      29, 34, 37, 40, 22, 26, 27, 29, 32, 35, 40, 48, 26, 27, 29, 32, 35, 40, 48, 58, 26, 27, 29, 34, 38, 46, 56, 69,
+      27, 29, 35, 38, 46, 56, 69, 83]   # natural order
+# 1-D IDCT basis, (c(u) / 2) * cos((2x + 1) u pi / 16) * 2^13, rounded (MB[u * 8 + x])
+MB = [2896, 2896, 2896, 2896, 2896, 2896, 2896, 2896, 4017, 3406, 2276, 799, -799, -2276, -3406, -4017,
+     3784, 1567, -1567, -3784, -3784, -1567, 1567, 3784, 3406, -799, -4017, -2276, 2276, 4017, 799, -3406,
+     2896, -2896, -2896, 2896, 2896, -2896, -2896, 2896, 2276, -4017, 799, 3406, -3406, -799, 4017, -2276,
+     1567, -3784, 3784, -1567, -1567, 3784, -3784, 1567, 799, -2276, 3406, -4017, 4017, -3406, 2276, -799]
+# AC codes (without the sign bit): code -> (run, level)
+_MAC = """11 0 1|011 1 1|0100 0 2|0101 2 1|00101 0 3|00111 3 1|00110 4 1|000110 1 2|000111 5 1|000101 6 1|000100 7 1|
+0000110 0 4|0000100 2 2|0000111 8 1|0000101 9 1|00100110 0 5|00100001 0 6|00100101 1 3|00100100 3 2|00100111 10 1|
+00100011 11 1|00100010 12 1|00100000 13 1|0000001010 0 7|0000001100 1 4|0000001011 2 3|0000001111 4 2|0000001001 5 2|
+0000001110 14 1|0000001101 15 1|0000001000 16 1|000000011101 0 8|000000011000 0 9|000000010011 0 10|000000010000 0 11|
+000000011011 1 5|000000010100 2 4|000000011100 3 3|000000010010 4 3|000000011110 6 2|000000010101 7 2|000000010001 8 2|
+000000011111 17 1|000000011010 18 1|000000011001 19 1|000000010111 20 1|000000010110 21 1|0000000011010 0 12|
+0000000011001 0 13|0000000011000 0 14|0000000010111 0 15|0000000010110 1 6|0000000010101 1 7|0000000010100 2 5|
+0000000010011 3 4|0000000010010 5 3|0000000010001 9 2|0000000010000 10 2|0000000011111 22 1|0000000011110 23 1|
+0000000011101 24 1|0000000011100 25 1|0000000011011 26 1|00000000011111 0 16|00000000011110 0 17|00000000011101 0 18|
+00000000011100 0 19|00000000011011 0 20|00000000011010 0 21|00000000011001 0 22|00000000011000 0 23|00000000010111 0 24|
+00000000010110 0 25|00000000010101 0 26|00000000010100 0 27|00000000010011 0 28|00000000010010 0 29|00000000010001 0 30|
+00000000010000 0 31|000000000011000 0 32|000000000010111 0 33|000000000010110 0 34|000000000010101 0 35|
+000000000010100 0 36|000000000010011 0 37|000000000010010 0 38|000000000010001 0 39|000000000010000 0 40|
+000000000011111 1 8|000000000011110 1 9|000000000011101 1 10|000000000011100 1 11|000000000011011 1 12|
+000000000011010 1 13|000000000011001 1 14|0000000000010011 1 15|0000000000010010 1 16|0000000000010001 1 17|
+0000000000010000 1 18|0000000000010100 6 3|0000000000011010 11 2|0000000000011001 12 2|0000000000011000 13 2|
+0000000000010111 14 2|0000000000010110 15 2|0000000000010101 16 2|0000000000011111 27 1|0000000000011110 28 1|
+0000000000011101 29 1|0000000000011100 30 1|0000000000011011 31 1"""
+MAC = {}
+for _me in _MAC.replace('\n', '').split('|'):
+    _mc, _mr, _ml = _me.split(); MAC[(len(_mc), int(_mc, 2))] = (int(_mr), int(_ml))
+
+
+def mdec_frame(sector, nsec, n):
+    """the bitstream of frame n (1-based, as in the sector headers) of an STR; sector(k) = user data of its k-th sector"""
+    parts = {}
+    for k in range(nsec):
+        d = sector(k)
+        if d[:4] != b'\x60\x01\x01\x80': continue
+        chunk, chunks, fr = struct.unpack_from('<HHI', d, 4)
+        if fr == n: parts[chunk] = d[32:2048]
+        elif fr > n and parts: break
+    return b''.join(parts[k] for k in sorted(parts))
+
+
+class _MBits:
+    def __init__(s, d): s.d = d; s.p = 0; s.acc = 0; s.n = 0
+
+    def peek(s, n):
+        while s.n < n:
+            w = s.d[s.p] | (s.d[s.p + 1] << 8) if s.p + 1 < len(s.d) else 0
+            s.p += 2; s.acc = (s.acc << 16) | w; s.n += 16
+        return (s.acc >> (s.n - n)) & ((1 << n) - 1)
+
+    def get(s, n):
+        v = s.peek(n); s.n -= n; s.acc &= (1 << s.n) - 1; return v
+
+
+def _msigned(v, n): return v - (1 << n) if v >> (n - 1) else v
+
+
+def _mdec_block(br, q, idct=True):
+    c = [0] * 64
+    v = _msigned(br.get(10), 10) * MQT[0]
+    c[0] = max(-1024, min(1023, v))
+    k = 0
+    while True:
+        if br.peek(2) == 2: br.get(2); break
+        if br.peek(6) == 1:
+            br.get(6); run = br.get(6); lev = _msigned(br.get(10), 10)
+        else:
+            for ln in range(2, 17):
+                e = MAC.get((ln, br.peek(ln)))
+                if e: break
+            else: raise ValueError('bad AC code')
+            br.get(ln); run, lev = e
+            if br.get(1): lev = -lev
+        k += run + 1
+        if k > 63: raise ValueError('AC past the block')
+        z = MZZ[k]
+        c[z] = max(-1024, min(1023, (lev * MQT[z] * q + 4) >> 3))
+    if not idct: return c
+    # IDCT: rows then columns
+    t = [0] * 64
+    for y in range(8):
+        r = c[y * 8:y * 8 + 8]
+        for x in range(8):
+            s = 0
+            for u in range(8):
+                if r[u]: s += MB[u * 8 + x] * r[u]
+            t[y * 8 + x] = (s + 1024) >> 11
+    o = [0] * 64
+    for x in range(8):
+        for y in range(8):
+            s = 0
+            for v in range(8): s += MB[v * 8 + y] * t[v * 8 + x]
+            o[y * 8 + x] = (s + 16384) >> 15
+    return o
+
+
+def mdec_decode(bs, w, h, x0=0, y0=0, x1=None, y1=None):
+    """RGB rows (list of bytearrays w*3) of a version-2 frame; only the macroblocks touching [x0,x1)x[y0,y1) are built
+    (the others are still parsed)"""
+    x1 = w if x1 is None else x1; y1 = h if y1 is None else y1
+    q, ver = struct.unpack_from('<HH', bs, 4)
+    assert ver == 2, ver
+    br = _MBits(bs[8:])
+    img = [bytearray(w * 3) for _ in range(h)]
+    for mx in range(0, w, 16):
+        for my in range(0, h, 16):
+            use = not (mx + 16 <= x0 or mx >= x1 or my + 16 <= y0 or my >= y1)
+            cr = _mdec_block(br, q, use); cb = _mdec_block(br, q, use); ys = [_mdec_block(br, q, use) for _ in range(4)]
+            if not use: continue
+            for yy in range(16):
+                row = img[my + yy]
+                for xx in range(16):
+                    yv = ys[(yy >> 3) * 2 + (xx >> 3)][(yy & 7) * 8 + (xx & 7)] + 128
+                    k = (yy >> 1) * 8 + (xx >> 1); r_ = cr[k]; b_ = cb[k]
+                    R = yv + ((359 * r_ + 128) >> 8); G = yv - ((88 * b_ + 183 * r_ + 128) >> 8); Bv = yv + ((454 * b_ + 128) >> 8)
+                    p = (mx + xx) * 3
+                    row[p] = 0 if R < 0 else 255 if R > 255 else R
+                    row[p + 1] = 0 if G < 0 else 255 if G > 255 else G
+                    row[p + 2] = 0 if Bv < 0 else 255 if Bv > 255 else Bv
+    return img
+
+
+def face_op(fbd, sector, nsec, op):
+    """['face', fbd, movie, {cards, face, clut, n}]: portraits from frames of a PS1 movie of the player's disc (mod crew).
+    cards = [[frame, x, y, w, h, white background], ...]; picture k (64x64, 8-bit) at VRAM face + (32 k, 0), its
+    palette (n colours, 0 = transparent) at clut + (0, k); fbd = bytearray of a FBD file (header 20, x 320, w 704);
+    sector(k) = user data of the k-th of the nsec sectors of the movie"""
+    p = op[3]; fx, fy = p['face']; cx, cy = p['clut']; n = p['n']
+    vo = lambda x, y: 20 + (y * 704 + x - 320) * 2
+    for k, card in enumerate(p['cards']):
+        idx, clut = _face(sector, nsec, card, n)
+        for y in range(64): o = vo(fx + 32 * k, fy + y); fbd[o:o + 64] = bytes(idx[y * 64:(y + 1) * 64])
+        o = vo(cx, cy + k); fbd[o:o + 2 * n] = struct.pack('<%dH' % n, *clut)
+
+
+def _face(sector, nsec, card, ncol):
+    fr, x0, y0, w, h, white = card
+    img = mdec_decode(mdec_frame(sector, nsec, fr), 320, 240, x0, y0, x0 + w, y0 + h)
+    px = [[(img[y0 + y][(x0 + x) * 3], img[y0 + y][(x0 + x) * 3 + 1], img[y0 + y][(x0 + x) * 3 + 2]) for x in range(w)] for y in range(h)]
+    def isbg(c):
+        if white: return min(c) >= 236 and max(c) - min(c) <= 16
+        return max(c) <= 48
+    bg = [[False] * w for _ in range(h)]
+    stack = [(x, y) for x in range(w) for y in (0, h - 1)] + [(x, y) for y in range(h) for x in (0, w - 1)]
+    while stack:
+        x, y = stack.pop()
+        if bg[y][x] or not isbg(px[y][x]): continue
+        bg[y][x] = True
+        if x > 0: stack.append((x - 1, y))
+        if x < w - 1: stack.append((x + 1, y))
+        if y > 0: stack.append((x, y - 1))
+        if y < h - 1: stack.append((x, y + 1))
+    small = []
+    for dy in range(64):
+        sy0, sy1 = dy * h // 64, (dy + 1) * h // 64
+        for dx in range(64):
+            sx0, sx1 = dx * w // 64, (dx + 1) * w // 64
+            r = g = b = c = t = 0
+            for y in range(sy0, sy1):
+                for x in range(sx0, sx1):
+                    t += 1
+                    if bg[y][x]: continue
+                    q = px[y][x]; r += q[0]; g += q[1]; b += q[2]; c += 1
+            small.append(None if c == 0 or c * 2 < t else (r // c, g // c, b // c))
+    pal = _median_cut([q for q in small if q is not None], ncol - 1)
+    idx = []
+    for q in small:
+        if q is None: idx.append(0); continue
+        best = 0; bd = 1 << 30
+        for i, c in enumerate(pal):
+            d = (q[0] - c[0]) ** 2 + (q[1] - c[1]) ** 2 + (q[2] - c[2]) ** 2
+            if d < bd: bd = d; best = i
+        idx.append(best + 1)
+    clut = [0] + [((c[0] >> 3) | (c[1] >> 3) << 5 | (c[2] >> 3) << 10) or 0x8000 for c in pal]
+    return idx, clut + [0] * (ncol - len(clut))
+
+
+def _median_cut(pixels, n):
+    boxes = [sorted(pixels)]
+    while len(boxes) < n:
+        best = -1; br = 0; bc = 0
+        for i, bx in enumerate(boxes):
+            if len(bx) < 2: continue
+            for c in range(3):
+                lo = min(q[c] for q in bx); hi = max(q[c] for q in bx)
+                if hi - lo > br: br = hi - lo; best = i; bc = c
+        if best < 0: break
+        bx = sorted(boxes[best], key=lambda q: (q[bc], q[0], q[1], q[2])); m = len(bx) // 2
+        boxes[best:best + 1] = [bx[:m], bx[m:]]
+    return [(sum(q[0] for q in bx) // len(bx), sum(q[1] for q in bx) // len(bx), sum(q[2] for q in bx) // len(bx)) for bx in boxes]
+
 
 def px4(d, op):
     """['px4', file, header, width (halfwords), [x, y, w, h, fill], transparent, [[sx, sy, w, h, dx, dy]...]]:

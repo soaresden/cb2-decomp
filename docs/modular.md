@@ -39,8 +39,8 @@ partagé vers la partie « contrôle en l'air » retournent directement au jeu (
 Opérations par mod, relatives au disque d'origine : mots de 32 bits (`w`, avec la valeur d'origine vérifiée), octets
 (`bs` : copiés depuis le fichier d'origine ou nouveaux), ajout à la fin d'un fichier (`append`), entrées de répertoire
 (`rec`), secteurs entiers (`sec`, copies depuis le disque + octets nouveaux), image 4 bits recomposée à partir de
-rectangles de l'image d'origine (`px4`). Aucune donnée du jeu n'y est stockée : ce qui
-vient du jeu est copié depuis le disque du joueur.
+rectangles de l'image d'origine (`px4`), portraits décodés d'une vidéo du disque du joueur (`face`, mod `crew`).
+Aucune donnée du jeu n'y est stockée : ce qui vient du jeu est copié depuis le disque du joueur.
 
 Régénération (après un changement du Remix) : `make_remix.py --release` (écrit aussi `build/patches.js` avec
 `window.REMIX_MODS`), ou :
@@ -101,3 +101,35 @@ Course : la table des planches (10 octets par planche : vitesse max, réactivit�
 0x8001228C, appel du point d'entrée de l'overlay), à la ligne de la planche du joueur (0x8005740A), les meilleures
 valeurs du jeu : 165/157/196, 100/110/80, 80/88/80. Code dans `func_8002815C` et `func_8001B774` (fonctions mortes de
 l'exe), voir remix/boardmax.py. Un concurrent de l'ordinateur qui aurait la même planche en profite aussi.
+
+## Jicchi, Nick et Kelly jouables (`crew`, v26)
+
+Code et données : `remix/crew.py` ; ses opérations sont calculées par `generate()` directement (hors build de
+référence et hors delta). Les trois riders sont des **alias** : le jeu garde un numéro de rider normal (BASE : Jicchi
+→ Yaggi, Nick → Jin, Kelly → Cindy, pour les animations, voix, etc.) et une variable ALIAS (1 à 3) dit qu'il s'agit
+en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 5 Big Air, 6 Big Air Master,
+7 Halfpipe, 8 Board Park (pas 0/1 Compétition, ni 3/4 VS).
+
+| Partie | Accroche |
+|---|---|
+| liste de l'écran BOARDER | appels de `func_80063E7C` : JICCHI NICK KELLY après IRIN ; curseur alias ACUR (écran BOARDER) copié depuis ALIAS à l'ouverture (`cinit`, 0x80060218) et vers ALIAS à la validation (`ccom`, 0x800605A8) |
+| portrait / nom | `func_80063324` / `func_800637A4` appelées normalement, puis la primitive (v0 − 0x28) est dirigée vers les nouvelles images |
+| barres de stats | lignes de D_8007B328 : `sll v0, v0, 2` → STATS (affichage seulement) |
+| fichiers en course | `func_8001D1B8` (modèle +0x10, texture +0x24) et `func_8001D694` (Halfpipe… : texture +0x20) : `jal func_80013BD0` → nouveaux fichiers |
+| paramètres de course | `sll v0, R, 4` avant le pointeur de paramètres des overlays à un joueur (FREE, TM, HP, BP, OMT, COMB) → les paramètres du rider de l'ordinateur (table de SBC2, places 4 à 6) |
+
+- Code dans des fonctions jamais appelées de l'exe (aucun `jal`, aucun pointeur, aucun saut dedans, vérifié dans tous
+  les fichiers) ; données à 0x8001FBC4.
+- Nouveaux fichiers (modèle et texture des trois riders, `remix/cpurider.py`) : à la fin du film d'intro, juste avant
+  les secteurs du mod `riders` (le film est raccourci de 71 secteurs). Table de fichiers dans l'exe (MSF + taille),
+  numéro de fichier = (entrée − 0x800583E8) / 8 (négatif). Secteurs : copies depuis PLAYER0.DAT / ENEMY1 / ENEMY2 ;
+  seuls les octets recalculés du modèle (palette, page, u) sont écrits.
+- Portraits : fiches profil de la vidéo `MOVIE/SBCMOVE.STR` (images 318, 344, 330), décodées par le patcheur
+  (`mdec_decode`, MDEC version 2, entiers seulement : `disc.js` donne les mêmes octets), détourées, réduites à 64×64
+  (affichées en 64×80), 95 couleurs. Écrites dans `TITLE/MAIN_SEL.FBD`, zone que les écrans du menu n'utilisent pas
+  (VRAM x 832..1023, y 320..383) : visages à x 832 / 864 / 896, palettes en x 928 lignes 320..322, noms (dessinés
+  par le Remix, 48×32, 4 bits, palette des noms du jeu en 768,464) à x 960 / 972 / 984, y 352.
+- Limites : dans le menu, l'aperçu 3D reste le modèle de Yaggi / Jin / Cindy (modèles du menu dans TITLE/CHR.DAT,
+  chargé en entier, sans place libre) ; voix, animations et nom en course sont ceux du rider de base.
+- Vérifié : émulateur (Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
+  patcheur Batocera = build Python.

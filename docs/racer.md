@@ -79,3 +79,10 @@ boutons de la manette (`g_padButtons`, bits actifs : 0x10 Triangle, 0x20 Rond, 0
 - Conversion : page → 9, u − 128 pour une moitié droite, palettes → 493/494 ; texture = 2 lignes de palette + la
   colonne de 128 × 256, au format de FR/FBD/FRM1_00.FBD. Essai : Jicchi à la place du modèle et des textures de Yaggi
   roule normalement en Free Style avec les animations de Yaggi (capture dans l'émulateur).
+
+### Jicchi, Nick et Kelly jouables (mod `crew`, v26)
+
+Fait en « alias » d'un rider existant (voir `docs/modular.md`) : l'écran BOARDER les propose après Irin, la course
+charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de course de la Compétition (SBC2
+0x8008F1F8, 16 octets par place : Jicchi 4, Nick 5, Kelly 6). Le second chargeur de fichiers du joueur,
+`func_8001D694` (Halfpipe, Big Air…), range la texture en +0x20 du contexte (au lieu de +0x24 pour `func_8001D1B8`).
