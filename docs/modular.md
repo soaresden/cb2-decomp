@@ -146,13 +146,9 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
   bits 0..2, 0x80057448/4A/4C = 0x3ff, 0x80057444 et 0x80057446 non nuls, 0x8005743C et 0x8005743E ≥ 10) ; `aval`
   et `amode` passent par elle, donc tant que le jeu n'est pas fini les trois alias restent gris dans la rangée de
   têtes et le curseur les saute. Avec `unlock` (mot 0x2403007F en 0x80063EA8), ils sont disponibles d'office.
-  La première ouverture de l'écran BOARDER (par allumage de la console) avec le jeu fini et sans `unlock` lance un
-  compteur de 300 images : « CONGRATULATIONS ! / JICCHI NICK KELLY UNLOCKED » par la fonction de texte du menu
-  (`func_8005E784`, comme « R1 : MAX »), sur un cadre sombre (TILE). Pour que le cadre passe sous le texte mais
-  au-dessus du reste, la dernière lettre (POLY_FT4, pointée par 0x8007B2F8, placée juste après le nœud de la liste)
-  est recopiée plus loin et le cadre prend sa place, chaîné vers elle.
+  L'annonce (CONGRATULATIONS) est faite par le mod `news`.
 - Limites : voix, animations et nom en course sont ceux du rider de base.
-- Vérifié : émulateur (verrouillé / 100 % avec message / `unlock` sans progression), Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
+- Vérifié : émulateur (verrouillé / 100 % / `unlock` sans progression), Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
   patcheur Batocera = build Python.
 
 ## Vue arrière (`rear`, v26)
@@ -173,3 +169,28 @@ d'autres rendus.
   le patcheur à partir des portraits du menu (opération `icons`, 4 bits, VRAM x 960 y 324, palettes x 928 lignes
   340..343) ; dix POLY_FT4 écrits par `strip` et chaînés juste après le nom tagué (le menu dessine avec l'origine au
   centre de l'écran : +160, +120).
+
+## Annonces de déblocage (`news`, v26)
+
+Code et données : `remix/news.py`.
+
+- La boucle principale de l'exe (0x80012260…) charge chaque overlay puis appelle `func_8001B668`, l'entrée de
+  l'overlay, `func_8001B718`. Ces deux appels deviennent `npre` / `npost` (exe, fonctions mortes 0x8001E630 et
+  suivante, état sur 32 octets : VALID, MASK, CNT, SNAP) :
+  - `npost` : en quittant un menu (mot 0 de l'overlay : 5 = MODE_SEL, 6 = MAIN_SEL), SNAP = les mots de progression
+    0x8005743C..0x8005744F (ceux de la carte mémoire), VALID = 1 ;
+  - `npre` : en entrant dans un menu, ce qui est apparu depuis SNAP (bits passés de 0 à 1) s'ajoute à MASK :
+    0x7440 bits 4..6 (Boss, Gray, Snowman), 0x7442 bits 0..2 (planches SPECIAL), 0x7444 / 0x7446 (Mirror, Hard),
+    0x743C / 0x743E en hausse (pistes), 0x7448 / 4A / 4C (trophées).
+  Ce qui se passe pendant les courses (overlays 8) est donc annoncé ; une carte mémoire chargée dans un menu ne
+  l'est pas (SNAP est pris en quittant le menu). Au démarrage, VALID = 0 : rien jusqu'à la première sortie de menu.
+- Affichage : le hub de MAIN_SEL (BOARDER / COURSE / BOARD / OPTIONS / START), où l'on revient par SELECT après une
+  course (EXIT passe par le titre et MODE_SEL : l'annonce attend le hub). Son appel par image de `func_8005BFD0`
+  (0x8005B280) devient `nhub` (fonctions mortes de MAIN_SEL : 0x8007586C, 0x80079F3C, 0x80075118 ; table et textes
+  en 0x80077E2C et 0x80078F54). Une ligne par élément, texte du jeu (`func_8005E784`), couleur des lettres qui pulse
+  de l'or au blanc (32 images), cadre sombre (TILE) placé comme dans `crew` (la dernière lettre est déplacée),
+  pendant 210 images du hub (7 s), puis MASK = 0. Si la progression atteint 100 % (`ncomp`, formule de
+  `remix/progress.py`) : CONGRATULATIONS, puis JICCHI NICK KELLY UNLOCKED si `crew` est là (sa table BASE en
+  0x8001FBD4), sinon GAME COMPLETED.
+- Vérifié : émulateur (Snowman + trophée simulés pendant une course puis SELECT ; tout à 100 % : 11 lignes ;
+  premier passage au hub sans annonce) ; JS = Python.
