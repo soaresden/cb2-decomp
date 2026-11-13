@@ -32,7 +32,7 @@ partagé vers la partie « contrôle en l'air » retournent directement au jeu (
 - émulateur (Beetle PSX) : chaque mod seul et « tous sauf un » (18 images) démarrent, passent les menus et jouent une
   manche de compétition ;
 - « 100 % à gagner » (tout sauf `unlock` et `special`) : 4 riders seulement sur une nouvelle partie (0x80057440 = 0xF),
-  miroir et hard verrouillés, ○ : MAX présent (rider), ligne MAX sur l'écran BOARD.
+  miroir et hard verrouillés, R1 : MAX présent (rider), ligne MAX sur l'écran BOARD.
 
 ## Le paquet
 

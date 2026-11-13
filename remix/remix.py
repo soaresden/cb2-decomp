@@ -15,7 +15,7 @@ FLIP_K=int(__import__('os').environ.get('FLIP_K','250'))
 SQ_SH=int(__import__('os').environ.get('SQ_SH','2'))
 MAXL_X=int(__import__('os').environ.get('MAXL_X','250')); MAXL_Y=int(__import__('os').environ.get('MAXL_Y','90')); MAXL_W=int(__import__('os').environ.get('MAXL_W','30'))
 KD_R=int(__import__('os').environ.get('KD_R','130')); KD_RY=int(__import__('os').environ.get('KD_RY','260')); KD_V=int(__import__('os').environ.get('KD_V','20')); KD_CD=int(__import__('os').environ.get('KD_CD','2'))
-HINT_X=int(__import__('os').environ.get('HINT_X','10')); HINT_Y=int(__import__('os').environ.get('HINT_Y','236')); HINT_F=int(__import__('os').environ.get('HINT_F','1')); HINT1=b'O : MAX'; HINT2=b'O : NORMAL'
+HINT_X=int(__import__('os').environ.get('HINT_X','10')); HINT_Y=int(__import__('os').environ.get('HINT_Y','236')); HINT_F=int(__import__('os').environ.get('HINT_F','1')); HINT1=b'R1 : MAX'; HINT2=b'R1 : NORMAL'
 AIR_K=int(__import__('os').environ.get('AIR_K','45'))
 CAVE_TEX=0x8004f800; CAVE_PL=0x8004f840; CAVE_EN=0x8004f8a0; CAVE_SLOT=0x8004f940; CAVE_PAD=0x8004f980; LOCTBL=0x8004f900
 def jal(a): return (3<<26)|((a>>2)&0x3ffffff)
@@ -84,14 +84,14 @@ def patches():
         # BOARDER screen bars: every stat shown at 10 while MAX is on
         # (+ Circle edge toggles MAX: this runs only while the BOARDER screen shows its bars)
         # (registers: only at/v0/a0 -- the bars loop keeps t0/t1 live across this call)
-        'maxd:',f'lui at, {_bm.hi(_bm.MASKV)}','addiu v0, zero, 0x20',f'sw v0, {_bm.lo(_bm.MASKV)}(at)','lui at, 0x8005','lw a0, -0x410(at)','lui at, 0x8003','addiu v0, zero, 8',f'sw v0, {lo(ACT)}(at)','andi a0, a0, 0x20',f'lw v0, {lo(EDGE)}(at)',f'sw a0, {lo(EDGE)}(at)','beqz a0, md0','nop','bnez v0, md0','nop',
+        'maxd:',f'lui at, {_bm.hi(_bm.MASKV)}','addiu v0, zero, 0x08',f'sw v0, {_bm.lo(_bm.MASKV)}(at)','lui at, 0x8005','lw a0, -0x410(at)','lui at, 0x8003','addiu v0, zero, 8',f'sw v0, {lo(ACT)}(at)','andi a0, a0, 0x08',f'lw v0, {lo(EDGE)}(at)',f'sw a0, {lo(EDGE)}(at)','beqz a0, md0','nop','bnez v0, md0','nop',
         f'lw v0, {lo(FLAG)}(at)','nop','xori v0, v0, 1',f'sw v0, {lo(FLAG)}(at)',
         'md0:','lh a0, 0(a1)',f'lw at, {lo(FLAG)}(at)','nop','beqz at, md1','nop','addiu a0, zero, 10','md1:','jr ra','nop',
         ]
     _ex=open(os.path.join(FS,'SCES_009.92'),'rb').read()
     cmx,lmx=asm(MX,DC); assert cmx[-1][0]<0x800297a0,hex(cmx[-1][0])
     MX2=[
-        # pad hook (port 0): while the BOARDER screen is up (ACT refreshed by maxd), Circle is eaten (it is the MAX toggle there)
+        # pad hook (port 0): while the BOARDER screen is up (ACT refreshed by maxd), R1 is eaten (it is the MAX toggle there)
         'padx:',f'lui at, {_bm.hi(_bm.RAWP)}',f'sw a2, {_bm.lo(_bm.RAWP)}(at)','lui at, 0x8003',f'lw t0, {lo(ACT)}(at)','nop','beqz t0, px9','addiu t0, t0, -1',f'sw t0, {lo(ACT)}(at)',
         f'lui at, {_bm.hi(_bm.MASKV)}',f'lw t0, {_bm.lo(_bm.MASKV)}(at)','nop','nor t0, t0, zero','and a2, a2, t0',
         'px9:',f'j {RM}','nop',

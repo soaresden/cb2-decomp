@@ -37,7 +37,7 @@ FEATURES = [   # id, French name, English name, description FR, description EN
      'Tenues cachées en vestes 4 à 6 sur l’écran WEAR, avec aperçu dans le menu, dans tous les modes (fin de la vidéo d’info raccourcie).',
      'Hidden outfits as jackets 4 to 6 on the WEAR screen, previewed in the menu, in every mode (end of the info movie cut).'),
     ('max', 'Stats MAX', 'MAX stats',
-     '○ sur l’écran BOARDER : toutes les stats au maximum, « MAX » sous le portrait. Écran BOARD : ligne MAX sous SPECIAL, avec les 21 motifs.', '○ on the BOARDER screen: every stat maxed, “MAX” under the portrait. BOARD screen: a MAX line under SPECIAL, with all 21 designs.'),
+     'R1 sur l’écran BOARDER : toutes les stats au maximum, « MAX » sous le portrait. Écran BOARD : ligne MAX sous SPECIAL, avec les 21 motifs.', 'R1 on the BOARDER screen: every stat maxed, “MAX” under the portrait. BOARD screen: a MAX line under SPECIAL, with all 21 designs.'),
     ('air', 'Figures en l’air', 'Air control',
      'La croix seule fait tourner (gauche/droite = spin, haut/bas = flip), Carré = rotations ×4, grabs « X to Y » en gardant R1.',
      'The d-pad alone rotates (left/right = spin, up/down = flip), Square = rotations x4, “X to Y” grabs while holding R1.'),
