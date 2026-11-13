@@ -275,6 +275,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
             elif t == 'sec': secs[op[1]] = (bytes.fromhex(op[2]), op[3])
             elif t == 'face':
                 ml_, ms_, _ = disc.files[op[2]]; face_op(buf(op[1]), lambda k: disc.user(ml_ + k), ms_ // 2048, op)
+            elif t == 'icons': icons_op(buf(op[1]), op)
             elif t == 'crewmenu':
                 ch = crew_menu_chunk(orig(op[2]), orig(op[3]), op[4]); nch = -(-len(ch) // 2048); ch += bytes(nch * 2048 - len(ch))
                 for k in range(nch):
@@ -582,6 +583,44 @@ def crew_menu_chunk(archive, fbd, p):
     chunk[p['img_off']:p['img_off'] + 32768] = b''.join(fbd[vo_(px, py + y):vo_(px, py + y) + 128] for y in range(256))
     struct.pack_into('<I', chunk, p['magic_off'], p['magic'])
     return bytes(chunk)
+
+
+def icons_op(fbd, op):
+    """['icons', fbd, p] (mod crew): 16x16 4-bit heads of the riders, made from the menu portraits of the FBD (8-bit,
+    p['src'] = [[x, y (VRAM of the picture's top left), w, h, clut x, clut y, colours], ...]); icon i at
+    p['dest'] + (4 i, 0), its palette at p['clut'] + (16 (i % 6), i // 6), the grey one 2 rows lower"""
+    p = op[2]; vo = lambda x, y: 20 + (y * 704 + x - 320) * 2
+    dx, dy = p['dest']; cx0, cy0 = p['clut']
+    for i, (sx, sy, w, h, cx, cy, nc) in enumerate(p['src']):
+        clut = struct.unpack_from('<%dH' % nc, fbd, vo(cx, cy))
+        small = []
+        for y in range(16):
+            for x in range(16):
+                r = g = b = c = t = 0
+                for yy in range(y * h // 16, (y + 1) * h // 16):
+                    row = vo(sx, sy + yy)
+                    for xx in range(x * w // 16, (x + 1) * w // 16):
+                        t += 1; ci = fbd[row + xx]; v = clut[ci] if ci < nc else 0
+                        if v == 0: continue
+                        r += (v & 31) << 3; g += ((v >> 5) & 31) << 3; b += ((v >> 10) & 31) << 3; c += 1
+                small.append(None if c == 0 or c * 2 < t else (r // c, g // c, b // c))
+        pal = _median_cut([q for q in small if q is not None], 15)
+        idx = []
+        for q in small:
+            if q is None: idx.append(0); continue
+            best = 0; bd = 1 << 30
+            for j, c in enumerate(pal):
+                dd = (q[0] - c[0]) ** 2 + (q[1] - c[1]) ** 2 + (q[2] - c[2]) ** 2
+                if dd < bd: bd = dd; best = j
+            idx.append(best + 1)
+        for y in range(16):
+            o = vo(dx + 4 * i, dy + y)
+            for x in range(0, 16, 2): fbd[o + x // 2] = idx[y * 16 + x] | (idx[y * 16 + x + 1] << 4)
+        cols = [0] + [((c[0] >> 3) | (c[1] >> 3) << 5 | (c[2] >> 3) << 10) or 0x8000 for c in pal]
+        greys = [0] + [((((c[0] * 77 + c[1] * 150 + c[2] * 29) >> 8) * 5 // 8) >> 3) * 0x421 or 0x8000 for c in pal]
+        cols += [0] * (16 - len(cols)); greys += [0] * (16 - len(greys))
+        for row, cl in ((cy0 + i // 6, cols), (cy0 + 2 + i // 6, greys)):
+            o = vo(cx0 + 16 * (i % 6), row); fbd[o:o + 32] = struct.pack('<16H', *cl)
 
 
 def px4(d, op):

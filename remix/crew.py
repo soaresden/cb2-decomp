@@ -87,8 +87,9 @@ CAVES = [(0x8001E67C, 0x8001E7C4), (0x80013940, 0x80013A34), (0x800169B4, 0x8001
          (0x80029AE0, 0x80029B7C), (0x80021DA0, 0x80021E38), (0x80022B70, 0x80022C08), (0x80021BB0, 0x80021C38),
          (0x8001829C, 0x80018320), (0x8001FA0C, 0x8001FA98),   # (0x800280B8, 0x8002E7D0: mod rear)
          (0x800404E4, 0x80040640), (0x8003EAC4, 0x8003EB80), (0x800123C8, 0x80012448), (0x8001B69C, 0x8001B718),
-         (0x8002DE10, 0x8002DE88), (0x8002E96C, 0x8002E9DC), (0x80027E9C, 0x80027F04), (0x8002C49C, 0x8002C504),
-         (0x800290C8, 0x80029128), (0x8003F028, 0x8003F088), (0x800439C4, 0x80043A24)]
+         (0x8002DE10, 0x8002DE88), (0x8002E96C, 0x8002EA10), (0x80027E9C, 0x80027F04), (0x8002C49C, 0x8002C504),
+         (0x800290C8, 0x80029128), (0x8003F028, 0x8003F088), (0x800439C4, 0x80043A24),
+         (0x80017BF8, 0x80017C9C), (0x8002043C, 0x8002050C), (0x80021A88, 0x80021B28), (0x800312C4, 0x80031374), (0x80028078, 0x800280B8)]
 DATA2 = 0x8003EE98; DATA2_END = 0x8003EF00             # menu models: file entries, rectangles, state
 ENT2, IDX2, RCOL, RCLUT, PENDING, DUMMY = (DATA2 + o for o in (0, 0x18, 0x20, 0x38, 0x50, 0x54))
 MENU_SHOWN = 0x4D575253                                 # 'SRWM' + k in MENU_SAVE: alias k's texture is in VRAM
@@ -153,7 +154,7 @@ def routines(race_regs):
         S += [f'{kind}wH:', f'lui t9, {H(ALIASV)}', f'j {kind}w', f'addiu t9, t9, {L(ALIASV)}',
               f'{kind}wB:', f'lui t9, {H(ACUR)}', f'addiu t9, t9, {L(ACUR)}',
               f'{kind}w:', 'addiu sp, sp, -0x30', 'sw ra, 0x28(sp)', 'sw s0, 0x24(sp)', 'sw t9, 0x1c(sp)',
-              *([f'lui t0, {H(ACUR)}', f'addiu t0, t0, {L(ACUR)}', 'bne t0, t9, fwp', 'nop', 'jal mpoll', 'nop', 'fwp:', 'lw t9, 0x1c(sp)'] if kind == 'f' else []),
+              *([f'lui t0, {H(ACUR)}', f'addiu t0, t0, {L(ACUR)}', 'bne t0, t9, fwp', 'nop', 'jal mpoll', 'nop', 'fwp:', 'lw t9, 0x1c(sp)', 'sw a0, 0x18(sp)'] if kind == 'f' else []),
               'lw t0, 0x40(sp)', 'lw t1, 0x44(sp)',
               'sw t0, 0x10(sp)', 'sw t1, 0x14(sp)', f'jal {fn}', 'sw t1, 0x20(sp)', 'move s0, v0',
               'lw t9, 0x1c(sp)', 'lw a0, 0x20(sp)', 'lw a1, 0(t9)', 'jal aval', 'nop', 'beqz v0, ' + kind + 'w9', 'addiu v0, v0, -1']
@@ -165,7 +166,10 @@ def routines(race_regs):
         S += ['sb t0, -0x1c(s0)', 'sb t0, -0xc(s0)', 'sb t1, -0x14(s0)', 'sb t1, -0x4(s0)',
               'sb t2, -0x1b(s0)', 'sb t2, -0x13(s0)', 'sb t3, -0xb(s0)', 'sb t3, -0x3(s0)',
               'lhu t4, -0x12(s0)', 'nop', 'andi t4, t4, 0xffe0', 'or t4, t4, t5', 'sh t4, -0x12(s0)',
-              f'{kind}w9:', 'move v0, s0', 'lw ra, 0x28(sp)', 'lw s0, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x30']
+              f'{kind}w9:',
+              *([f'lui t0, {H(ACUR)}', 'lw t9, 0x1c(sp)', f'addiu t0, t0, {L(ACUR)}', 'bne t0, t9, nws', 'move a0, s0',
+                 'lw a1, 0x20(sp)', 'jal strip', 'addiu a2, s0, -0x28', 'move s0, v0', 'nws:'] if kind == 'n' else []),
+              'move v0, s0', 'lw ra, 0x28(sp)', 'lw s0, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x30']
     # stat bars: replaces "sll v0, v0, 2" (delay slot: addu v0, v0, X) -> v0 = row pointer offset
     for rr, xr in sorted({(r, x) for _, r, x in BARS}):
         S += [f'bar_{rr}_{xr}:', f'lui at, {H(AB)}', f'lw at, {L(AB)}(at)', f'addiu {rr}, {rr}, 1', f'bne at, {rr}, br_{rr}_{xr}', f'addiu {rr}, {rr}, -1',
@@ -239,6 +243,39 @@ def routines(race_regs):
           f'lui at, {H(PENDING)}', f'sw zero, {L(PENDING)}(at)', f'lui at, {H(ACUR)}', f'lw t0, {L(ACUR)}(at)', 'nop', 'bne t0, s0, mp9', 'nop',
           f'lui at, {H(BASEV)}', 'addu at, at, s0', 'jal mdl', f'lbu a0, {L(BASEV)}(at)',
           'mp9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw a0, 0x18(sp)', 'lw a1, 0x1c(sp)', 'lw a2, 0x20(sp)', 'lw a3, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x28']
+    # strip(a0 = primitive buffer, a1 = rider under the cursor, a2 = the name tag's primitive) -> v0 = buffer after the
+    # 10 heads (POLY_FT4 written here, linked right after the name tag: drawn over the screen like it)
+    S += ['strip:', 'addiu sp, sp, -0x30', 'sw ra, 0x28(sp)', 'sw s0, 0x10(sp)', 'sw s1, 0x14(sp)', 'sw s2, 0x18(sp)', 'sw s3, 0x1c(sp)',
+          'sw s4, 0x20(sp)', 'sw s5, 0x24(sp)', 'move s0, a0', 'move s2, a1', 'move s1, a2',
+          f'lui at, {H(ACUR)}', f'lw a1, {L(ACUR)}(at)', 'jal aval', 'move a0, s2', 'bnez v0, st1', 'addiu s3, v0, 3',
+          'move s3, s2', 'slti t0, s2, 4', 'bnez t0, st1', 'nop', 'addiu s3, s2, 3',
+          'st1:', 'lui at, 0x8005', 'lhu s4, 0x7440(at)', f'lui at, {H(UNLOCK_ALL[0])}', f'lw t0, {L(UNLOCK_ALL[0])}(at)',
+          f'lui t1, {UNLOCK_ALL[1] >> 16:#x}', f'ori t1, t1, {UNLOCK_ALL[1] & 0xffff:#x}', 'bne t0, t1, st2', 'nop', 'ori s4, s4, 0x7f',
+          'st2:', 'jal amode', 'nop', 'beqz v0, st3', 'nop', 'ori s4, s4, 0x380',
+          'st3:', 'j stl', 'move s5, zero',
+          # i -> availability bit: 0..3 = riders 0..3, 4..6 = bits 7..9, 7..9 = riders 4..6
+          'stl:', 'move t0, s5', 'slti t1, s5, 4', 'bnez t1, st4', 'slti t1, s5, 7', 'beqz t1, st4', 'addiu t0, s5, -3', 'addiu t0, s5, 3',
+          'st4:', 'srlv t0, s4, t0', 'andi t9, t0, 1',            # t9 = 1: available
+          # colour: 0x80 under the cursor, 0x50 the others
+          'lui t0, 0x2c50', 'ori t0, t0, 0x5050', 'bne s5, s3, st5', 'nop', 'lui t0, 0x2c80', 'ori t0, t0, 0x8080',
+          'st5:', 'sw t0, 4(s0)',
+          # screen: x 92 + 18 i, y 222, 16x16 (20x20 under the cursor)
+          'sll t0, s5, 4', 'sll t1, s5, 1', 'addu t0, t0, t1', f'addiu t0, t0, {STRIP_X}', f'addiu t1, zero, {STRIP_Y}', 'addiu t2, t0, 16', f'addiu t3, zero, {STRIP_Y + 16}',
+          'bne s5, s3, st7', 'nop', 'addiu t0, t0, -2', 'addiu t1, t1, -2', 'addiu t2, t2, 2', 'addiu t3, t3, 2',
+          'st7:', 'sh t0, 8(s0)', 'sh t1, 0xa(s0)', 'sh t2, 0x10(s0)', 'sh t1, 0x12(s0)', 'sh t0, 0x18(s0)', 'sh t3, 0x1a(s0)', 'sh t2, 0x20(s0)', 'sh t3, 0x22(s0)',
+          'j stp', 'nop',
+          # texture: u 16 i, v 68..84, tpage of the name tag with x 960, y 256; palette x 928 + 16 (i % 6), row 340 + i // 6 (+ 2: grey)
+          'stp:', 'sll t0, s5, 4', 'sb t0, 0xc(s0)', 'sb t0, 0x1c(s0)', 'addiu t0, t0, 16', 'sb t0, 0x14(s0)', 'sb t0, 0x24(s0)',
+          f'addiu t0, zero, {ICON_Y - 256}', 'sb t0, 0xd(s0)', 'sb t0, 0x15(s0)', f'addiu t0, zero, {ICON_Y - 240}', 'sb t0, 0x1d(s0)', 'sb t0, 0x25(s0)',
+          'lhu t0, 0x16(s1)', 'nop', 'andi t0, t0, 0xffe0', 'ori t0, t0, 0x1f', 'sh t0, 0x16(s0)',
+          'slti t1, s5, 6', 'move t2, s5', f'addiu t3, zero, {ICON_CLUT_Y}', 'bnez t1, st8', 'nop', 'addiu t2, s5, -6', f'addiu t3, zero, {ICON_CLUT_Y + 1}',
+          'st8:', 'bnez t9, st9', 'nop', 'addiu t3, t3, 2',
+          'st9:', 'sll t3, t3, 6', f'addiu t2, t2, {ICON_CLUT_X >> 4}', 'or t3, t3, t2', 'sh t3, 0xe(s0)',
+          # link after the name tag: s0.tag = 9 words, next = the name's next; name.next = s0
+          'lw t0, 0(s1)', 'lui t1, 0xff', 'ori t1, t1, 0xffff', 'and t2, t0, t1', 'lui t3, 0x0900', 'or t2, t2, t3', 'sw t2, 0(s0)',
+          'lui t3, 0xff00', 'and t0, t0, t3', 'and t2, s0, t1', 'or t0, t0, t2', 'sw t0, 0(s1)', 'move s1, s0',
+          'addiu s0, s0, 0x28', 'addiu s5, s5, 1', 'slti t0, s5, 10', 'bnez t0, stl', 'nop',
+          'move v0, s0', 'lw ra, 0x28(sp)', 'lw s0, 0x10(sp)', 'lw s1, 0x14(sp)', 'lw s2, 0x18(sp)', 'lw s3, 0x1c(sp)', 'lw s4, 0x20(sp)', 'lw s5, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x30']
     # wup: the WEAR screen's texture uploads are skipped while an alias's texture is shown
     S += ['wup:', f'lui at, {H(MENU_SAVE)}', f'lw t0, {L(MENU_SAVE)}(at)', f'lui t1, {H(MENU_SHOWN)}', f'addiu t1, t1, {L(MENU_SHOWN + 1)}', 'subu t0, t0, t1',
           'sltiu t0, t0, 3', 'beqz t0, wu1', 'nop', 'jr ra', 'nop', 'wu1:', f'j {UPLOAD}', 'nop']
@@ -272,7 +309,7 @@ def place(S):
 
 
 # block starts for place(); nx and mdq are not fallen into (an unconditional jump comes before them)
-TOP = {'aval', 'amode', 'setcur', 'navH', 'nx', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
+TOP = {'aval', 'amode', 'setcur', 'navH', 'nx', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
 
 
 # ---------------------------------------------------------------------------------------------------- disc layout
@@ -398,6 +435,7 @@ def ops(disc):
     for k, rows in enumerate(name_tags()):
         for y in range(32): out.append(['b', FBD, vram_off(NAME_X + 12 * k, NAME_Y + y), rows[y].hex()])
     out.append(face_op())
+    out.append(icons_op())
     ml = disc.files[MOVIE][0]; out.append(['rec', MOVIE, ml, (first - ml) * 2048])
     srcs = [(disc.files[p][0] * 2048, rd(p)) for p in SOURCES]
     import bundle, cpurider
@@ -461,3 +499,24 @@ def menu_chunk(archive, fbd, k, dest=MENU_BUF):
 MENU_MAGIC = 0x4D575243   # 'CRWM' (+ 1..3)
 END_TEX = [((512, 256), (768, 485)), ((576, 256), (768, 486)), ((640, 256), (768, 487))]   # Jicchi, Nick, Kelly in ENDING.FBD
 
+
+
+# ---------------------------------------------------------------------------------------------------- rider strip
+# BOARDER screen: a row of 16x16 heads, in the order of the list (YAGGI JIN CINDY IRIN JICCHI NICK KELLY BOSS GRAY
+# SNOWMAN), grey for the riders not available. The heads are made by the patcher from the menu portraits
+# (modular.icons_op) into the free VRAM of the menu: x 960 + 4 i, y 324 (4-bit), palettes at x 928 rows 340/341, grey
+# 342/343. Drawn by strip() from the BOARDER screen's portrait wrapper, with the game's own name-tag function.
+STRIP_ORDER = [0, 1, 2, 3, 'J', 'N', 'K', 4, 5, 6]
+ICON_X, ICON_Y, ICON_CLUT_X, ICON_CLUT_Y = 960, 324, 928, 340
+STRIP_X, STRIP_Y, STRIP_DX = 92 - 160, 222 - 120, 18     # first head (screen x 92, y 222; the menu draws from the centre), step
+UNLOCK_ALL = (0x80063EA8, 0x2403007F)                    # the 'unlock' mod's word: every boarder selectable
+FACE_TPX = [0x140] * 6 + [0x180]; FACE_U = [0, 0x40, 0x40, 0, 0x40, 0, 0]; FACE_V = [0x50, 0x50, 0xA0, 0xA0, 0, 0, 0xB0]
+FACE_CY = [0x1C8, 0x1C9, 0x1CB, 0x1CA, 0x1CD, 0x1CC, 0x1CE]          # tables of func_80063324 (menu portraits)
+
+
+def icons_op():
+    src = []
+    for r in STRIP_ORDER:
+        if isinstance(r, int): src.append([FACE_TPX[r] + FACE_U[r] // 2, 256 + FACE_V[r] + 4, 64, 64, 0x300, FACE_CY[r], 256])
+        else: k = 'JNK'.index(r); src.append([FACE_X + 32 * k, FACE_Y, 64, 64, CLUT_X, CLUT_Y + k, NCOL])
+    return ['icons', FBD, {'src': src, 'dest': [ICON_X, ICON_Y], 'clut': [ICON_CLUT_X, ICON_CLUT_Y]}]

@@ -157,3 +157,9 @@ regarde derrière lui. Code dans deux fonctions mortes de l'exe (0x800280B8, 0x8
 Limite : le jeu ne dessine que la piste devant le rider, des trous blancs peuvent apparaître au loin derrière.
 `GsSetRefView2` (0x8002F830) n'est pas la caméra de course : il est appelé des dizaines de fois par image pour
 d'autres rendus.
+- Rangée de têtes (v26) : en bas de l'écran BOARDER, 10 têtes 16x16 dans l'ordre de la liste (YAGGI JIN CINDY IRIN
+  JICCHI NICK KELLY BOSS GRAY SNOWMAN), celle du curseur plus grande, celles des riders non disponibles en gris
+  (bits de 0x80057440, ou tous si le mot du mod `unlock` est là ; Jicchi/Nick/Kelly selon le mode). Têtes faites par
+  le patcheur à partir des portraits du menu (opération `icons`, 4 bits, VRAM x 960 y 324, palettes x 928 lignes
+  340..343) ; dix POLY_FT4 écrits par `strip` et chaînés juste après le nom tagué (le menu dessine avec l'origine au
+  centre de l'écran : +160, +120).
