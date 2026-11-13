@@ -254,7 +254,8 @@ Code : `remix/options.py` (MODE_SEL + trois fonctions mortes de l'exe réservée
 `news.py`.
 
 - Les interrupteurs sont des bits de 0x80057438 (bit à 1 = coupé) : 1 vue arrière, 2 notes du half-pipe en direct,
-  4 annonces de déblocage, 8 figures en l'air (`air`), 16 chocs en Boarder Cross (`ramming`). Cet octet fait partie
+  4 annonces de déblocage, 8 figures en l'air (`air`), 16 chocs en Boarder Cross (`ramming`), 32 écran large (à 1 =
+  actif : coupé par défaut). Cet octet fait partie
   du bloc 0x80057434..0x8005744D copié dans la sauvegarde mais n'est jamais lu par le jeu (docs/progression.md) : le
   réglage suit la carte mémoire. À 0, tout est actif comme avant.
 - `rear`, `hplive`, `news` lisent leur bit. `air` et `ramming` sont coupés là où leur code vit, dans l'exe (toujours
@@ -262,6 +263,12 @@ Code : `remix/options.py` (MODE_SEL + trois fonctions mortes de l'exe réservée
   « coupé » (air : les branches de md 0x8004FA44, ax 0x8004FAC8, rm 0x8004FB28 rendues inconditionnelles ; ramming :
   l'entrée de `kc` 0x80028BF4 devient un saut vers la réponse de collision du jeu), seulement si le mot vaut déjà l'une
   des deux valeurs (mod absent : rien n'est touché), puis FlushCache.
+- Écran large : l'échelle X de la matrice 0x80059288 (identité recopiée par l'init libgs `func_8002DE88`, puis
+  seulement lue par les fonctions de vue) passe de 0x1000 à 0xC00 : le jeu calcule lui-même un champ 16:9, à afficher
+  étiré en 16:9 (sans le « widescreen hack » de l'émulateur). Valeur reprise du code DuckStation de PeterDelta pour ce
+  disque (SCES-00992 : A7059288 10000C00, github.com/PeterDelta/PCSX2). Vérifié : course de Free Style en 16:9.
+- Tampon de primitives du panneau : 0x1000 par image (6 lignes, environ 130 lettres de 20 octets) ; à 0x800 il
+  débordait sur celui de l'autre image et l'écran tombait à 3 images sur 60.
 - Écran de choix du mode : l'appel de `func_80028BDC` en 0x800643E4 (fonction de la télé, chaque image) passe par
   `opt`. R1 maintenu : panneau REMIX OPTIONS (texte du jeu `func_80012CA0`, cadre sombre) ; L1 descend le curseur
   (ligne dorée), R2 bascule la ligne.

@@ -134,3 +134,6 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
   murs du haut vont jusqu'au bord : il ne manque que le sol tout près de la caméra sur les côtés, soit les polygones
   rejetés parce qu'un sommet passe trop près de la caméra (limite de la GTE), invisibles en 4:3 et visibles en 16:9.
   Les corriger demanderait de découper ces polygones contre le plan proche : hors de portée d'un patch.
+- Solution retenue (option « WIDESCREEN 16:9 » du mod `options`) : ne pas utiliser le hack de l'émulateur, mais faire
+  calculer au jeu un champ plus large en réduisant l'échelle X de la matrice 0x80059288 (0x1000 → 0xC00, code de
+  PeterDelta pour DuckStation) ; l'image s'affiche étirée en 16:9, sans bords manquants.

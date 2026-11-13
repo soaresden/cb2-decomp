@@ -13,7 +13,7 @@
 # MODE_SEL: the TV function (func_80064200, every frame, s4 = its OT table, s1 = frame buffer index) calls
 # func_80028BDC (GetClut) at 0x800643E4: that call goes through opt (dead functions of MODE_SEL), which reads the pad
 # (0x800832BA), applies the switches, and draws the panel with the game's text routine (func_80012CA0, menu font)
-# into a private primitive buffer (0x801F8000 + 0x800 per frame buffer), on a dark box (TILE).
+# into a private primitive buffer (0x801F8000 + 0x1000 per frame buffer: about 130 letters of 20 bytes), on a dark box (TILE).
 import struct
 from asm import asm
 
@@ -27,8 +27,10 @@ PRIMS = 0x801F8000
 CAVES = [(0x800654A8, 0x8006562C), (0x8006F680, 0x8006F71C), (0x8006F7C4, 0x8006F83C),   # MODE_SEL (after crewrank's code in the first)
          (0x80031180, 0x8003120C), (0x8003BD98, 0x8003BE10), (0x80040AA4, 0x80040B0C)]    # exe: dead functions kept for this mod (see crew.CAVES)
 DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data
-X0, X1, Y0, DY = -150, 70, 30, 13
-LINES = [('REAR VIEW (CIRCLE)', 1), ('LIVE HALF-PIPE MARKS', 2), ('UNLOCK NEWS', 4), ('AIR CONTROL', 8), ('BOARDER CROSS RAMMING', 16)]
+X0, X1, Y0, DY = -150, 70, 18, 13
+LINES = [('REAR VIEW (CIRCLE)', 1), ('LIVE HALF-PIPE MARKS', 2), ('UNLOCK NEWS', 4), ('AIR CONTROL', 8), ('BOARDER CROSS RAMMING', 16),
+         ('WIDESCREEN 16:9', 32)]
+INV = 32                               # lines whose bit set means ON (off by default)
 TITLE = 'REMIX OPTIONS'
 RESP = 0x80073714                      # SBC2: the game's racer collision response (kc's own target)
 J = lambda op, t: (op << 26) | ((t >> 2) & 0x3ffffff)
@@ -37,7 +39,11 @@ PATCH = [(0x8004FA44, 0x10600012, 0x10000012, 8),     # md: beqz v1 -> b (no mod
          (0x8004FAC8, 0x15E00013, 0x10000013, 8),     # ax: bnez t7 -> b (no charge)
          (0x8004FB28, 0x1480001D, 0x1000001D, 8),     # rm: bnez a0 -> b (no remap)
          (0x80028BF4, 0x27BDFFE0, J(2, RESP), 16),    # kc: -> j response
-         (0x80028BF8, 0xAFBF001C, 0, 16)]
+         (0x80028BF8, 0xAFBF001C, 0, 16),
+         # widescreen: X scale of the matrix 0x80059288 (identity copied by the libgs init func_8002DE88, then only
+         # read by the view functions): 0.75 = the game itself renders a 16:9 field (to show stretched to 16:9, with
+         # the emulator's own widescreen hack off), as PeterDelta's DuckStation cheat for this disc (A7059288 10000C00)
+         (0x80059288, 0x00001000, 0x00000C00, 32)]
 
 
 def H(a): return (a + 0x8000) >> 16
@@ -68,7 +74,7 @@ def routines(D):
          'sllv t7, t7, t5', 'xor t6, t6, t7', f'sb t6, {L(FLAGS)}(t0)',
          'op4:', 'sw t6, 0x38(sp)', 'sw t5, 0x24(sp)', 'j odr', 'nop']
     # odr: the panel
-    S += ['odr:', 'sll v1, s1, 2', 'addu v1, v1, s1', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw s5, 4(v1)', 'sll v0, s1, 11',
+    S += ['odr:', 'sll v1, s1, 2', 'addu v1, v1, s1', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw s5, 4(v1)', 'sll v0, s1, 12',
           f'lui s6, {H(PRIMS)}', 'addu s6, s6, v0', f'addiu s6, s6, {L(PRIMS)}',
           f'addiu t4, zero, {X0}', f'addiu t5, zero, {Y0}', *la('t6', D['title']), *la('t7', D['rgbt']), 'jal drw', 'nop',
           'move s7, zero',
@@ -76,7 +82,7 @@ def routines(D):
           'sll t5, s7, 3', 'addu t5, t5, s7', 'sll t0, s7, 2', 'addu t5, t5, t0', f'addiu t5, t5, {Y0 + DY}', 'sw t5, 0x28(sp)',
           *la('t7', D['rgbn']), 'lw t0, 0x24(sp)', 'nop', 'bne t0, s7, ol1', 'nop', *la('t7', D['rgbt']),
           'ol1:', 'jal drw', 'nop', 'j ost', 'nop']
-    S += ['ost:', 'lw s7, 0x30(sp)', 'lw t0, 0x38(sp)', 'nop', 'srlv t0, t0, s7', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']),
+    S += ['ost:', 'lw s7, 0x30(sp)', 'lw t0, 0x38(sp)', 'nop', f'xori t0, t0, {INV}', 'srlv t0, t0, s7', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']),
           'beqz t0, os', 'nop', *la('t6', D['off']), *la('t7', D['rgboff']),
           'os:', f'addiu t4, zero, {X1}', 'lw t5, 0x28(sp)', 'jal drw', 'nop',
           'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', f'slti t0, s7, {n}', 'beqz t0, os9', 'nop', 'j ol', 'nop', 'os9:', 'j box', 'nop']
