@@ -5,8 +5,10 @@
 # roster (8 entries of 0xA8 bytes at 0x80057464, indexed by rider) has a start gap at +0x8E (halfword, 1/100 s)
 # and the same x10 at +0x90 (word), written by SBC1 from the qualifying ranking (best = 0, last = about 22 s).
 #
-# Here, SBC1 runs its stage through func_80062804 (tour screen, the event, the results) and then handles the end of
-# the stage by mode. When the mode is 0 (competition qualifying), that call is replaced: the gaps are written
+# Here, SBC1 runs its stage through func_80062804 (the event, the results) and then handles the end of the stage by
+# mode. The choice is the player's, on the "1st STAGE" screen: START = play the qualifying as usual, SELECT held
+# while pressing START = skip it. When the mode is 0 (competition qualifying) and SELECT is held (pad 0x8004FBF0,
+# bit 0x100), that call is replaced: the gaps are written
 # directly (the player gets the 4th one, the CPU riders the others, rotated each round), the qualifying scores are set
 # to 0, the stage counter (0x8005745C) goes up by one and the course of the stage (0x8005741C) becomes the round's
 # course (0x80057458), as after a played stage, and the call "returns" exit code 3: SBC1's own end-of-stage code then
@@ -25,7 +27,8 @@ JL = lambda t: (3 << 26) | ((t >> 2) & 0x3ffffff)
 def code():
     data = SK_END - 0x20     # 16 bytes of gaps (halfwords) + 7 slots
     hi = (data + 0x8000) >> 16; lo = data - (hi << 16)
-    L = ['skq:', 'lui t1, 0x8005', 'lw t2, 0x7420(t1)', 'nop', 'bnez t2, run', 'nop',
+    L = ['skq:', 'lui t1, 0x8005', 'lw t2, 0x7420(t1)', 'lw t9, -0x410(t1)', 'bnez t2, run', 'andi t9, t9, 0x100',
+         'beqz t9, run', 'nop',
          'lh t3, 0x7408(t1)', 'lw t4, 0x7458(t1)', 'addiu t5, t1, 0x7464', 'move t6, zero', 'move t7, zero',
          'lp:', 'beq t6, t3, pl', 'nop',
          'addu t8, t7, t4', 'm7:', 'slti t9, t8, 7', 'bnez t9, m7d', 'nop', 'j m7', 'addiu t8, t8, -7',

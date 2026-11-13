@@ -51,9 +51,9 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('lift', 'Arrivée express en Free Style', 'Quick finish in Free Style',
      'À l’arrivée, le temps compte comme d’habitude (classement, records, trophées) mais sans célébration ni replay : classement, START, résultats avec ton temps, X = RETRY et tu repars aussitôt d’en haut.',
      'At the finish the run counts as usual (ranking, records, trophies) but without the celebration and the replay: ranking, START, results with your time, X = RETRY and you start again from the top.'),
-    ('skipq', 'Compétition sans qualifications', 'Competition without qualifying',
-     'Chaque manche passe directement au Boarder Cross (pas d’épreuve de figures avant) et tu pars 4e sur 8, au milieu du départ en handicap.',
-     'Each round goes straight to the Boarder Cross (no trick event first) and you start 4th of 8, in the middle of the handicap start.'),
+    ('skipq', 'Qualifications au choix', 'Optional qualifying',
+     'Sur l’écran « 1st STAGE » : START = jouer les qualifications, SELECT + START = les passer et partir 4e sur 8, au milieu du départ en handicap du Boarder Cross.',
+     'On the “1st STAGE” screen: START = play the qualifying, SELECT + START = skip it and start 4th of 8, in the middle of the Boarder Cross handicap start.'),
 ]
 INPUT = 'input'   # shared pad hook (needed by 'max' and 'air')
 BRAND = 'brand'   # "REMIX" on the title screen: with any mod (already inside the moved title files when 'riders' is on)

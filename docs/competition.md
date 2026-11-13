@@ -30,9 +30,10 @@ sont dans la file du contexte (`sp+0x10` de `main`, lue par `func_80012448` en t
 
 ## Mod `skipq` (v25)
 
-À 0x8005B058, en mode 0 seulement : écarts écrits directement (joueur 4e = 11,50 s ; les 7 autres écarts aux riders
+Au choix sur l'écran « 1st STAGE » : START = qualifications jouées ; SELECT maintenu + START = passées.
+À 0x8005B058, en mode 0 et SELECT tenu (manette 0x8004FBF0, bit 0x100) seulement : écarts écrits directement (joueur 4e = 11,50 s ; les 7 autres écarts aux riders
 de l'ordinateur, décalés à chaque manche), essais à 0, `0x8005745C` + 1, `0x8005741C` = piste de la manche, puis
 « retour » du code 3 : la fin d'épreuve normale de SBC1 enchaîne sur le Boarder Cross. L'écran « 1st STAGE » reste
-affiché (START pour passer). Code dans `func_800291CC` (fonction morte de l'exe), voir remix/skipq.py.
+affiché (c'est là que se fait le choix ; le retirer bloque le chargement de l'épreuve). Code dans `func_800291CC` (fonction morte de l'exe), voir remix/skipq.py.
 Échecs instructifs : forcer l'overlay depuis la boucle principale charge les fichiers de la mauvaise épreuve (la file
 est lue avant le chargement de la scène) ou bloque le chargement.
