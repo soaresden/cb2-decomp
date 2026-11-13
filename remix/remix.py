@@ -170,6 +170,14 @@ def patches():
     ckd,lkd=asm(KC,0x80028bf4); assert ckd[-1][0]<0x80028d3c,hex(ckd[-1][0])
     for a_,w_ in ckd: P.append(('/SCES_009.92',a_,struct.unpack_from('<I',_ex,a_-0x8000f800)[0],w_))
     P.append(('/SBC2.BIN',0x8005ff70,0x0c01cdc5,(3<<26)|((lkd['kc']>>2)&0x3ffffff)))
+    # --- Big Air Master: Exit of the pause menu ends the session as a finish (exit code 5: "YOUR GRADE IS ...", then
+    #     the TRICK MASTER ranking) instead of leaving without results (3). Mode 6 only (Master); code in the dead
+    #     func_8002934C of the exe. The pause handler stores v0 at 0x8005CCC8 with `at` already set: kept.
+    cbx,lbx_=asm(['bx:','lui t0, 0x8005','lw t0, 0x7420(t0)','addiu t1, zero, 6','bne t0, t1, bx9','addiu v0, zero, 3','addiu v0, zero, 5',
+                 'bx9:','jr ra','nop'],0x8002934c)
+    assert cbx[-1][0]<0x800293f8
+    for a_,w_ in cbx: P.append(('/SCES_009.92',a_,struct.unpack_from('<I',_ex,a_-0x8000f800)[0],w_))
+    P.append(('/TM.BIN',0x8005ccc0,0x24020003,(3<<26)|((lbx_['bx']>>2)&0x3ffffff)))
     # --- Big Air Master: always show the trick command box (was hidden from level 19)
     P+=[('/TM.BIN',0x80075758,0x10400009,0)]
     # Big Air Master: keys always shown (the game hides them on each new trick until a first failure: flag 0x8009cf2c)

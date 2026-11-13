@@ -44,7 +44,7 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('ramming', 'Chocs en Boarder Cross', 'Boarder Cross ramming',
      'Fonce dans un adversaire : le plus rapide des deux reste debout.', 'Ram an opponent: the faster of the two stays up.'),
     ('bam', 'Big Air Master', 'Big Air Master',
-     'Touches toujours affichées et figures suivantes (NEXT) à droite.', 'Keys always shown and the next tricks (NEXT) on the right.'),
+     'Touches toujours affichées, figures suivantes (NEXT) à droite, et Exit dans la pause termine la session avec ta note et le classement.', 'Keys always shown, the next tricks (NEXT) on the right, and Exit in the pause menu ends the session with your grade and the ranking.'),
     ('progress', 'Progression dans le jeu', 'In-game progress',
      'SELECT maintenu sur l’écran des modes : riders cachés, Mirror, Hard, Hard + Mirror, planches SPECIAL, trophées et pourcentage.',
      'Hold SELECT on the mode select screen: hidden riders, Mirror, Hard, Hard + Mirror, SPECIAL boards, trophies and percentage.'),
@@ -70,7 +70,7 @@ EXE_MAP = [   # (lo, hi, feature) in the executable
     (0x8004F920, 0x8004F93F, 'outfits'), (0x8004F96C, 0x8004F97F, 'outfits'), (0x8004F9E0, 0x8004F9EF, 'outfits'),
     (0x8001D140, 0x8001D140, 'outfits'), (0x8001003C, 0x8001003C, 'outfits'), (0x800100B8, 0x800100B8, 'outfits'),
     (0x800100B4, 0x800100B4, 'progress'),
-    (0x800291CC, 0x8002934B, 'skipq'),
+    (0x800291CC, 0x8002934B, 'skipq'), (0x8002934C, 0x800293F7, 'bam'),
 ]
 MODE_MAP = [(0x800643B4, 0x800643B4, 'progress'), (0x800832C8, 0x800836A8, 'progress')]
 MS_MAP = [*[(a, a, 'max') for a in (0x8006E0A8, 0x8006E0AC, 0x8006E120, 0x8006E124, 0x8006E1CC, 0x8006D478, 0x8006DC98, 0x8006E4B8, 0x8006D614, 0x8006D618,
@@ -82,7 +82,7 @@ SBC_MAP = {'/FREE.BIN': [(0x8005D5A4, 0x8005D5A4, 'lift')],
            '/SBC1.BIN': [(0x8005B058, 0x8005B058, 'skipq'), (0x800832DC, 0x800832DC, 'riders'), (0x8008D8C8, 0x8008D910, 'riders')],
            '/SBC2.BIN': [(0x8005FF70, 0x8005FF70, 'ramming'), (0x80064D70, 0x80064D70, 'riders'), (0x800666EC, 0x800666F0, 'riders'),
                          (0x80066CB4, 0x80066CB8, 'riders'), (0x80090300, 0x80090420, 'riders'), (0x800847AC, 0x800847AC, 'riders'), (0x800902A8, 0x800902F0, 'riders')],
-           '/TM.BIN': [(0x80075738, 0x80075758, 'bam'), (0x80074CFC, 0x80074CFC, 'bam'), (0x80094F18, 0x80095538, 'bam')]}
+           '/TM.BIN': [(0x8005CCC0, 0x8005CCC0, 'bam'), (0x80075738, 0x80075758, 'bam'), (0x80074CFC, 0x80074CFC, 'bam'), (0x80094F18, 0x80095538, 'bam')]}
 MAXC = {('/SBC1.BIN', 0x80063F04), ('/SBC2.BIN', 0x80065BE4), ('/VS.BIN', 0x80064E08), ('/OMT.BIN', 0x80063C58), ('/BP.BIN', 0x80063B1C),
         ('/HP.BIN', 0x80063D0C), ('/FREE.BIN', 0x8006465C), ('/TM.BIN', 0x80063C38), ('/COMB.BIN', 0x80064B88)}
 RACE = {'/SBC1.BIN', '/SBC2.BIN', '/VS.BIN', '/OMT.BIN', '/BP.BIN', '/HP.BIN', '/FREE.BIN', '/TM.BIN', '/COMB.BIN'}
