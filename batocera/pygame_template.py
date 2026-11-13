@@ -226,11 +226,10 @@ def main():
         else: say(T("Erreur : Cool Boarders 2 (PAL) d'origine introuvable dans /userdata/roms/psx (.chd ou .bin)", "Error: original Cool Boarders 2 (PAL) not found in /userdata/roms/psx (.chd or .bin)"))
     else:
         s, disc = orig[0]; ext = '.chd' if disc.kind == 'chd' else '.bin'
-        has_us = bool(usa_orig) and disc.kind == 'chd'
-        cfg = start_config()
-        if pygame: cfg = menu(pygame, scr, (big, small), cfg, has_us); lines.clear()
-        us = usa_orig[0][1] if has_us and cfg['us_music'] else None
-        if cfg['us_music'] and us is None: cfg['us_music'] = False; say(T("(musiques US : il faut le CHD americain dans roms/psx)", "(US music: the USA CHD must be in roms/psx)"))
+        # one job: the original disc becomes the Remix, with every mod; what can be chosen is chosen in the game
+        # (REMIX OPTIONS, R1 on the mode select screen). 'unlock' stays out until it is one of those options.
+        cfg = {'mods': [f for f in M['SHOWN'] if f != 'unlock'], 'us_music': False, 'skins': []}
+        us = None
         code = M['encode_config'](cfg['mods'], cfg['us_music'], cfg['skins'])
         if cfg['skins']: say(T("(les tenues du code se mettent avec le site : ignorees ici)", "(outfits in the code are added by the web site: ignored here)"))
         try: open(CODE_FILE, 'w').write(code + '\n')
