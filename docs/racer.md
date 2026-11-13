@@ -127,3 +127,10 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
   vides ou blancs (Free Style à gauche, half-pipe des deux côtés). Les bornes d'écran ne sont pas comparées en
   coordonnées écran (pas de test x contre ±160 / 320 trouvé) : le décor est choisi plus tôt (blocs de piste selon la
   caméra). Pas de correctif pour l'instant ; jouer en 4:3 reste conseillé.
+- Suite de l'enquête : les routines de subdivision de libgte/libgs de l'exe (`func_80024D98`, `func_80025198`,
+  `func_80037CD0`, `func_80038040`, `func_80038450`, `func_800388D0`, `func_80038DF0`, `func_80039340`) rejettent un
+  polygone dont tous les sommets sont hors de OFX ± l/2 (l en +4 d'une structure passée sur la pile) ; neutraliser ces
+  tests (56 branches, essai en RAM) ne change rien, pas plus que la largeur 320 de 0x80058E54. Sur le half-pipe, les
+  murs du haut vont jusqu'au bord : il ne manque que le sol tout près de la caméra sur les côtés, soit les polygones
+  rejetés parce qu'un sommet passe trop près de la caméra (limite de la GTE), invisibles en 4:3 et visibles en 16:9.
+  Les corriger demanderait de découper ces polygones contre le plan proche : hors de portée d'un patch.
