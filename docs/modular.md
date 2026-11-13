@@ -142,8 +142,17 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
   base sont sauvées (StoreImage 0x80029BE0, vers 0x801D2000), celles de l'alias envoyées (LoadImage 0x80029B7C) et le
   modèle est construit avec le pointeur de l'alias à la place de celui de la table 0x8007C4E8 ; en revenant à un
   autre rider, la sauvegarde est remise. L'écran WEAR n'envoie pas ses textures tant qu'un alias est affiché.
+- Récompense des 100 % : `acomp` reprend la formule de la page de progression (0x80057440 bits 4..6, 0x80057442
+  bits 0..2, 0x80057448/4A/4C = 0x3ff, 0x80057444 et 0x80057446 non nuls, 0x8005743C et 0x8005743E ≥ 10) ; `aval`
+  et `amode` passent par elle, donc tant que le jeu n'est pas fini les trois alias restent gris dans la rangée de
+  têtes et le curseur les saute. Avec `unlock` (mot 0x2403007F en 0x80063EA8), ils sont disponibles d'office.
+  La première ouverture de l'écran BOARDER (par allumage de la console) avec le jeu fini et sans `unlock` lance un
+  compteur de 300 images : « CONGRATULATIONS ! / JICCHI NICK KELLY UNLOCKED » par la fonction de texte du menu
+  (`func_8005E784`, comme « R1 : MAX »), sur un cadre sombre (TILE). Pour que le cadre passe sous le texte mais
+  au-dessus du reste, la dernière lettre (POLY_FT4, pointée par 0x8007B2F8, placée juste après le nœud de la liste)
+  est recopiée plus loin et le cadre prend sa place, chaîné vers elle.
 - Limites : voix, animations et nom en course sont ceux du rider de base.
-- Vérifié : émulateur (Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
+- Vérifié : émulateur (verrouillé / 100 % avec message / `unlock` sans progression), Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
   patcheur Batocera = build Python.
 
 ## Vue arrière (`rear`, v26)

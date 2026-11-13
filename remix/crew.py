@@ -91,7 +91,7 @@ CAVES = [(0x8001E67C, 0x8001E7C4), (0x80013940, 0x80013A34), (0x800169B4, 0x8001
          (0x800290C8, 0x80029128), (0x8003F028, 0x8003F088), (0x800439C4, 0x80043A24),
          (0x80017BF8, 0x80017C9C), (0x8002043C, 0x8002050C), (0x80021A88, 0x80021B28), (0x800312C4, 0x80031374), (0x80028078, 0x800280B8)]
 DATA2 = 0x8003EE98; DATA2_END = 0x8003EF00             # menu models: file entries, rectangles, state
-ENT2, IDX2, RCOL, RCLUT, PENDING, DUMMY = (DATA2 + o for o in (0, 0x18, 0x20, 0x38, 0x50, 0x54))
+ENT2, IDX2, RCOL, RCLUT, PENDING, DUMMY, ANNOUNCED, ANN_CNT = (DATA2 + o for o in (0, 0x18, 0x20, 0x38, 0x50, 0x54, 0x58, 0x5C))
 MENU_SHOWN = 0x4D575253                                 # 'SRWM' + k in MENU_SAVE: alias k's texture is in VRAM
 MODELS = 0x8007C4E8; FN_MDL = 0x80064A08; MDL_SITES = [0x800602E8, 0x80061580]
 UPLOAD = 0x8005DB60; WEAR_UPLOADS = [0x80064100, 0x80064124]
@@ -99,6 +99,10 @@ LOADIMAGE = 0x80029B7C; STOREIMAGE = 0x80029BE0; DRAWSYNC = 0x800298B8; QPOLL = 
 CDMODE = 0x80013C94       # CdControl(CdlSetmode, 0xA0): data reading, as the game's own loads do
 DATA = 0x8001FBC4; DATA_END = 0x8001FCA8
 ALIASV, ACUR, AB, ASTP, BASEV, MODESV, IDX, STATS, PARAMS, ENT = (DATA + o for o in (0, 4, 8, 0xC, 0x10, 0x14, 0x18, 0x24, 0x48, 0x7C))
+STR_C = DATA + 0xAC; STR_U = STR_C + 18                 # 'CONGRATULATIONS !', 'JICCHI NICK KELLY UNLOCKED' (end of DATA)
+TEXT_C, TEXT_U = b'CONGRATULATIONS !', b'JICCHI NICK KELLY UNLOCKED'
+TEXTFN = 0x8005E784; TEXT_LAST = 0x8007B2F8; ANN_FRAMES = 300; ANN_X1, ANN_X2, ANN_Y = 92, 56, 110   # MAIN_SEL text function (as the R1 : MAX hint)
+ANN_BOX, ANN_BOX_RGB = (36, 102, 248, 40), 0x401010     # x, y, w, h on screen; colour b g r
 BASE = [0, 1, 2]
 MODES = (1 << 2) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8)   # Free Style, Big Air, Big Air Master, Halfpipe, Board Park
 STAT_BARS = [(3, 4, 4, 6, 6, 8), (2, 4, 6, 4, 8, 6), (6, 8, 6, 6, 4, 4)]    # BOARDER screen bars (display only)
@@ -122,11 +126,20 @@ def L(a): return a - (((a + 0x8000) >> 16) << 16)
 def routines(race_regs):
     S = []
     # aval(a0 = rider, a1 = alias) -> v0 = alias if usable in this mode for this rider, else 0 (uses at only)
-    S += ['aval:', 'beqz a1, av0', 'lui at, 0x8005', 'lw v0, 0x7420(at)', f'lui at, {H(MODESV)}', f'lw at, {L(MODESV)}(at)', 'nop',
-          'srlv at, at, v0', 'andi at, at, 1', 'beqz at, av0', f'lui at, {H(BASEV)}', 'addu at, at, a1', f'lbu at, {L(BASEV)}(at)', 'nop',
-          'bne at, a0, av0', 'nop', 'jr ra', 'move v0, a1', 'av0:', 'jr ra', 'move v0, zero']
-    # amode() -> v0 = 1 if the mode allows the new riders (uses at)
-    S += ['amode:', 'lui at, 0x8005', 'lw v0, 0x7420(at)', f'lui at, {H(MODESV)}', f'lw at, {L(MODESV)}(at)', 'nop', 'srlv at, at, v0', 'jr ra', 'andi v0, at, 1']
+    S += ['aval:', 'beqz a1, av0', f'lui at, {H(BASEV)}', 'addu at, at, a1', f'lbu at, {L(BASEV)}(at)', 'nop', 'bne at, a0, av0',
+          'lui at, 0x8005', 'lw v0, 0x7420(at)', f'lui at, {H(MODESV)}', f'lw at, {L(MODESV)}(at)', 'nop',
+          'srlv at, at, v0', 'andi at, at, 1', 'beqz at, av0', 'nop', 'j acomp', 'nop', 'av0:', 'jr ra', 'move v0, zero']
+    # amode() -> v0 = 1 if the mode allows the new riders and they are won (uses at, a1)
+    S += ['amode:', 'lui at, 0x8005', 'lw v0, 0x7420(at)', f'lui at, {H(MODESV)}', f'lw at, {L(MODESV)}(at)', 'nop', 'srlv at, at, v0',
+          'andi at, at, 1', 'bnez at, am1', 'nop', 'jr ra', 'move v0, zero', 'am1:', 'j acomp', 'addiu a1, zero, 1']
+    # acomp(a1) -> v0 = a1 if the game is complete (100 % of the progress page) or with the 'unlock' mod, else 0 (uses at, v0)
+    S += ['acomp:', f'lui at, {H(UNLOCK_ALL[0])}', f'lw v0, {L(UNLOCK_ALL[0])}(at)', f'lui at, {UNLOCK_ALL[1] >> 16:#x}', f'ori at, at, {UNLOCK_ALL[1] & 0xffff:#x}',
+          'beq v0, at, ac1', 'lui at, 0x8005', 'lhu v0, 0x7440(at)', 'nop', 'srl v0, v0, 4', 'andi v0, v0, 7', 'xori v0, v0, 7', 'bnez v0, ac0',
+          'lhu v0, 0x7442(at)', 'nop', 'andi v0, v0, 7', 'xori v0, v0, 7', 'bnez v0, ac0',
+          *[x for o in (0x7448, 0x744A, 0x744C) for x in (f'lhu v0, {o}(at)', 'nop', 'andi v0, v0, 0x3ff', 'xori v0, v0, 0x3ff', 'bnez v0, ac0')],
+          'lhu v0, 0x7444(at)', 'nop', 'beqz v0, ac0', 'lhu v0, 0x7446(at)', 'nop', 'beqz v0, ac0',
+          'lhu v0, 0x743c(at)', 'nop', 'sltiu v0, v0, 10', 'bnez v0, ac0', 'lhu v0, 0x743e(at)', 'nop', 'sltiu v0, v0, 10', 'bnez v0, ac0', 'nop',
+          'ac1:', 'jr ra', 'move v0, a1', 'ac0:', 'jr ra', 'move v0, zero']
     # setcur(a0 = alias): ACUR, AB (base + 1, 0 = none), ASTP (stat bars row)
     S += ['setcur:', f'lui at, {H(ACUR)}', f'sw a0, {L(ACUR)}(at)', 'beqz a0, sc0', 'move v0, zero',
           f'lui at, {H(BASEV)}', 'addu at, at, a0', f'lbu v0, {L(BASEV)}(at)', 'nop', 'addiu v0, v0, 1',
@@ -154,7 +167,8 @@ def routines(race_regs):
         S += [f'{kind}wH:', f'lui t9, {H(ALIASV)}', f'j {kind}w', f'addiu t9, t9, {L(ALIASV)}',
               f'{kind}wB:', f'lui t9, {H(ACUR)}', f'addiu t9, t9, {L(ACUR)}',
               f'{kind}w:', 'addiu sp, sp, -0x30', 'sw ra, 0x28(sp)', 'sw s0, 0x24(sp)', 'sw t9, 0x1c(sp)',
-              *([f'lui t0, {H(ACUR)}', f'addiu t0, t0, {L(ACUR)}', 'bne t0, t9, fwp', 'nop', 'jal mpoll', 'nop', 'fwp:', 'lw t9, 0x1c(sp)', 'sw a0, 0x18(sp)'] if kind == 'f' else []),
+              *([f'lui t0, {H(ACUR)}', f'addiu t0, t0, {L(ACUR)}', 'bne t0, t9, fwp', 'nop', 'jal mpoll', 'nop', 'fwp:', 'lw t9, 0x1c(sp)'] if kind == 'f' else []),
+              'sw a0, 0x18(sp)',
               'lw t0, 0x40(sp)', 'lw t1, 0x44(sp)',
               'sw t0, 0x10(sp)', 'sw t1, 0x14(sp)', f'jal {fn}', 'sw t1, 0x20(sp)', 'move s0, v0',
               'lw t9, 0x1c(sp)', 'lw a0, 0x20(sp)', 'lw a1, 0(t9)', 'jal aval', 'nop', 'beqz v0, ' + kind + 'w9', 'addiu v0, v0, -1']
@@ -168,7 +182,7 @@ def routines(race_regs):
               'lhu t4, -0x12(s0)', 'nop', 'andi t4, t4, 0xffe0', 'or t4, t4, t5', 'sh t4, -0x12(s0)',
               f'{kind}w9:',
               *([f'lui t0, {H(ACUR)}', 'lw t9, 0x1c(sp)', f'addiu t0, t0, {L(ACUR)}', 'bne t0, t9, nws', 'move a0, s0',
-                 'lw a1, 0x20(sp)', 'jal strip', 'addiu a2, s0, -0x28', 'move s0, v0', 'nws:'] if kind == 'n' else []),
+                 'lw a1, 0x20(sp)', 'lw a3, 0x18(sp)', 'jal strip', 'addiu a2, s0, -0x28', 'move s0, v0', 'nws:'] if kind == 'n' else []),
               'move v0, s0', 'lw ra, 0x28(sp)', 'lw s0, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x30']
     # stat bars: replaces "sll v0, v0, 2" (delay slot: addu v0, v0, X) -> v0 = row pointer offset
     for rr, xr in sorted({(r, x) for _, r, x in BARS}):
@@ -185,7 +199,11 @@ def routines(race_regs):
     # BOARDER screen opens (sel_riderCursor = g_rider): ACUR = usable ALIAS; validated: ALIAS = ACUR
     S += ['cinit:', 'lhu v0, 0x7408(v0)', 'move t4, ra', 'move t5, a0', 'move t6, a1', 'move t3, v0', 'sll a0, v0, 16', 'sra a0, a0, 16',
           f'lui at, {H(ALIASV)}', f'lw a1, {L(ALIASV)}(at)', 'jal aval', 'nop', 'jal setcur', 'move a0, v0',
-          'move ra, t4', 'move a0, t5', 'move a1, t6', 'move v0, t3', f'j {CINIT + 8}', 'nop']
+          # the first time the BOARDER screen opens with the game complete (not with the 'unlock' mod): CONGRATULATIONS
+          f'lui at, {H(ANNOUNCED)}', f'lw t0, {L(ANNOUNCED)}(at)', 'nop', 'bnez t0, ci9', 'nop', 'jal acomp', 'addiu a1, zero, 1', 'beqz v0, ci9',
+          f'lui at, {H(UNLOCK_ALL[0])}', f'lw t0, {L(UNLOCK_ALL[0])}(at)', f'lui t1, {UNLOCK_ALL[1] >> 16:#x}', f'ori t1, t1, {UNLOCK_ALL[1] & 0xffff:#x}',
+          'beq t0, t1, ci9', 'addiu t0, zero, 1', f'lui at, {H(ANNOUNCED)}', f'sw t0, {L(ANNOUNCED)}(at)', f'addiu t0, zero, {ANN_FRAMES}', f'sw t0, {L(ANN_CNT)}(at)',
+          'ci9:', 'move ra, t4', 'move a0, t5', 'move a1, t6', 'move v0, t3', f'j {CINIT + 8}', 'nop']
     S += ['ccom:', 'sh v0, 0x7408(at)', f'lui at, {H(ACUR)}', f'lw t9, {L(ACUR)}(at)', f'lui at, {H(ALIASV)}', f'j {CCOM + 8}', f'sw t9, {L(ALIASV)}(at)']
     # race parameters: replaces "sll v0, R, 4" (delay slot: lui v1, hi); the next instruction (at ra) is addiu v1, v1, lo
     for rr in sorted(set(race_regs)):
@@ -245,8 +263,8 @@ def routines(race_regs):
           'mp9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw a0, 0x18(sp)', 'lw a1, 0x1c(sp)', 'lw a2, 0x20(sp)', 'lw a3, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x28']
     # strip(a0 = primitive buffer, a1 = rider under the cursor, a2 = the name tag's primitive) -> v0 = buffer after the
     # 10 heads (POLY_FT4 written here, linked right after the name tag: drawn over the screen like it)
-    S += ['strip:', 'addiu sp, sp, -0x30', 'sw ra, 0x28(sp)', 'sw s0, 0x10(sp)', 'sw s1, 0x14(sp)', 'sw s2, 0x18(sp)', 'sw s3, 0x1c(sp)',
-          'sw s4, 0x20(sp)', 'sw s5, 0x24(sp)', 'move s0, a0', 'move s2, a1', 'move s1, a2',
+    S += ['strip:', 'addiu sp, sp, -0x48', 'sw ra, 0x40(sp)', 'sw s0, 0x20(sp)', 'sw s1, 0x24(sp)', 'sw s2, 0x28(sp)', 'sw s3, 0x2c(sp)',
+          'sw s4, 0x30(sp)', 'sw s5, 0x34(sp)', 'move s0, a0', 'move s2, a1', 'move s1, a2', 'sw a3, 0x3c(sp)',
           f'lui at, {H(ACUR)}', f'lw a1, {L(ACUR)}(at)', 'jal aval', 'move a0, s2', 'bnez v0, st1', 'addiu s3, v0, 3',
           'move s3, s2', 'slti t0, s2, 4', 'bnez t0, st1', 'nop', 'addiu s3, s2, 3',
           'st1:', 'lui at, 0x8005', 'lhu s4, 0x7440(at)', f'lui at, {H(UNLOCK_ALL[0])}', f'lw t0, {L(UNLOCK_ALL[0])}(at)',
@@ -276,7 +294,23 @@ def routines(race_regs):
           'lw t0, 0(s1)', 'lui t1, 0xff', 'ori t1, t1, 0xffff', 'and t2, t0, t1', 'lui t3, 0x0900', 'or t2, t2, t3', 'sw t2, 0(s0)',
           'lui t3, 0xff00', 'and t0, t0, t3', 'and t2, s0, t1', 'or t0, t0, t2', 'sw t0, 0(s1)', 'move s1, s0',
           'addiu s0, s0, 0x28', 'addiu s5, s5, 1', 'slti t0, s5, 10', 'bnez t0, stl', 'nop',
-          'move v0, s0', 'lw ra, 0x28(sp)', 'lw s0, 0x10(sp)', 'lw s1, 0x14(sp)', 'lw s2, 0x18(sp)', 'lw s3, 0x1c(sp)', 'lw s4, 0x20(sp)', 'lw s5, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x30']
+          'j sta', 'nop',
+          # CONGRATULATIONS (two lines, the game's own text function, as "R1 : MAX") while the counter runs
+          'sta:', f'lui at, {H(ANN_CNT)}', f'lw t0, {L(ANN_CNT)}(at)', 'nop', 'beqz t0, st9x', 'addiu t0, t0, -1', f'sw t0, {L(ANN_CNT)}(at)',
+          *[x for txt, x0, y0 in ((STR_C, ANN_X1, ANN_Y), (STR_U, ANN_X2, ANN_Y + 14)) for x in (
+            'lw a0, 0x3c(sp)', 'move a1, s0', f'lui a2, {H(txt)}', f'addiu a2, a2, {L(txt)}', f'addiu t0, zero, {y0}', 'sw t0, 0x10(sp)',
+            'sw zero, 0x14(sp)', 'addiu t0, zero, 1', 'sw t0, 0x18(sp)', f'jal {TEXTFN}', f'addiu a3, zero, {x0}', 'move s0, v0')],
+          'j stb', 'nop',
+          # dark box behind the text, at the text's place in the drawing order: the text function inserts each letter
+          # (POLY_FT4, 0x28 bytes) right after one node and keeps the last one in TEXT_LAST, so that letter moves to s0
+          # and the box (TILE) takes its place, linked to it
+          'stb:', f'lui at, {H(TEXT_LAST)}', f'lw t4, {L(TEXT_LAST)}(at)', 'move t5, zero',
+          'stc:', 'addu t0, t4, t5', 'lw t1, 0(t0)', 'addu t0, s0, t5', 'addiu t5, t5, 4', 'slti t2, t5, 0x28', 'bnez t2, stc', 'sw t1, 0(t0)',
+          'lui t1, 0xff', 'ori t1, t1, 0xffff', 'and t2, s0, t1', 'lui t3, 0x0300', 'or t2, t2, t3', 'sw t2, 0(t4)',
+          f'lui t0, {(0x60000000 | ANN_BOX_RGB) >> 16:#x}', f'ori t0, t0, {ANN_BOX_RGB & 0xffff:#x}', 'sw t0, 4(t4)',
+          f'lui t0, {(ANN_BOX[1] - 120) & 0xffff:#x}', f'ori t0, t0, {(ANN_BOX[0] - 160) & 0xffff:#x}', 'sw t0, 8(t4)',
+          f'lui t0, {ANN_BOX[3]:#x}', f'ori t0, t0, {ANN_BOX[2]:#x}', 'sw t0, 0xc(t4)', 'addiu s0, s0, 0x28',
+          'st9x:', 'move v0, s0', 'lw ra, 0x40(sp)', 'lw s0, 0x20(sp)', 'lw s1, 0x24(sp)', 'lw s2, 0x28(sp)', 'lw s3, 0x2c(sp)', 'lw s4, 0x30(sp)', 'lw s5, 0x34(sp)', 'jr ra', 'addiu sp, sp, 0x48']
     # wup: the WEAR screen's texture uploads are skipped while an alias's texture is shown
     S += ['wup:', f'lui at, {H(MENU_SAVE)}', f'lw t0, {L(MENU_SAVE)}(at)', f'lui t1, {H(MENU_SHOWN)}', f'addiu t1, t1, {L(MENU_SHOWN + 1)}', 'subu t0, t0, t1',
           'sltiu t0, t0, 3', 'beqz t0, wu1', 'nop', 'jr ra', 'nop', 'wu1:', f'j {UPLOAD}', 'nop']
@@ -310,7 +344,7 @@ def place(S):
 
 
 # block starts for place(); nx and mdq are not fallen into (an unconditional jump comes before them)
-TOP = {'aval', 'amode', 'setcur', 'navH', 'nx', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
+TOP = {'aval', 'amode', 'setcur', 'navH', 'nx', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'sta', 'stb', 'acomp', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
 
 
 # ---------------------------------------------------------------------------------------------------- disc layout
@@ -359,6 +393,7 @@ def patches(fs_read, placed):
             + struct.pack('<6h', idx[0], idx[2], idx[4], idx[1], idx[3], idx[5])
             + b''.join(struct.pack('<6h', *s) for s in STAT_BARS) + params)
     data += bytes(ENT - DATA - len(data)) + ent
+    data += bytes(STR_C - DATA - len(data)) + TEXT_C + b'\0' + TEXT_U + b'\0'
     assert DATA + len(data) <= DATA_END and (ENT - G_FILES) % 8 == 0
     data += bytes((-len(data)) % 4)
     P += [('/SCES_009.92', DATA + i, struct.unpack_from('<I', data, i)[0]) for i in range(0, len(data), 4)]
@@ -366,8 +401,8 @@ def patches(fs_read, placed):
     d2 = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[6:9])
     d2 += struct.pack('<3h', *[(ENT2 + 8 * k - G_FILES) // 8 for k in range(3)]) + bytes(2)
     d2 += b''.join(struct.pack('<4h', MENU_COL[k], 0, 64, 256) for k in range(3))
-    d2 += b''.join(struct.pack('<4h', 768, MENU_CLUT_Y[k], 256, 1) for k in range(3)) + bytes(8)
-    assert DATA2 + len(d2) <= DATA2_END and (ENT2 - G_FILES) % 8 == 0 and len(d2) == DUMMY + 4 - DATA2
+    d2 += b''.join(struct.pack('<4h', 768, MENU_CLUT_Y[k], 256, 1) for k in range(3)) + bytes(16)
+    assert DATA2 + len(d2) <= DATA2_END and (ENT2 - G_FILES) % 8 == 0 and len(d2) == ANN_CNT + 4 - DATA2
     P += [('/SCES_009.92', DATA2 + i, struct.unpack_from('<I', d2, i)[0]) for i in range(0, len(d2), 4)]
     # hooks
     ms = fs_read('/MAIN_SEL.BIN'); ex = fs_read('/SCES_009.92')
