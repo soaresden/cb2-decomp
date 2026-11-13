@@ -297,9 +297,7 @@ def patches():
     import progress as _pg
     _o,_b,_h=_pg.block()
     P+=[('/MODE_SEL.BIN',_pg.HOOK,_pg.HOOK_OLD,_h),('/SCES_009.92',0x800100b4,0x800832c8,_pg.LIMIT)]
-    # Free Style lift (lift.py): the finish counts as usual, no celebration / replay, straight to ranking -> RETRY
-    import lift as _lf
-    P+=_lf.patches()
+    # (Free Style quick finish, lift.py: withdrawn in v25 at the player's request -- celebration and replay are back)
     # Competition: skip the qualifying stage (skipq.py): straight to the Boarder Cross, 4th start gap
     import skipq as _sq
     P+=_sq.patches(_ex,open(os.path.join(FS,'SBC1.BIN'),'rb').read())

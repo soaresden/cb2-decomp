@@ -15,7 +15,7 @@ près**.
 | `air` | Figures en l'air | overlays de course |
 | `ramming` | Chocs en Boarder Cross | exe 0x80028BF4–0x80028D3C, SBC2 |
 | `bam` | Big Air Master | TM |
-| `lift` | Arrivée express en Free Style (pas de célébration ni de replay, résultats puis RETRY) | FREE 0x8005D5A4 — voir `freestyle_lift.md` |
+| `lift` | *Retiré en v25 (le joueur préfère la célébration et le replay d'origine) ; gardé dans les codes.* | (FREE 0x8005D5A4 — voir `freestyle_lift.md`) |
 | `progress` | Progression dans le jeu (SELECT sur l'écran des modes) | fin de MODE_SEL (82 secteurs : déplacé à la fin de STAFFE.STR, coupé), crochet 0x800643B4, début du tas de MODE_SEL (exe 0x800100B4) — voir `progression.md` |
 | `skipq` | Compétition sans qualifications | exe 0x800291CC–0x8002934B, SBC1 0x8005B058 (docs/competition.md) |
 

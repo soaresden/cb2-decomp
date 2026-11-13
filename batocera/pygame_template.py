@@ -94,7 +94,7 @@ def patch(src, dst, log=print, progress=lambda f: None, us=None, cfg=None):
     log(T("Calcul du patch...", "Building the patch..."))
     if '/SCUS_943.58' in disc.files: mods = apply_delta(disc, gzip.decompress(base64.b64decode(DELTA_US_B64)), log=log)
     else:
-        cfg = cfg or {'mods': M['IDS'], 'us_music': us is not None, 'skins': []}
+        cfg = cfg or {'mods': list(M['SHOWN']), 'us_music': us is not None, 'skins': []}
         mods = M['apply'](disc, PKG, cfg['mods'])
         M['mark'](disc, mods, M['encode_config'](cfg['mods'], cfg['us_music'], cfg['skins']))
     tmp = dst + '.part'
@@ -114,18 +114,19 @@ def patch(src, dst, log=print, progress=lambda f: None, us=None, cfg=None):
     return len(mods)
 
 NAMES = {f[0]: (f[1] if FR else f[2]).replace('\u2019', "'") for f in M['FEATURES']}
-PRESETS = [(T('Remix complet', 'Full Remix'), list(M['IDS'])), (T('100 % a gagner', '100% to earn'), [f for f in M['IDS'] if f not in ('unlock', 'special')]), (T('Aucun mod', 'No mods'), [])]
+PRESETS = [(T('Remix complet', 'Full Remix'), list(M['SHOWN'])), (T('100 % a gagner', '100% to earn'), [f for f in M['SHOWN'] if f not in ('unlock', 'special')]), (T('Aucun mod', 'No mods'), [])]
 
 def start_config():
     for src in (CODE_FILE,):
-        try: return M['decode_config'](open(src).read().strip())
+        try:
+            c = M['decode_config'](open(src).read().strip()); c['mods'] = [f for f in c['mods'] if f in M['SHOWN']]; return c
         except Exception: pass
-    return {'mods': list(M['IDS']), 'us_music': False, 'skins': []}
+    return {'mods': list(M['SHOWN']), 'us_music': False, 'skins': []}
 
 def menu(pygame, scr, fonts, cfg, has_us):
     """switch screen: up/down, A (or Enter) = tick, START (or Space) = build, B = back to the full Remix. -> cfg"""
     big, small = fonts; W, H = scr.get_size()
-    rows = [('mod', f) for f in M['IDS']] + ([('us', None)] if has_us else []) + [('preset', i) for i in range(len(PRESETS))] + [('go', None)]
+    rows = [('mod', f) for f in M['SHOWN']] + ([('us', None)] if has_us else []) + [('preset', i) for i in range(len(PRESETS))] + [('go', None)]
     cur = len(rows) - 1; last_axis = 0; t_in = time.time(); pygame.event.clear()
     while True:
         scr.fill((16, 22, 30))
@@ -159,7 +160,7 @@ def menu(pygame, scr, fonts, cfg, has_us):
             if act == 'go': return cfg
             if act == 'ok':
                 k, v = rows[cur]
-                if k == 'mod': cfg['mods'] = [f for f in M['IDS'] if (f in cfg['mods']) != (f == v)]
+                if k == 'mod': cfg['mods'] = [f for f in M['SHOWN'] if (f in cfg['mods']) != (f == v)]
                 elif k == 'us': cfg['us_music'] = not cfg['us_music']
                 elif k == 'preset': cfg['mods'] = list(PRESETS[v][1])
                 else: return cfg

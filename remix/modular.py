@@ -338,6 +338,8 @@ def load(path): return json.loads(gzip.decompress(open(path, 'rb').read()))
 # trailing zero bytes dropped, then 1 check byte (crc32 & 255); Crockford base32, "CB2-XXXX-XXXX".
 B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 IDS = [f[0] for f in FEATURES]
+RETIRED = {'lift'}                       # kept in IDS so that old codes still decode; no longer offered
+SHOWN = [f for f in IDS if f not in RETIRED]
 
 def encode_config(mods, us_music=False, skins=()):
     m = sum(1 << IDS.index(f) for f in mods); s = sum(1 << i for i in skins if 0 <= i < 64)
