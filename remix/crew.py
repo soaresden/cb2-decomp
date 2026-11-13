@@ -259,8 +259,9 @@ def routines(race_regs):
           # colour: 0x80 under the cursor, 0x50 the others
           'lui t0, 0x2c50', 'ori t0, t0, 0x5050', 'bne s5, s3, st5', 'nop', 'lui t0, 0x2c80', 'ori t0, t0, 0x8080',
           'st5:', 'sw t0, 4(s0)',
-          # screen: x 92 + 18 i, y 222, 16x16 (20x20 under the cursor)
-          'sll t0, s5, 4', 'sll t1, s5, 1', 'addu t0, t0, t1', f'addiu t0, t0, {STRIP_X}', f'addiu t1, zero, {STRIP_Y}', 'addiu t2, t0, 16', f'addiu t3, zero, {STRIP_Y + 16}',
+          # screen: two rows of 5 under the BOARDER title, 16x16 (20x20 under the cursor)
+          'move t8, s5', f'addiu t1, zero, {STRIP_Y}', 'slti t0, s5, 5', 'bnez t0, sts', 'nop', 'addiu t8, s5, -5', f'addiu t1, t1, {STRIP_DY}',
+          'sts:', 'sll t0, t8, 4', 'sll t8, t8, 1', 'addu t0, t0, t8', f'addiu t0, t0, {STRIP_X}', 'addiu t2, t0, 16', 'addiu t3, t1, 16',
           'bne s5, s3, st7', 'nop', 'addiu t0, t0, -2', 'addiu t1, t1, -2', 'addiu t2, t2, 2', 'addiu t3, t3, 2',
           'st7:', 'sh t0, 8(s0)', 'sh t1, 0xa(s0)', 'sh t2, 0x10(s0)', 'sh t1, 0x12(s0)', 'sh t0, 0x18(s0)', 'sh t3, 0x1a(s0)', 'sh t2, 0x20(s0)', 'sh t3, 0x22(s0)',
           'j stp', 'nop',
@@ -508,7 +509,7 @@ END_TEX = [((512, 256), (768, 485)), ((576, 256), (768, 486)), ((640, 256), (768
 # 342/343. Drawn by strip() from the BOARDER screen's portrait wrapper, with the game's own name-tag function.
 STRIP_ORDER = [0, 1, 2, 3, 'J', 'N', 'K', 4, 5, 6]
 ICON_X, ICON_Y, ICON_CLUT_X, ICON_CLUT_Y = 960, 324, 928, 340
-STRIP_X, STRIP_Y, STRIP_DX = 92 - 160, 222 - 120, 18     # first head (screen x 92, y 222; the menu draws from the centre), step
+STRIP_X, STRIP_Y, STRIP_DX, STRIP_DY = 16 - 160, 46 - 120, 18, 17   # first head (screen x 16, y 46, under the title; the menu draws from the centre), steps
 UNLOCK_ALL = (0x80063EA8, 0x2403007F)                    # the 'unlock' mod's word: every boarder selectable
 FACE_TPX = [0x140] * 6 + [0x180]; FACE_U = [0, 0x40, 0x40, 0, 0x40, 0, 0]; FACE_V = [0x50, 0x50, 0xA0, 0xA0, 0, 0, 0xB0]
 FACE_CY = [0x1C8, 0x1C9, 0x1CB, 0x1CA, 0x1CD, 0x1CC, 0x1CE]          # tables of func_80063324 (menu portraits)

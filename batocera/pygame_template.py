@@ -94,7 +94,7 @@ def patch(src, dst, log=print, progress=lambda f: None, us=None, cfg=None):
     log(T("Calcul du patch...", "Building the patch..."))
     if '/SCUS_943.58' in disc.files: mods = apply_delta(disc, gzip.decompress(base64.b64decode(DELTA_US_B64)), log=log)
     else:
-        cfg = cfg or {'mods': list(M['SHOWN']), 'us_music': us is not None, 'skins': []}
+        cfg = cfg or {'mods': [f for f in M['SHOWN'] if f != 'unlock'], 'us_music': us is not None, 'skins': []}
         mods = M['apply'](disc, PKG, cfg['mods'])
         M['mark'](disc, mods, M['encode_config'](cfg['mods'], cfg['us_music'], cfg['skins']))
     tmp = dst + '.part'
@@ -121,7 +121,7 @@ def start_config():
         try:
             c = M['decode_config'](open(src).read().strip()); c['mods'] = [f for f in c['mods'] if f in M['SHOWN']]; return c
         except Exception: pass
-    return {'mods': list(M['SHOWN']), 'us_music': False, 'skins': []}
+    return {'mods': [f for f in M['SHOWN'] if f != 'unlock'], 'us_music': False, 'skins': []}   # 'Tout débloqué' off by default
 
 def menu(pygame, scr, fonts, cfg, has_us):
     """switch screen: up/down, A / B / X / Y (or Enter) = tick, START (or Space) = build. -> cfg"""

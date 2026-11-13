@@ -159,7 +159,8 @@ Limite : le jeu ne dessine que la piste devant le rider, des trous blancs peuven
 d'autres rendus.
 - Rangée de têtes (v26) : en bas de l'écran BOARDER, 10 têtes 16x16 dans l'ordre de la liste (YAGGI JIN CINDY IRIN
   JICCHI NICK KELLY BOSS GRAY SNOWMAN), celle du curseur plus grande, celles des riders non disponibles en gris
-  (bits de 0x80057440, ou tous si le mot du mod `unlock` est là ; Jicchi/Nick/Kelly selon le mode). Têtes faites par
+  (bits de 0x80057440, ou tous si le mot du mod `unlock` est là ; Jicchi/Nick/Kelly selon le mode), en 2 rangées de 5
+  sous le titre BOARDER. Têtes faites par
   le patcheur à partir des portraits du menu (opération `icons`, 4 bits, VRAM x 960 y 324, palettes x 928 lignes
   340..343) ; dix POLY_FT4 écrits par `strip` et chaînés juste après le nom tagué (le menu dessine avec l'origine au
   centre de l'écran : +160, +120).
