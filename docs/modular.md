@@ -250,17 +250,22 @@ Code : `remix/hplive.py` (HP.BIN seulement).
 
 ## Options dans le jeu (`options`, v26)
 
-Code : `remix/options.py` (MODE_SEL) ; tests dans `rear.py`, `hplive.py`, `news.py`.
+Code : `remix/options.py` (MODE_SEL + trois fonctions mortes de l'exe réservées) ; tests dans `rear.py`, `hplive.py`,
+`news.py`.
 
 - Les interrupteurs sont des bits de 0x80057438 (bit à 1 = coupé) : 1 vue arrière, 2 notes du half-pipe en direct,
-  4 annonces de déblocage. Cet octet fait partie du bloc 0x80057434..0x8005744D copié dans la sauvegarde mais n'est
-  jamais lu par le jeu (docs/progression.md) : le réglage suit la carte mémoire. À 0 (sauvegarde d'avant), tout est
-  actif comme avant. Chacun des trois mods lit son bit avant d'agir (sans le mod `options`, l'octet reste à 0).
-- Écran de choix du mode : la fonction de la télé (`func_80064200`, chaque image) appelle `func_80028BDC` en
-  0x800643E4 ; l'appel passe par `opt` (fonctions mortes de MODE_SEL : après le code de `crewrank` en 0x800654A8,
-  puis 0x8006F680 et 0x8006F800 ; données après celles de `crewrank` en 0x8005C8B0). R1 maintenu : panneau REMIX
-  OPTIONS (texte du jeu `func_80012CA0`, tampon de primitives à 0x801F8000 + 0x800 par tampon d'image, cadre sombre
-  comme la page de progression) ; L1 / L2 / R2 (appuis nouveaux, manette en 0x800832BA) basculent les bits.
-- Vérifié dans l'émulateur : bascules (0 → 1 → 5 → 4) et affichage ON / OFF ; notes du half-pipe absentes avec le
-  bit 2 ; vue arrière normale avec le bit 1 ; annonce non lancée avec le bit 4 (lancée sans). Pas encore vérifié :
-  l'octet relu après un vrai enregistrement puis chargement de la carte.
+  4 annonces de déblocage, 8 figures en l'air (`air`), 16 chocs en Boarder Cross (`ramming`). Cet octet fait partie
+  du bloc 0x80057434..0x8005744D copié dans la sauvegarde mais n'est jamais lu par le jeu (docs/progression.md) : le
+  réglage suit la carte mémoire. À 0, tout est actif comme avant.
+- `rear`, `hplive`, `news` lisent leur bit. `air` et `ramming` sont coupés là où leur code vit, dans l'exe (toujours
+  en mémoire) : à chaque image de l'écran de choix du mode, `oap` donne aux mots de PATCH leur valeur « actif » ou
+  « coupé » (air : les branches de md 0x8004FA44, ax 0x8004FAC8, rm 0x8004FB28 rendues inconditionnelles ; ramming :
+  l'entrée de `kc` 0x80028BF4 devient un saut vers la réponse de collision du jeu), seulement si le mot vaut déjà l'une
+  des deux valeurs (mod absent : rien n'est touché), puis FlushCache.
+- Écran de choix du mode : l'appel de `func_80028BDC` en 0x800643E4 (fonction de la télé, chaque image) passe par
+  `opt`. R1 maintenu : panneau REMIX OPTIONS (texte du jeu `func_80012CA0`, cadre sombre) ; L1 descend le curseur
+  (ligne dorée), R2 bascule la ligne.
+- Vérifié dans l'émulateur : curseur et bascules ; mots de l'exe changés et remis (air, ramming) ; course de Free
+  Style avec air et ramming coupés ; notes du half-pipe absentes avec le bit 2 ; vue arrière normale avec le bit 1 ;
+  annonce non lancée avec le bit 4. Pas encore vérifié : l'octet relu après un vrai enregistrement puis chargement de
+  la carte.
