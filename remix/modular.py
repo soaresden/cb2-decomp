@@ -57,6 +57,9 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('crew', 'Jicchi, Nick et Kelly jouables', 'Jicchi, Nick and Kelly playable',
      'Les trois riders de l’ordinateur rejoignent l’écran BOARDER après Irin, avec leur portrait (tiré de la vidéo de la Compétition), leur modèle et leurs stats de course. Free Style, Big Air, Halfpipe et Board Park (pas en Compétition ni en VS). Fin du film d’intro raccourcie d’une demi-seconde.',
      'The three CPU riders join the BOARDER screen after Irin, with their portrait (from the Competition movie), their model and their race stats. Free Style, Big Air, Halfpipe and Board Park (not in Competition or VS). End of the intro movie half a second shorter.'),
+    ('rear', 'Vue arrière (Rond)', 'Rear view (Circle)',
+     'En course, Rond maintenu : la caméra passe devant ton rider et regarde derrière lui (pour voir qui te suit).',
+     'In a race, hold Circle: the camera moves in front of your rider and looks back (to see who is following).'),
 ]
 INPUT = 'input'   # shared pad hook (needed by 'max' and 'air')
 BRAND = 'brand'   # "REMIX" on the title screen: with any mod (already inside the moved title files when 'riders' is on)
@@ -214,6 +217,8 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     # Jicchi, Nick and Kelly: computed here (not in the reference build), portraits drawn by the patcher itself
     import crew as _cw
     pkg['ops']['crew'] = _cw.ops(O)
+    import rear as _rv
+    pkg['ops']['rear'] = _rv.ops(O)
     # sectors: everything else the reference changes (new blobs in free sectors, Boss voice bank at the end of the
     # intro movie, moved small files) -> 'riders', taken from the published delta (copies from the player's disc)
     P = gzip.decompress(open(delta_gz, 'rb').read()); n = struct.unpack_from('<I', P, 16)[0]; o = 20; entries = {}
@@ -252,7 +257,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     def buf(p):
         if p not in files: files[p] = bytearray(orig(p))
         return files[p]
-    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'crew', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', INPUT, 'input_noair', BRAND) if f in feats]
+    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'crew', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'rear', INPUT, 'input_noair', BRAND) if f in feats]
     for feat in order:
         for op in pkg['ops'][feat]:
             t = op[0]

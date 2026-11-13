@@ -134,3 +134,15 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
   chargé en entier, sans place libre) ; voix, animations et nom en course sont ceux du rider de base.
 - Vérifié : émulateur (Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
   patcheur Batocera = build Python.
+
+## Vue arrière (`rear`, v26)
+
+Code : `remix/rear.py` (opérations calculées par `generate()`). Les courses règlent leur caméra à chaque image par
+`GsSetView2` (libgs, exe 0x80030984), qui écrit GsWSMATRIX (0x80058E20) ; la vue est relative au rider (l'origine
+du monde est le rider). Rond maintenu (0x8004FBF0, bit 0x20) dans un overlay de course (mot 0 de l'overlay = 8, sauf
+ENDING) : à la fin de `GsSetView2`, GsWSMATRIX et sa copie de travail (0x80059220) tournent de 180° autour de l'axe
+vertical du monde (colonnes X et Z opposées) : la caméra passe devant le rider, même distance et même hauteur, et
+regarde derrière lui. Code dans deux fonctions mortes de l'exe (0x800280B8, 0x8002E7D0).
+Limite : le jeu ne dessine que la piste devant le rider, des trous blancs peuvent apparaître au loin derrière.
+`GsSetRefView2` (0x8002F830) n'est pas la caméra de course : il est appelé des dizaines de fois par image pour
+d'autres rendus.
