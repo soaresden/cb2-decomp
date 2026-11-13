@@ -286,6 +286,9 @@ def apply(disc, pkg, feats, log=lambda m: None):
             elif t == 'face':
                 ml_, ms_, _ = disc.files[op[2]]; face_op(buf(op[1]), lambda k: disc.user(ml_ + k), ms_ // 2048, op)
             elif t == 'icons': icons_op(buf(op[1]), op)
+            elif t == 'fcopy':     # ['fcopy', src, dst, [[src off, dst off, len]...]]: bytes of a file as patched so far
+                sb, db = buf(op[1]), buf(op[2])
+                for so, do, n in op[3]: db[do:do + n] = sb[so:so + n]
             elif t == 'crewmenu':
                 ch = crew_menu_chunk(orig(op[2]), orig(op[3]), op[4]); nch = -(-len(ch) // 2048); ch += bytes(nch * 2048 - len(ch))
                 for k in range(nch):

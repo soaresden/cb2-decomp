@@ -465,6 +465,8 @@ def ops(disc):
         for y in range(32): out.append(['b', FBD, vram_off(NAME_X + 12 * k, NAME_Y + y), rows[y].hex()])
     out.append(face_op())
     out.append(icons_op())
+    import crewrank      # rankings: own rider numbers in the records, heads on the ranking screens
+    out += crewrank.ops(disc, ALIASV, BASEV, MODESV, FBD, ICON_X, ICON_Y, ICON_CLUT_X, ICON_CLUT_Y, [STRIP_ORDER.index(c) for c in 'JNK'])
     ml = disc.files[MOVIE][0]; out.append(['rec', MOVIE, ml, (first - ml) * 2048])
     srcs = [(disc.files[p][0] * 2048, rd(p)) for p in SOURCES]
     import bundle, cpurider

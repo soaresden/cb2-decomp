@@ -152,6 +152,18 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
   (0x100000) à la hauteur normale 0x5CE, avec un alias pour ce rider de base dans un mode permis, la hauteur devient
   celle de l'alias (Jicchi −1,5, Nick −4, Kelly +3 demi-tons : 1363, 1179, 1767). Pas `aval` ici : son test du mod
   `unlock` lit MAIN_SEL, absent en course. Vérifié dans l'émulateur (appel forcé : 0x5CE avec Jin, 0x49B avec Nick).
+- Classements (`remix/crewrank.py`) : les records gardent le numéro de l'alias (7, 8, 9) et les écrans RANKING montrent
+  sa tête. La fonction de record de FREE (0x80089F34), HP (0x80089754) et OMT (0x80087450) copie le rider reçu dans un
+  registre à son début : ce « addu sX, aY, zero » saute vers `rr`, qui met 6 + ALIAS quand l'alias est choisi pour ce
+  rider de base dans un mode permis. Le dessin d'un record (même code dans FREE, HP, BP, OMT, MODE_SEL ×3, MAIN_SEL ×3) :
+  icône 16 × 16 par une table de 7 mots (u, v, palette, sur la pile en sp + 0x38) et page de texture par une autre
+  (sp + 0x58, 0x17 = VRAM (448, 256), pleine) ; pour 7..9, `ia` donne le mot d'une table à nous et `tb` la page 7
+  (VRAM (448, 0), vide sur ces écrans) où les trois têtes (12 × 16) et leurs palettes (480, 0..2) sont envoyées par
+  LoadImage à chaque dessin ; dans MAIN_SEL, les têtes de la rangée BOARDER déjà en VRAM (960, 324), page 0x1F. Le test
+  « rider < 5 » (pas d'étiquette de planche pour Boss, Gray, Snowman) passe par `bc`, qui compte les alias comme 0..2.
+  Les têtes viennent de TITLE/MAIN_SEL.FBD (opération `icons`), copiées dans chaque overlay par la nouvelle opération
+  `fcopy` (octets d'un fichier tel qu'il est déjà modifié). Vérifié : record de half-pipe battu avec Kelly (octet 9,
+  sa tête au classement), records forcés à 7/8/9 au classement d'avant course (MAIN_SEL) et de fin de half-pipe.
 - Limites : animations et nom en course sont ceux du rider de base.
 - Vérifié : émulateur (verrouillé / 100 % / `unlock` sans progression), Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
   patcheur Batocera = build Python.
