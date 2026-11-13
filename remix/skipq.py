@@ -54,3 +54,17 @@ def patches(exe, sbc1):
     old = lambda a: struct.unpack_from('<I', exe, a - 0x8000f800)[0]
     assert struct.unpack_from('<I', sbc1, HOOK - 0x8005AEA8)[0] == HOOK_OLD
     return [('/SCES_009.92', a, old(a), w) for a, w in c] + [('/SBC1.BIN', HOOK, HOOK_OLD, JL(l['skq']))]
+
+
+# The "1st STAGE" screen is the game's loading screen (exe func_80014450, run by the main loop before the overlay
+# entry): it waits for START or CROSS (mask 0x840 on the new presses, two sites). SELECT is added (0x940), so SELECT
+# alone leaves that screen, and it is still held (pad copy 0x8004FBF0) when the stage starts: the qualifying is skipped.
+SELECT_SITES = [0x800149B4, 0x80014984]
+
+
+def select_ops(exe):
+    out = []
+    for a in SELECT_SITES:
+        o = a - 0x8000F800; w = int.from_bytes(exe[o:o + 4], 'little'); assert w == 0x32020840, hex(w)   # andi v0, s0, 0x840
+        out.append(['w', '/SCES_009.92', o, w, 0x32020940])
+    return out

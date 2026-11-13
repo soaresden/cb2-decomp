@@ -37,3 +37,12 @@ de l'ordinateur, décalés à chaque manche), essais à 0, `0x8005745C` + 1, `0x
 affiché (c'est là que se fait le choix ; le retirer bloque le chargement de l'épreuve). Code dans `func_800291CC` (fonction morte de l'exe), voir remix/skipq.py.
 Échecs instructifs : forcer l'overlay depuis la boucle principale charge les fichiers de la mauvaise épreuve (la file
 est lue avant le chargement de la scène) ou bloque le chargement.
+
+
+## SELECT seul sur l'écran « 1st STAGE » (v26)
+
+L'écran « 1st STAGE … PRESS START » est l'écran de chargement du jeu (`func_80014450` de l'exe, appelé par la boucle
+principale avant l'entrée de l'overlay) : il attend START ou CROIX (masque 0x840 sur les nouveaux appuis, en 0x80014984
+et 0x800149B4). Le mod `skipq` ajoute SELECT (0x940) : SELECT seul quitte l'écran, et il est encore enfoncé (copie de la
+manette 0x8004FBF0) quand l'étape commence, donc les qualifications sont passées. Vérifié dans l'émulateur : SELECT →
+« 2nd STAGE BOARDER CROSS » (mode 1, compteur d'étapes + 1) ; START → qualifications jouées.

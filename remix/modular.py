@@ -52,8 +52,8 @@ FEATURES = [   # id, French name, English name, description FR, description EN
      'À l’arrivée, le temps compte comme d’habitude (classement, records, trophées) mais sans célébration ni replay : classement, START, résultats avec ton temps, X = RETRY et tu repars aussitôt d’en haut.',
      'At the finish the run counts as usual (ranking, records, trophies) but without the celebration and the replay: ranking, START, results with your time, X = RETRY and you start again from the top.'),
     ('skipq', 'Qualifications au choix', 'Optional qualifying',
-     'Sur l’écran « 1st STAGE » : START = jouer les qualifications, SELECT + START = les passer et partir 4e sur 8, au milieu du départ en handicap du Boarder Cross.',
-     'On the “1st STAGE” screen: START = play the qualifying, SELECT + START = skip it and start 4th of 8, in the middle of the Boarder Cross handicap start.'),
+     'Sur l’écran « 1st STAGE » : START = jouer les qualifications, SELECT = les passer et partir 4e sur 8, au milieu du départ en handicap du Boarder Cross.',
+     'On the “1st STAGE” screen: START = play the qualifying, SELECT = skip it and start 4th of 8, in the middle of the Boarder Cross handicap start.'),
     ('crew', 'Jicchi, Nick et Kelly jouables', 'Jicchi, Nick and Kelly playable',
      'Les trois riders de l’ordinateur rejoignent l’écran BOARDER après Irin, avec leur portrait (tiré de la vidéo de la Compétition), leur modèle 3D (celui de la fin du jeu dans le menu, celui des courses en piste) et leurs stats de course ; leur voix est celle du rider de base, plus grave (Nick, Jicchi) ou plus aiguë (Kelly). Free Style, Big Air, Halfpipe et Board Park (Free Style à 2 joueurs compris, pas en Compétition). Ils sont la récompense des 100 % (écran CONGRATULATIONS) ; avec « Tout débloqué », ils sont là d’office. Fin du film d’intro raccourcie d’environ une seconde.',
      'The three CPU riders join the BOARDER screen after Irin, with their portrait (from the Competition movie), their 3D model (the ending’s in the menu, the race one on the slopes) and their race stats; their voice is the base rider’s, deeper (Nick, Jicchi) or higher (Kelly). Free Style, Big Air, Halfpipe and Board Park (2-player Free Style included, not in Competition). They are the 100 % reward (CONGRATULATIONS screen); with “Everything unlocked” they are there from the start. End of the intro movie about one second shorter.'),
@@ -226,6 +226,9 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     # Jicchi, Nick and Kelly: computed here (not in the reference build), portraits drawn by the patcher itself
     import boardmax as _bmx
     _bmx.fix_label_y(pkg['ops']['max'])          # MAX label of the BOARD screen: always under SPECIAL
+    import skipq as _skq
+    pkg['ops']['skipq'] = [op for op in pkg['ops']['skipq'] if not (op[0] == 'w' and op[2] + 0x8000F800 in _skq.SELECT_SITES)]
+    pkg['ops']['skipq'] += _skq.select_ops(O.read_file('/SCES_009.92'))   # SELECT alone on the 1st STAGE screen
     import crew as _cw
     pkg['ops']['crew'] = _cw.ops(O)
     import rear as _rv
