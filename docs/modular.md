@@ -19,6 +19,9 @@ près**.
 | `progress` | Progression dans le jeu (SELECT sur l'écran des modes) | fin de MODE_SEL (82 secteurs : déplacé à la fin de STAFFE.STR, coupé), crochet 0x800643B4, début du tas de MODE_SEL (exe 0x800100B4) — voir `progression.md` |
 | `skipq` | Compétition sans qualifications | exe 0x800291CC–0x8002934B, SBC1 0x8005B058 (docs/competition.md) |
 
+Écran titre : « REMIX » à côté du « 2 » (`remix/title.py`, dans `ETC/CB2T1E.FBD` et `CB2T2E.FBD`) dès qu'un mod est choisi
+(`brand`, ajouté automatiquement ; avec `riders` les deux fichiers sont déplacés et leurs copies le portent déjà).
+
 `max` et `air` partagent la lecture de la manette (`input`, ajoutée automatiquement). Sans `air`, les sauts du code
 partagé vers la partie « contrôle en l'air » retournent directement au jeu (`input_noair`).
 

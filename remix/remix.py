@@ -476,6 +476,8 @@ def layout(im,blobs):
     assert ed+53==etcdir
     small=['/ETC/CB2T1E.FBD','/ETC/CB2T2E.FBD','/ETC/NENTRY.NEP','/ETC/PRESENTS.DAT','/ETC/SPBRD.TMD','/ETC/UEPLOGO.DAT']
     data={p:im.read_file(p) for p in small}
+    import title as _tt
+    for p in _tt.FILES: data[p]=_tt.draw(data[p])   # title screen: stylised REMIX (title.py)
     im.set_record('/DATA/CRS/VS/VS_CS1.DAT',lba=F['/DATA/CRS/CRS_CS1.DAT'][0])
     pos={}
     def put(p,a,lim):

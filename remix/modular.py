@@ -56,6 +56,7 @@ FEATURES = [   # id, French name, English name, description FR, description EN
      'Each round goes straight to the Boarder Cross (no trick event first) and you start 4th of 8, in the middle of the handicap start.'),
 ]
 INPUT = 'input'   # shared pad hook (needed by 'max' and 'air')
+BRAND = 'brand'   # "REMIX" on the title screen: with any mod (already inside the moved title files when 'riders' is on)
 
 def _r(*xs): return xs
 EXE_MAP = [   # (lo, hi, feature) in the executable
@@ -133,7 +134,7 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     O, R = cb2disc.Disc(pal_chd), cb2disc.Disc(ref_chd)
     pkg = {'format': 'cb2mods', 'version': open(os.path.join(ROOT, 'remix', 'VERSION')).read().strip(),
            'exe_crc': None, 'features': [], 'ops': {k[0]: [] for k in FEATURES}}
-    pkg['ops'][INPUT] = []; pkg['ops']['input_noair'] = []
+    pkg['ops'][INPUT] = []; pkg['ops']['input_noair'] = []; pkg['ops'][BRAND] = []
     exe = O.read_file('/SCES_009.92'); import zlib; pkg['exe_crc'] = zlib.crc32(exe); pkg['exe_size'] = len(exe)
     for fid, nfr, nen, dfr, den in FEATURES: pkg['features'].append({'id': fid, 'fr': nfr, 'en': nen, 'dfr': dfr, 'den': den})
     words = {}; grown_files = set()
@@ -175,6 +176,16 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
             while j < len(a) and (a[j] != b[j] or (j + 8 < len(a) and a[j:j + 8] != b[j:j + 8])): j += 1
             feat = feat_of_file.get(p) or classify(p, (i + EXE - 0x800) if p == '/SCES_009.92' else i + OVL)
             pkg['ops'][feat].append(['bs', p, i, segments(bytes(b[i:j]), bytes(O.read_file(p)))]); i = j
+    # title screen (title.py): drawn into the files at their original place; with 'riders' they are moved and the
+    # moved copies (sectors below) already carry the word
+    import title as _tt
+    for p in _tt.FILES:
+        a = O.read_file(p); b = _tt.draw(a); i = 0
+        while i < len(a):
+            if a[i] == b[i]: i += 1; continue
+            j = i
+            while j < len(a) and (a[j] != b[j] or (j + 8 < len(a) and a[j:j + 8] != b[j:j + 8])): j += 1
+            pkg['ops'][BRAND].append(['bs', p, i, segments(bytes(b[i:j]), bytes(a))]); i = j
     # MODE_SEL moved (progress page, one more sector): words of the other mods are in pkg, the page is appended
     if R.files['/MODE_SEL.BIN'][0] != O.files['/MODE_SEL.BIN'][0]:
         a = bytearray(O.read_file('/MODE_SEL.BIN')); r = R.read_file('/MODE_SEL.BIN')
@@ -226,6 +237,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     feats = [f for f in pkg['ops'] if f in feats]
     if 'max' in feats or 'air' in feats: feats.append(INPUT)
     if INPUT in feats and 'air' not in feats: feats.append('input_noair')
+    if feats and 'riders' not in feats and pkg['ops'].get(BRAND): feats.append(BRAND)
     files = {}; recs = {}; secs = {}
     origs = {}
     def orig(p):
@@ -234,7 +246,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     def buf(p):
         if p not in files: files[p] = bytearray(orig(p))
         return files[p]
-    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', INPUT, 'input_noair') if f in feats]
+    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', INPUT, 'input_noair', BRAND) if f in feats]
     for feat in order:
         for op in pkg['ops'][feat]:
             t = op[0]

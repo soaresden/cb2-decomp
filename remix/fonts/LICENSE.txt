@@ -1,3 +1,7 @@
 FreeSansBoldOblique.ttf : GNU FreeFont (https://www.gnu.org/software/freefont/).
 Licence GPL v3 ou ultérieure, avec l'exception pour les polices : un document (ici les plaques de nom
 GRAY / SNOWMAN dessinées dans le jeu) qui utilise la police n'est pas, de ce fait, couvert par la GPL.
+
+NotoSans-BlackItalic.ttf : Noto Sans (https://notofonts.github.io/), © The Noto Project Authors.
+Licence SIL Open Font License 1.1 (https://openfontlicense.org) : libre d'utilisation, de modification et de
+redistribution, y compris dans des documents ; ici le mot « REMIX » de l'écran titre.
