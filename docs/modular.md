@@ -199,3 +199,21 @@ Code et données : `remix/news.py`.
   0x8001FBD4), sinon GAME COMPLETED.
 - Vérifié : émulateur (Snowman + trophée simulés pendant une course puis SELECT ; tout à 100 % : 11 lignes ;
   premier passage au hub sans annonce) ; JS = Python.
+
+## Notes du half-pipe en direct (`hplive`, v26)
+
+Code : `remix/hplive.py` (HP.BIN seulement).
+
+- Le score du half-pipe vient d'accumulateurs du run (D_8009AC48..D_8009AC6B) changés en cinq notes de 0 à 100 dixièmes
+  par `func_8006A81C` (total, pour le classement et le test de Gray ≥ 37,6) et `func_8006A5C4` (panneau de fin) :
+  figures = AC5C / 20, amplitude = AC62 / 8, rotation = (min(AC5E, 7000) + AC60) / 95, réception = min(AC48 × 10, 100) −
+  AC64, mérite technique = min(somme / 4, 100) − 3 (AC68 + AC69 + AC6A + AC6B), chacune bornée à 0..100.
+- Le panneau dessine une ligne par `func_80086E50` (OT, prim, ligne, note, x, y) et le total par `func_800871B8`
+  (OT, prim, total, x + 16, y) ; entrée d'OT = *(*(D_8009BE4C) + 4) + 0xC, primitives en D_80058E0C, page de texture
+  du panneau (4 bits, x 320, y 0) posée par un DR_MODE chaîné en dernier.
+- La boucle principale du run (`func_8005BFF0`) appelle `func_800757EC` à chaque image (0x8005C2FC) : l'appel passe par
+  `hpj` (fonction morte `func_8006AFFC`), qui calcule les cinq notes comme le jeu (sans réécrire AC5E), dessine les
+  lignes en haut à droite (x 112, y 28, tous les 12 px), le total, un cadre sombre semi-transparent (TILE 0x62, mode
+  de mélange du panneau) et le DR_MODE.
+- Vérifié dans l'émulateur : le total monte pendant le run (0 → 1,0 → 2,1 → 3,3 → 5,0 → 6,2) et les cinq notes de la
+  fin du run sont celles de l'écran de fin (0,4 / 1,4 / 4,4 / 0,0 / 0,0 ; 6,2).

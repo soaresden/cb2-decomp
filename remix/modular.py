@@ -60,6 +60,9 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('rear', 'Vue arrière (Rond)', 'Rear view (Circle)',
      'En course, Rond maintenu : la caméra passe devant ton rider et regarde derrière lui (pour voir qui te suit).',
      'In a race, hold Circle: the camera moves in front of your rider and looks back (to see who is following).'),
+    ('hplive', 'Notes du half-pipe en direct', 'Live half-pipe marks',
+     'En half-pipe, les cinq notes des juges (figures, amplitude, réception, rotation, mérite technique) et le total s’affichent en haut à droite pendant le run, et montent à chaque figure.',
+     'In the half-pipe, the five judges’ marks (manoeuvres, amplitude, landing, rotation, technical merit) and the total are shown at the top right during the run, and go up with each trick.'),
     ('news', 'Annonces de déblocage', 'Unlock announcements',
      'De retour au menu après une course, un bandeau qui brille annonce ce que tu viens de gagner : Boss, Gray, Snowman, planche SPECIAL, Mirror, Hard, nouvelles pistes, trophée, et les 100 % (CONGRATULATIONS, avec Jicchi, Nick et Kelly si leur mod est coché).',
      'Back in the menu after a race, a shining banner tells what you just won: Boss, Gray, Snowman, SPECIAL board, Mirror, Hard, new courses, trophy, and the 100 % (CONGRATULATIONS, with Jicchi, Nick and Kelly if their mod is on).'),
@@ -224,6 +227,8 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     pkg['ops']['rear'] = _rv.ops(O)
     import news as _nw
     pkg['ops']['news'] = _nw.ops(O)
+    import hplive as _hl
+    pkg['ops']['hplive'] = _hl.ops(O)
     # sectors: everything else the reference changes (new blobs in free sectors, Boss voice bank at the end of the
     # intro movie, moved small files) -> 'riders', taken from the published delta (copies from the player's disc)
     P = gzip.decompress(open(delta_gz, 'rb').read()); n = struct.unpack_from('<I', P, 16)[0]; o = 20; entries = {}
@@ -262,7 +267,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     def buf(p):
         if p not in files: files[p] = bytearray(orig(p))
         return files[p]
-    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'crew', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'rear', 'news', INPUT, 'input_noair', BRAND) if f in feats]
+    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'crew', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'rear', 'news', 'hplive', INPUT, 'input_noair', BRAND) if f in feats]
     for feat in order:
         for op in pkg['ops'][feat]:
             t = op[0]
