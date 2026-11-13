@@ -16,6 +16,7 @@ HOOK, HOOK_FN = 0x8005C2FC, 0x800757EC
 CAVE, CAVE_END = 0x8006AFFC, 0x8006B3E0             # dead functions of HP.BIN (no call, jump or pointer to them)
 LINE_FN, TOTAL_FN = 0x80086E50, 0x800871B8
 FRAME, PRIMS = 0x8009BE4C, 0x80058E0C
+OPT_FLAGS, OPT_BIT = 0x80057438, 2          # in-game options (mod options): bit set = live marks off
 X, Y, DY, TY = 112, 28, 12, 70
 BOX = (X - 6, Y - 5, 320 - (X - 6) - 4, TY + 22)      # translucent dark box behind (x, y, w, h)
 DRAW_MODE = 0xE1000400 | (320 >> 6)                   # GetTPage(4 bits, 0, 320, 0), as func_80086A9C                       # screen: lines from (X, Y) every DY; total line TY below
@@ -27,7 +28,7 @@ def L(a): return a - (H(a) << 16)
 
 def code():
     S = ['hpj:', 'addiu sp, sp, -0x48', 'sw ra, 0x44(sp)', 'sw s0, 0x30(sp)', 'sw s1, 0x34(sp)', 'sw s2, 0x38(sp)', 'sw s3, 0x3c(sp)',
-         f'jal {HOOK_FN}', 'nop', 'sw v0, 0x40(sp)',
+         f'jal {HOOK_FN}', 'nop', 'sw v0, 0x40(sp)', 'lui t0, 0x8005', f'lbu t0, {OPT_FLAGS & 0xffff:#x}(t0)', 'nop', f'andi t0, t0, {OPT_BIT}', 'bnez t0, hpx', 'nop',
          f'lui s3, {H(0x8009AC48)}']
     # marks at 0x18.. 0x28(sp): standard, amplitude, landing, rotation, technical (as the panel's lines 0..4)
     S += [f'lh t0, {L(0x8009AC5C)}(s3)', 'lui at, 0x6666', 'ori at, at, 0x6667', 'mult t0, at', 'sra t1, t0, 31', 'mfhi t2', 'sra t2, t2, 3', 'subu t2, t2, t1']
@@ -65,7 +66,7 @@ def code():
           'and t0, t0, t2', 'lui t3, 0x100', 'or t0, t0, t3', 'sw t0, 0(v0)', 'lw t0, 0(s1)', 'lui t3, 0xff00', 'and t0, t0, t3', 'and t4, v0, t2',
           'or t0, t0, t4', 'sw t0, 0(s1)', 'addiu v0, v0, 8',
           f'lui t0, {H(PRIMS)}', f'sw v0, {L(PRIMS)}(t0)',
-          'lw v0, 0x40(sp)', 'lw ra, 0x44(sp)', 'lw s0, 0x30(sp)', 'lw s1, 0x34(sp)', 'lw s2, 0x38(sp)', 'lw s3, 0x3c(sp)', 'jr ra', 'addiu sp, sp, 0x48']
+          'hpx:', 'lw v0, 0x40(sp)', 'lw ra, 0x44(sp)', 'lw s0, 0x30(sp)', 'lw s1, 0x34(sp)', 'lw s2, 0x38(sp)', 'lw s3, 0x3c(sp)', 'jr ra', 'addiu sp, sp, 0x48']
     c, l = asm(S, CAVE)
     assert c[-1][0] < CAVE_END, hex(c[-1][0])
     return c, l

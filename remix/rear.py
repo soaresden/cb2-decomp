@@ -16,10 +16,11 @@ CAVE = 0x800280B8; CAVE_END = 0x8002815C          # dead functions of the exe (n
 CAVE2 = 0x8002E7D0; CAVE2_END = 0x8002E864
 WS = 0x80058E20; WORK = 0x80059220
 ENDING_W1 = 0x27BDCAB0
+OPT_FLAGS, OPT_BIT = 0x80057438, 1          # in-game options (mod options): bit set = rear view off
 
 
 def code():
-    S = ['rv:', 'lui t0, 0x8005', 'lw t1, -0x410(t0)', 'nop', 'andi t1, t1, 0x20', 'beqz t1, rv9',
+    S = ['rv:', 'lui t0, 0x8005', f'lbu t2, {OPT_FLAGS & 0xffff:#x}(t0)', 'lw t1, -0x410(t0)', f'andi t2, t2, {OPT_BIT}', 'bnez t2, rv9', 'andi t1, t1, 0x20', 'beqz t1, rv9',
          'lui t0, 0x8006', 'lw t1, -0x5158(t0)', 'addiu t2, zero, 8', 'bne t1, t2, rv9',
          'lw t1, -0x5154(t0)', f'lui t2, {ENDING_W1 >> 16:#x}', f'ori t2, t2, {ENDING_W1 & 0xffff:#x}', 'beq t1, t2, rv9',
          'move t3, ra', f'lui t0, {(WS + 0x8000) >> 16:#x}', f'addiu t0, t0, {WS - (((WS + 0x8000) >> 16) << 16)}', 'jal rvf', 'nop',

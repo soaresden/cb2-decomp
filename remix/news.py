@@ -30,6 +30,7 @@ MS_STR = (0x80078F54, 0x800790B8)
 MS_CODE2 = (0x80079F3C, 0x8007A074)                # ncomp
 MS_CODE3 = (0x80075118, 0x800751C0)                # nbox
 TEXTFN, TEXT_LAST, PRIMS = 0x8005E784, 0x8007B2F8, 0x80058E0C
+OPT_FLAGS, OPT_BIT = 0x80057438, 4          # in-game options (mod options): bit set = announcements off
 FRAMES = 210                                        # hub frames (the hub runs at 30 per second): 7 s
 LINE_H, BOX_X, BOX_W = 14, 32, 256
 CREW_WORD = (0x8001FBD4, 0x020100FF)                # mod crew: its BASE table (0xff, Yaggi, Jin, Cindy)
@@ -84,7 +85,7 @@ def table():
 
 def ms_code():
     S = ['nhub:', 'addiu sp, sp, -0x48', 'sw ra, 0x40(sp)', 'sw s0, 0x20(sp)', 'sw s1, 0x24(sp)', 'sw s2, 0x28(sp)', 'sw s3, 0x2c(sp)',
-         'sw s4, 0x30(sp)', 'sw a0, 0x3c(sp)', f'lui s4, {H(NEWS)}', f'addiu s4, s4, {L(NEWS)}', f'lw s3, {MASK}(s4)', 'nop', 'beqz s3, nh9', 'nop',
+         'sw s4, 0x30(sp)', 'sw a0, 0x3c(sp)', f'lui s4, {H(NEWS)}', f'addiu s4, s4, {L(NEWS)}', f'lw s3, {MASK}(s4)', 'lui t0, 0x8005', f'lbu t0, {OPT_FLAGS & 0xffff:#x}(t0)', 'nop', f'andi t0, t0, {OPT_BIT}', 'beqz t0, nho', 'nop', 'move s3, zero', 'nho:', 'beqz s3, nh9', 'nop',
          # 100 %: the game was not complete when SNAP was taken (some bit appeared), it is now
          'jal ncomp', 'nop', 'beqz v0, nh0', f'lui t0, {H(CREW_WORD[0])}', f'lw t0, {L(CREW_WORD[0])}(t0)',
          f'lui t1, {CREW_WORD[1] >> 16:#x}', f'ori t1, t1, {CREW_WORD[1] & 0xffff:#x}', 'ori s3, s3, 0x8000', 'bne t0, t1, nhx', 'lui t2, 2',

@@ -229,3 +229,20 @@ Code : `remix/hplive.py` (HP.BIN seulement).
   de mélange du panneau) et le DR_MODE.
 - Vérifié dans l'émulateur : le total monte pendant le run (0 → 1,0 → 2,1 → 3,3 → 5,0 → 6,2) et les cinq notes de la
   fin du run sont celles de l'écran de fin (0,4 / 1,4 / 4,4 / 0,0 / 0,0 ; 6,2).
+
+## Options dans le jeu (`options`, v26)
+
+Code : `remix/options.py` (MODE_SEL) ; tests dans `rear.py`, `hplive.py`, `news.py`.
+
+- Les interrupteurs sont des bits de 0x80057438 (bit à 1 = coupé) : 1 vue arrière, 2 notes du half-pipe en direct,
+  4 annonces de déblocage. Cet octet fait partie du bloc 0x80057434..0x8005744D copié dans la sauvegarde mais n'est
+  jamais lu par le jeu (docs/progression.md) : le réglage suit la carte mémoire. À 0 (sauvegarde d'avant), tout est
+  actif comme avant. Chacun des trois mods lit son bit avant d'agir (sans le mod `options`, l'octet reste à 0).
+- Écran de choix du mode : la fonction de la télé (`func_80064200`, chaque image) appelle `func_80028BDC` en
+  0x800643E4 ; l'appel passe par `opt` (fonctions mortes de MODE_SEL : après le code de `crewrank` en 0x800654A8,
+  puis 0x8006F680 et 0x8006F800 ; données après celles de `crewrank` en 0x8005C8B0). R1 maintenu : panneau REMIX
+  OPTIONS (texte du jeu `func_80012CA0`, tampon de primitives à 0x801F8000 + 0x800 par tampon d'image, cadre sombre
+  comme la page de progression) ; L1 / L2 / R2 (appuis nouveaux, manette en 0x800832BA) basculent les bits.
+- Vérifié dans l'émulateur : bascules (0 → 1 → 5 → 4) et affichage ON / OFF ; notes du half-pipe absentes avec le
+  bit 2 ; vue arrière normale avec le bit 1 ; annonce non lancée avec le bit 4 (lancée sans). Pas encore vérifié :
+  l'octet relu après un vrai enregistrement puis chargement de la carte.
