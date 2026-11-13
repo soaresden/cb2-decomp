@@ -89,7 +89,12 @@ CAVES = [(0x80013940, 0x80013A34), (0x800169B4, 0x80016AB0), (0x800238E0, 0x8002
          (0x800404E4, 0x80040640), (0x8003EAC4, 0x8003EB80), (0x800123C8, 0x80012448), (0x8001B69C, 0x8001B718),
          (0x8002DE10, 0x8002DE88), (0x8002E96C, 0x8002EA10), (0x80027E9C, 0x80027F04), (0x8002C49C, 0x8002C504),
          (0x800290C8, 0x80029128), (0x8003F028, 0x8003F088), (0x800439C4, 0x80043A24),
-         (0x80017BF8, 0x80017C9C), (0x8002043C, 0x8002050C), (0x80021A88, 0x80021B28), (0x800312C4, 0x80031374), (0x80028078, 0x800280B8)]
+         (0x80017BF8, 0x80017C9C), (0x8002043C, 0x8002050C), (0x80021A88, 0x80021B28), (0x800312C4, 0x80031374), (0x80028078, 0x800280B8),
+         # v26 (2 players): small unreferenced functions, checked against every jump, branch and pointer of every file
+         (0x80013BA0, 0x80013BD0), (0x80020288, 0x800202C4), (0x80020394, 0x800203BC), (0x80028D78, 0x80028DB4), (0x80028E18, 0x80028E40),
+         (0x80029194, 0x800291CC), (0x8002A62C, 0x8002A694), (0x8002A798, 0x8002A7C4), (0x8002E6A4, 0x8002E6D0), (0x8002E79C, 0x8002E7D0),
+         (0x80031180, 0x8003120C), (0x80031230, 0x80031280), (0x8003BD98, 0x8003BE10), (0x8003C0A4, 0x8003C108), (0x8003C138, 0x8003C168),
+         (0x8003EFEC, 0x8003F028), (0x80040AA4, 0x80040B0C), (0x800435B4, 0x80043604)]
 DATA2 = 0x8003EE98; DATA2_END = 0x8003EF00             # menu models: file entries, rectangles, state
 ENT2, IDX2, RCOL, RCLUT, PENDING, DUMMY = (DATA2 + o for o in (0, 0x18, 0x20, 0x38, 0x50, 0x54))
 MENU_SHOWN = 0x4D575253                                 # 'SRWM' + k in MENU_SAVE: alias k's texture is in VRAM
@@ -99,23 +104,26 @@ LOADIMAGE = 0x80029B7C; STOREIMAGE = 0x80029BE0; DRAWSYNC = 0x800298B8; QPOLL = 
 CDMODE = 0x80013C94       # CdControl(CdlSetmode, 0xA0): data reading, as the game's own loads do
 DATA = 0x8001FBC4; DATA_END = 0x8001FCA8
 ALIASV, ACUR, AB, ASTP, BASEV, MODESV, IDX, STATS, PARAMS, ENT, VPITCH = (DATA + o for o in (0, 4, 8, 0xC, 0x10, 0x14, 0x18, 0x24, 0x48, 0x7C, 0xAC))
+ENT3, IDX3, ALIAS2 = DATA + 0xB4, DATA + 0xCC, DATA + 0xD4   # 2 players: player 2's models (files, indices), player 2's alias
 # voices: the base rider's, played higher or lower (SPU pitch, 0x5CE = the game's own): Jicchi -1.5, Nick -4, Kelly +3 semitones
 PLAY = 0x80015D18; VOICE_CH, VOICE_PITCH = 0x100000, 0x5CE
 VOICE_SEMI = [-1.5, -4, 3]
 BASE = [0, 1, 2]
-MODES = (1 << 2) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8)   # Free Style, Big Air, Big Air Master, Halfpipe, Board Park
+MODES = (1 << 2) | (1 << 3) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8)   # Free Style (1P, 2P), Big Air, Big Air Master, Halfpipe, Board Park
 STAT_BARS = [(3, 4, 4, 6, 6, 8), (2, 4, 6, 4, 8, 6), (6, 8, 6, 6, 4, 4)]    # BOARDER screen bars (display only)
 SBC2_PARAMS = 0x8008F1F8; SBC2_SLOT = [4, 5, 6]                               # race parameters of the CPU riders
 NAV = 0x80063E7C; FACE = 0x80063324; NAME = 0x800637A4; ENQ = 0x80013BD0
-NAV_H = [0x8005FCE0, 0x8005FE58]; NAV_B = [0x80061570]
-FACE_H = [0x800600F4]; NAME_H = [0x8005FFCC, 0x8006005C, 0x80060118]
+NAV_H = [0x8005FCE0, 0x8005FE58]; NAV_B = [0x80061570]; NAV_H2 = [0x8005FD48]       # hub (2 players: player 2's name)
+FACE_H = [0x800600F4]; NAME_H = [0x8005FFCC, 0x8006005C, 0x80060118]; NAME_H2 = [0x8005FFF0, 0x80060080]
 FACE_B = [0x80062680, 0x800628DC, 0x800643D4, 0x8006476C]; NAME_B = [0x800626A0, 0x800628FC, 0x800643FC, 0x80064794]
 BARS = [(0x800612F4, 'a0', 't1'), (0x800614AC, 'a0', 't1'), (0x80061904, 'a0', 't0'), (0x80062990, 'v1', 's7'), (0x800629E0, 'v1', 's7')]
 LOAD_SITES = [(0x8001D420, 0x24), (0x8001D55C, 0x24),   # func_8001D1B8 (Free Style...): P1 model (not VS) / P1 texture
-              (0x8001D828, 0x20), (0x8001D938, 0x20)]   # func_8001D694 (Halfpipe...): P1 model / P1 texture
+              (0x8001D828, 0x20), (0x8001D938, 0x20),   # func_8001D694 (Halfpipe...): P1 model / P1 texture
+              (0x8001D3AC, 0x24), (0x8001D3E8, 0x24), (0x8001D644, 0x24)]   # 2 players (VS): P1 model, P2 model, P2 texture
 CINIT = 0x80060218; CCOM = 0x800605A8
 RACE = {'/FREE.BIN': 0x8006465C, '/TM.BIN': 0x80063C38, '/HP.BIN': 0x80063D0C, '/BP.BIN': 0x80063B1C, '/OMT.BIN': 0x80063C58,
-        '/COMB.BIN': 0x80064B88}   # addu of the params pointer (one-player race overlays)
+        '/COMB.BIN': 0x80064B88, '/VS.BIN': 0x80064E08}   # addu of the params pointer (VS: 2 players, racer number at sp + 0x408)
+VS_RACER = 0x408
 
 
 def H(a): return ((a + 0x8000) >> 16) & 0xffff
@@ -145,7 +153,8 @@ def routines(race_regs):
           'sc0:', f'lui at, {H(AB)}', f'sw v0, {L(AB)}(at)', 'sll v0, a0, 3', 'sll at, a0, 2', 'addu v0, v0, at',
           f'lui at, {H(STATS - 12)}', f'addiu at, at, {L(STATS - 12)}', 'addu v0, v0, at', f'lui at, {H(ASTP)}', 'jr ra', f'sw v0, {L(ASTP)}(at)']
     # rider list: navH (hub, ALIAS) / navB (BOARDER screen, ACUR); a0 = rider, a1 = direction (< 0 = next)
-    S += ['navH:', f'lui t9, {H(ALIASV)}', 'j nav', f'addiu t9, t9, {L(ALIASV)}',
+    S += ['navH2:', f'lui t9, {H(ALIAS2)}', 'j nav', f'addiu t9, t9, {L(ALIAS2)}',
+          'navH:', f'lui t9, {H(ALIASV)}', 'j nav', f'addiu t9, t9, {L(ALIASV)}',
           'navB:', f'lui t9, {H(ACUR)}', f'addiu t9, t9, {L(ACUR)}',
           'nav:', 'addiu sp, sp, -0x28', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'sw s1, 0x18(sp)', 'sw s2, 0x1c(sp)', 'sw s3, 0x20(sp)',
           'move s0, t9', 'move s1, a0', 'move s2, a1', 'lw a1, 0(s0)', 'jal aval', 'nop', 'move s3, v0', 'jal amode', 'nop',
@@ -163,7 +172,8 @@ def routines(race_regs):
           'fn9:', 'lw v0, 0x24(sp)', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw s1, 0x18(sp)', 'lw s2, 0x1c(sp)', 'lw s3, 0x20(sp)', 'jr ra', 'addiu sp, sp, 0x28']
     # portrait / name: call the game's function, then point the primitive (v0 - 0x28) at the new picture
     for kind, fn in (('f', FACE), ('n', NAME)):
-        S += [f'{kind}wH:', f'lui t9, {H(ALIASV)}', f'j {kind}w', f'addiu t9, t9, {L(ALIASV)}',
+        S += [f'{kind}wH2:', f'lui t9, {H(ALIAS2)}', f'j {kind}w', f'addiu t9, t9, {L(ALIAS2)}',
+              f'{kind}wH:', f'lui t9, {H(ALIASV)}', f'j {kind}w', f'addiu t9, t9, {L(ALIASV)}',
               f'{kind}wB:', f'lui t9, {H(ACUR)}', f'addiu t9, t9, {L(ACUR)}',
               f'{kind}w:', 'addiu sp, sp, -0x30', 'sw ra, 0x28(sp)', 'sw s0, 0x24(sp)', 'sw t9, 0x1c(sp)',
               *([f'lui t0, {H(ACUR)}', f'addiu t0, t0, {L(ACUR)}', 'bne t0, t9, fwp', 'nop', 'jal mpoll', 'nop', 'fwp:', 'lw t9, 0x1c(sp)'] if kind == 'f' else []),
@@ -191,14 +201,21 @@ def routines(race_regs):
               f'br_{rr}_{xr}:', f'subu v0, v0, {xr}', 'sll v0, v0, 2', 'jr ra', f'addu v0, v0, {xr}']
     # file loads of the player's rider (P1 model / texture)
     S += ['ld24:', 'j ld', 'addiu t7, s1, 0x24', 'ld20:', 'j ld', 'addiu t7, s1, 0x20',
-          'ld:', 'move t4, ra', 'move t5, a0', 'move t6, a1', 'lui at, 0x8005', 'lh a0, 0x7408(at)', f'lui at, {H(ALIASV)}', f'lw a1, {L(ALIASV)}(at)', 'jal aval', 'nop',
+          'ld:', 'subu t8, a2, s1', 'addiu at, zero, 0x14', 'beq t8, at, ldq', 'addiu at, zero, 0x28', 'beq t8, at, ldq', 'nop',
+          'move t4, ra', 'move t5, a0', 'move t6, a1', 'lui at, 0x8005', 'lh a0, 0x7408(at)', f'lui at, {H(ALIASV)}', f'lw a1, {L(ALIASV)}(at)', 'jal aval', 'nop',
           'move ra, t4', 'move a0, t5', 'beqz v0, ld9', 'move a1, t6', 'sll t0, v0, 1', f'lui at, {H(IDX)}', 'addu at, at, t0',
           'addiu t1, s1, 0x10', 'bne a2, t1, ld1', 'nop', 'j ld9', f'lh a0, {L(IDX) - 2}(at)',
           'ld1:', 'bne a2, t7, ld9', 'nop', f'lh a0, {L(IDX) + 4}(at)',
-          'ld9:', f'j {ENQ}', 'nop']
+          'ld9:', f'j {ENQ}', 'nop',
+          # player 2 (2 players): slot 0x14 = model (its own copy, IDX3), 0x28 = texture (the same files as player 1)
+          'ldq:', 'move t4, ra', 'move t5, a0', 'move t6, a1', 'lui at, 0x8005', 'lh a0, 0x7412(at)', f'lui at, {H(ALIAS2)}', f'lw a1, {L(ALIAS2)}(at)',
+          'jal aval', 'nop', 'move ra, t4', 'move a0, t5', 'beqz v0, ld9', 'move a1, t6', 'sll t0, v0, 1', 'addiu at, zero, 0x14',
+          'bne t8, at, ldq1', f'lui at, {H(IDX3)}', 'addu at, at, t0', 'j ld9', f'lh a0, {L(IDX3) - 2}(at)',
+          'ldq1:', f'lui at, {H(IDX)}', 'addu at, at, t0', 'j ld9', f'lh a0, {L(IDX) + 4}(at)']
     # BOARDER screen opens (sel_riderCursor = g_rider): ACUR = usable ALIAS; validated: ALIAS = ACUR
     S += ['cinit:', 'lhu v0, 0x7408(v0)', 'move t4, ra', 'move t5, a0', 'move t6, a1', 'move t3, v0', 'sll a0, v0, 16', 'sra a0, a0, 16',
-          f'lui at, {H(ALIASV)}', f'lw a1, {L(ALIASV)}(at)', 'jal aval', 'nop', 'jal setcur', 'move a0, v0',
+          f'lui at, {H(ALIASV)}', 'beqz a1, ci1', f'lw a1, {L(ALIASV)}(at)', 'lui at, 0x8005', 'lh a0, 0x7412(at)', f'lui at, {H(ALIAS2)}',
+          f'lw a1, {L(ALIAS2)}(at)', 'ci1:', 'jal aval', 'nop', 'jal setcur', 'move a0, v0',
           'move ra, t4', 'move a0, t5', 'move a1, t6', 'move v0, t3', f'j {CINIT + 8}', 'nop']
     # play function of the exe (a0 pitch, a1 SPU voice bit, a2 sample, a3 volume): the rider's voice in a race
     # (voice 20, pitch 0x5CE) with an alias -> its own pitch. Replaces "lui v0 / lhu v0" at the entry. Not aval: its
@@ -211,15 +228,22 @@ def routines(race_regs):
           f'lui at, {H(MODESV)}', f'lw at, {L(MODESV)}(at)', 'nop', 'srlv at, at, t3', 'andi at, at, 1', 'beqz at, vp9',
           'sll t3, t0, 1', f'lui at, {H(VPITCH - 2)}', 'addu at, at, t3', f'lhu a0, {L(VPITCH - 2)}(at)',
           'vp9:', 'lui v0, 0x8005', 'lhu v0, 0x08a8(v0)', f'j {PLAY + 8}', 'nop']
-    S += ['ccom:', 'sh v0, 0x7408(at)', f'lui at, {H(ACUR)}', f'lw t9, {L(ACUR)}(at)', f'lui at, {H(ALIASV)}', f'j {CCOM + 8}', f'sw t9, {L(ALIASV)}(at)']
+    S += ['ccom:', 'sh v0, 0x7408(at)', f'lui at, {H(ACUR)}', f'lw t9, {L(ACUR)}(at)', 'bnez s6, cc2', f'lui at, {H(ALIASV)}', f'j {CCOM + 8}',
+          f'sw t9, {L(ALIASV)}(at)', 'cc2:', f'lui at, {H(ALIAS2)}', f'j {CCOM + 8}', f'sw t9, {L(ALIAS2)}(at)']
     # race parameters: replaces "sll v0, R, 4" (delay slot: lui v1, hi); the next instruction (at ra) is addiu v1, v1, lo
+    # rider in a register R (one stub per register: t2 = R); 2 players (VS.BIN, R = s2): racer 0 = player 1 (g_rider,
+    # ALIAS), racer 1 = player 2 (0x80057412, ALIAS2), racer number at sp + VS_RACER
     for rr in sorted(set(race_regs)):
-        S += [f'rp_{rr}:', 'sw t0, -4(sp)', 'sw t1, -8(sp)', 'lui at, 0x8005', 'lh t0, 0x7408(at)', 'lw t1, 0x7420(at)', f'bne t0, {rr}, rp9_{rr}',
-              f'lui at, {H(MODESV)}', f'lw at, {L(MODESV)}(at)', 'nop', 'srlv at, at, t1', 'andi at, at, 1', f'beqz at, rp9_{rr}', f'lui at, {H(ALIASV)}',
-              f'lw t1, {L(ALIASV)}(at)', 'nop', f'beqz t1, rp9_{rr}', f'lui at, {H(BASEV)}', 'addu at, at, t1', f'lbu at, {L(BASEV)}(at)', 'nop',
-              f'bne at, t0, rp9_{rr}', 'nop', 'lh at, 0(ra)', 'sll t1, t1, 4', 'addu at, at, v1', f'lui t0, {H(PARAMS - 16)}', f'addiu t0, t0, {L(PARAMS - 16)}',
-              'addu t0, t0, t1', f'j rpe_{rr}', 'subu v0, t0, at',
-              f'rp9_{rr}:', f'sll v0, {rr}, 4', f'rpe_{rr}:', 'lw t0, -4(sp)', 'lw t1, -8(sp)', 'jr ra', 'nop']
+        S += [f'rp_{rr}:', 'sw t2, -12(sp)', 'j rpg', f'move t2, {rr}']
+    S += ['rpv:', 'sw t2, -12(sp)', 'sw t0, -4(sp)', 'sw t1, -8(sp)', 'move t2, s2', f'lw t1, {VS_RACER}(sp)', 'lui at, 0x8005', 'lh t0, 0x7408(at)',
+          'beqz t1, rpv1', 'addiu t1, t1, -1', 'bnez t1, rpvn', 'lh t0, 0x7412(at)', f'lui t1, {H(ALIAS2)}', 'j rpc', f'lw t1, {L(ALIAS2)}(t1)',
+          'rpv1:', f'lui t1, {H(ALIASV)}', 'j rpc', f'lw t1, {L(ALIASV)}(t1)', 'rpvn:', 'j rp9', 'nop',
+          'rpg:', 'sw t0, -4(sp)', 'sw t1, -8(sp)', 'lui at, 0x8005', 'lh t0, 0x7408(at)', 'lw t1, 0x7420(at)', f'lui at, {H(MODESV)}',
+          f'lw at, {L(MODESV)}(at)', 'nop', 'srlv at, at, t1', 'andi at, at, 1', 'beqz at, rp9', f'lui t1, {H(ALIASV)}', f'lw t1, {L(ALIASV)}(t1)',
+          'rpc:', 'bne t0, t2, rp9', 'nop', 'beqz t1, rp9', f'lui at, {H(BASEV)}', 'addu at, at, t1', f'lbu at, {L(BASEV)}(at)', 'nop',
+          'bne at, t0, rp9', 'nop', 'lh at, 0(ra)', 'sll t1, t1, 4', 'addu at, at, v1', f'lui t0, {H(PARAMS - 16)}', f'addiu t0, t0, {L(PARAMS - 16)}',
+          'addu t0, t0, t1', 'j rpe', 'subu v0, t0, at',
+          'rp9:', 'sll v0, t2, 4', 'rpe:', 'lw t0, -4(sp)', 'lw t1, -8(sp)', 'lw t2, -12(sp)', 'jr ra', 'nop']
     # ---- menu models (BOARDER screen): see menu_chunk()
     MM = MENU_BUF + M_MAGIC
     rect = lambda tbl, kreg: [f'addiu t0, {kreg}, -1', 'sll t0, t0, 3', f'lui a0, {H(tbl)}', f'addiu a0, a0, {L(tbl)}', 'addu a0, a0, t0']
@@ -240,11 +264,11 @@ def routines(race_regs):
           'mu9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'jr ra', 'addiu sp, sp, 0x20']
     # mshow(a0 = k): the base rider's texture saved, alias k's put in its place
     S += ['mshow:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'move s0, a0', f'lui at, {H(MENU_SAVE)}', f'lw t1, {L(MENU_SAVE)}(at)',
-          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'addu t0, t0, s0', 'beq t0, t1, ms9', 'nop',
+          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'addu t0, t0, s0', 'bne t0, t1, msa', 'nop', 'j ms9', 'nop', 'msa:',
           'jal munsh', 'nop', f'jal {DRAWSYNC}', 'move a0, zero',
           *rect(RCOL, 's0'), f'lui a1, {H(MENU_SAVE + 0x204)}', f'jal {STOREIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 0x204)}',
           *rect(RCLUT, 's0'), f'lui a1, {H(MENU_SAVE + 4)}', f'jal {STOREIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 4)}',
-          f'jal {DRAWSYNC}', 'move a0, zero',
+          f'jal {DRAWSYNC}', 'move a0, zero', 'j msb', 'nop', 'msb:',
           *rect(RCOL, 's0'), f'lui a1, {H(MENU_BUF + M_IMG)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_BUF + M_IMG)}',
           *rect(RCLUT, 's0'), f'lui a1, {H(MENU_BUF + M_CLUT)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_BUF + M_CLUT)}',
           f'jal {DRAWSYNC}', 'move a0, zero',
@@ -252,8 +276,9 @@ def routines(race_regs):
           'ms9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'jr ra', 'addiu sp, sp, 0x20']
     # mdl(a0 = rider): replaces the BOARDER screen's calls to func_80064A08 (model of the rider)
     S += ['mdl:', 'addiu sp, sp, -0x28', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'sw s1, 0x18(sp)', 'sw s2, 0x1c(sp)', 'move s0, a0',
-          f'lui at, {H(ACUR)}', f'lw a1, {L(ACUR)}(at)', 'jal aval', 'nop', 'move s1, v0', 'beqz s1, md0', 'nop',
-          f'lui at, {H(MM)}', f'lw t0, {L(MM)}(at)', f'lui t1, {H(MENU_MAGIC)}', f'addiu t1, t1, {L(MENU_MAGIC)}', 'addu t1, t1, s1', 'bne t0, t1, mdq', 'nop',
+          f'lui at, {H(ACUR)}', f'lw a1, {L(ACUR)}(at)', 'jal aval', 'nop', 'move s1, v0', 'bnez s1, mdk', 'nop', 'j md0', 'nop',
+          'mdk:', f'lui at, {H(MM)}', f'lw t0, {L(MM)}(at)', f'lui t1, {H(MENU_MAGIC)}', f'addiu t1, t1, {L(MENU_MAGIC)}', 'addu t1, t1, s1', 'beq t0, t1, mdk2', 'nop',
+          'j mdq', 'nop', 'mdk2:',
           'jal mshow', 'move a0, s1',
           'sll t2, s0, 2', f'lui at, {H(MODELS)}', 'addu at, at, t2', f'lw s2, {L(MODELS)}(at)', f'lui t3, {H(MENU_BUF)}', f'addiu t3, t3, {L(MENU_BUF)}', f'sw t3, {L(MODELS)}(at)',
           f'jal {FN_MDL}', 'move a0, s0',
@@ -300,7 +325,7 @@ def routines(race_regs):
           # link after the name tag: s0.tag = 9 words, next = the name's next; name.next = s0
           'lw t0, 0(s1)', 'lui t1, 0xff', 'ori t1, t1, 0xffff', 'and t2, t0, t1', 'lui t3, 0x0900', 'or t2, t2, t3', 'sw t2, 0(s0)',
           'lui t3, 0xff00', 'and t0, t0, t3', 'and t2, s0, t1', 'or t0, t0, t2', 'sw t0, 0(s1)', 'move s1, s0',
-          'addiu s0, s0, 0x28', 'addiu s5, s5, 1', 'slti t0, s5, 10', 'bnez t0, stl', 'nop',
+          'addiu s0, s0, 0x28', 'addiu s5, s5, 1', 'slti t0, s5, 10', 'beqz t0, stx', 'nop', 'j stl', 'nop', 'stx:',
           'move v0, s0',          'st9x:', 'move v0, s0', 'lw ra, 0x40(sp)', 'lw s0, 0x20(sp)', 'lw s1, 0x24(sp)', 'lw s2, 0x28(sp)', 'lw s3, 0x2c(sp)', 'lw s4, 0x30(sp)', 'lw s5, 0x34(sp)', 'jr ra', 'addiu sp, sp, 0x48']
     # wup: the WEAR screen's texture uploads are skipped while an alias's texture is shown
     S += ['wup:', f'lui at, {H(MENU_SAVE)}', f'lw t0, {L(MENU_SAVE)}(at)', f'lui t1, {H(MENU_SHOWN)}', f'addiu t1, t1, {L(MENU_SHOWN + 1)}', 'subu t0, t0, t1',
@@ -322,6 +347,17 @@ def place(S):
         fit = [c for c in caves if c[1] + size(b) <= c[2]]
         if not fit: raise ValueError('plus de place pour ' + b[0])
         c = min(fit, key=lambda c: c[2] - c[1]); c[3].append(b); c[1] += size(b)
+    cave_of = {}; bad = []
+    for lo, _, _, bl in caves:
+        for l in (l for b in bl for l in b):
+            if l.endswith(':'): cave_of[l[:-1]] = lo
+    for lo, _, _, bl in caves:
+        for l in (l for b in bl for l in b):
+            op = l.split()[0] if not l.endswith(':') else ''
+            if op in ('beq', 'bne', 'beqz', 'bnez', 'bltz', 'bgez', 'blez', 'bgtz'):
+                t = l.split(',')[-1].strip()
+                if cave_of.get(t, lo) != lo: bad.append(l)
+    assert not bad, 'branches hors de leur zone : ' + ', '.join(bad)
     labels = {}
     for lo, _, _, bl in caves:
         pc = lo
@@ -335,7 +371,7 @@ def place(S):
 
 
 # block starts for place(); nx and mdq are not fallen into (an unconditional jump comes before them)
-TOP = {'aval', 'amode', 'setcur', 'navH', 'nx', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'acomp', 'fwx', 'nwx', 'vp', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
+TOP = {'aval', 'amode', 'setcur', 'navH2', 'fwH2', 'nwH2', 'rpv', 'rpg', 'msb', 'navH', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'acomp', 'fwx', 'nwx', 'vp', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
 
 
 # ---------------------------------------------------------------------------------------------------- disc layout
@@ -385,6 +421,10 @@ def patches(fs_read, placed):
             + b''.join(struct.pack('<6h', *s) for s in STAT_BARS) + params)
     data += bytes(ENT - DATA - len(data)) + ent
     data += b''.join(struct.pack('<H', round(VOICE_PITCH * 2 ** (k / 12))) for k in VOICE_SEMI)
+    # 2 players: player 2's models (files 9..11 of placed), their indices, player 2's alias
+    data += bytes(ENT3 - DATA - len(data)) + b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[9:12])
+    data += struct.pack('<3h', *[(ENT3 + 8 * k - G_FILES) // 8 for k in range(3)]) + bytes(2) + struct.pack('<I', 0)
+    assert (ENT3 - G_FILES) % 8 == 0 and DATA + len(data) == ALIAS2 + 4
     assert DATA + len(data) <= DATA_END and (ENT - G_FILES) % 8 == 0
     data += bytes((-len(data)) % 4)
     P += [('/SCES_009.92', DATA + i, struct.unpack_from('<I', data, i)[0]) for i in range(0, len(data), 4)]
@@ -398,7 +438,8 @@ def patches(fs_read, placed):
     # hooks
     ms = fs_read('/MAIN_SEL.BIN'); ex = fs_read('/SCES_009.92')
     w_ms = lambda a: struct.unpack_from('<I', ms, a - OVL)[0]; w_ex = lambda a: struct.unpack_from('<I', ex, a - EXE_BASE)[0]
-    for sites, fn, lab in ((NAV_H, NAV, 'navH'), (NAV_B, NAV, 'navB'), (FACE_H, FACE, 'fwH'), (NAME_H, NAME, 'nwH'), (FACE_B, FACE, 'fwB'), (NAME_B, NAME, 'nwB')):
+    for sites, fn, lab in ((NAV_H, NAV, 'navH'), (NAV_B, NAV, 'navB'), (FACE_H, FACE, 'fwH'), (NAME_H, NAME, 'nwH'), (FACE_B, FACE, 'fwB'), (NAME_B, NAME, 'nwB'),
+                           (NAV_H2, NAV, 'navH2'), (NAME_H2, NAME, 'nwH2')):
         for a in sites: assert w_ms(a) == J(3, fn), hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb[lab])))
     for a, r, x in BARS:
         assert w_ms(a) == 0x00021080 and w_ms(a + 4) & 0xffe0ffff == 0x00401021, hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb[f'bar_{r}_{x}'])))
@@ -406,7 +447,7 @@ def patches(fs_read, placed):
     assert w_ms(CINIT) == 0x3c028005 and w_ms(CCOM) == 0x3c018005
     P += [('/MAIN_SEL.BIN', CINIT, J(2, lb['cinit'])), ('/MAIN_SEL.BIN', CINIT + 4, 0x3c028005),
           ('/MAIN_SEL.BIN', CCOM, J(2, lb['ccom'])), ('/MAIN_SEL.BIN', CCOM + 4, 0x3c018005)]
-    for f, a in RACE.items(): P.append((f, a - 12, J(3, lb['rp_' + race_regs[f]])))
+    for f, a in RACE.items(): P.append((f, a - 12, J(3, lb['rpv' if f == '/VS.BIN' else 'rp_' + race_regs[f]])))
     for a in MDL_SITES: assert w_ms(a) == J(3, FN_MDL), hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb['mdl'])))
     for a in WEAR_UPLOADS: assert w_ms(a) == J(3, UPLOAD), hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb['wup'])))
     assert w_ex(PLAY) == 0x3c028005 and w_ex(PLAY + 4) == 0x944208a8          # lui v0, 0x8005 / lhu v0, 0x8a8(v0)
@@ -456,7 +497,8 @@ def _split(segs, n):
 def ops(disc):
     """the operations of the mod, relative to the player's original disc"""
     rd = disc.read_file
-    blobs = files(rd) + [bytes(M_SIZE)] * 3; first, placed = layout(blobs)
+    import vs2p
+    fl = files(rd); blobs = fl + [bytes(M_SIZE)] * 3 + [vs2p.to_p2(fl[2 * k]) for k in range(3)]; first, placed = layout(blobs)
     out = []
     for f, a, new in patches(rd, placed):
         o = (a - EXE_BASE) if f == '/SCES_009.92' else (a - OVL)
@@ -472,10 +514,10 @@ def ops(disc):
     import bundle, cpurider
     p0 = rd(SOURCES[0]); p0a = srcs[0][0]
     for j, (lba, b) in enumerate(placed):
-        if j >= 6:         # menu model: built by the patcher from the ending model and ENDING.FBD
+        if 6 <= j < 9:     # menu model: built by the patcher from the ending model and ENDING.FBD
             out.append(['crewmenu', lba, ENDING_MODELS[j - 6], ENDING_FBD, menu_params(j - 6)]); continue
-        if j % 2 == 0:     # model: the CPU model where it lies in PLAYER0.DAT, only the recomputed bytes stored
-            src = bundle.parse(p0)[cpurider.CPU[NAMES[j // 2]][0]]; o = p0.find(src); assert o >= 0 and len(src) == len(b)
+        if j % 2 == 0 or j >= 9:     # model (player 1, or player 2's copy): from the CPU model in PLAYER0.DAT, recomputed bytes only
+            src = bundle.parse(p0)[cpurider.CPU[NAMES[j // 2 if j < 9 else j - 9]][0]]; o = p0.find(src); assert o >= 0 and len(src) == len(b)
             segs = []; i = 0
             while i < len(b):
                 k = i; same = b[i] == src[i]

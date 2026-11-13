@@ -164,7 +164,25 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
   Les têtes viennent de TITLE/MAIN_SEL.FBD (opération `icons`), copiées dans chaque overlay par la nouvelle opération
   `fcopy` (octets d'un fichier tel qu'il est déjà modifié). Vérifié : record de half-pipe battu avec Kelly (octet 9,
   sa tête au classement), records forcés à 7/8/9 au classement d'avant course (MAIN_SEL) et de fin de half-pipe.
-- Limites : animations et nom en course sont ceux du rider de base.
+- 2 joueurs (mode 3, Free Style à deux, overlay VS) : l'écran BOARDER est le même qu'à un joueur, ouvert pour le
+  joueur 1 puis pour le joueur 2 (manette 2) ; `func_80060200(a0, a1 = joueur)`, le joueur reste dans s6 jusqu'à la
+  validation. ALIAS2 (0x8001FC98) est l'alias du joueur 2 : `cinit` prend le rider 0x80057412 et ALIAS2 quand a1 ≠ 0,
+  `ccom` range ACUR dans ALIAS2 quand s6 ≠ 0. Hub à deux : noms du joueur 2 en 0x8005FFF0 / 0x80060080 (`nwH2`),
+  changement rapide du joueur 2 en 0x8005FD48 (`navH2`). Course : `LoadRaceRiders` charge en VS le modèle VS/1P du
+  joueur 1 (0x8001D3AC, case +0x10), le modèle VS/2P du joueur 2 (0x8001D3E8, +0x14) et sa texture (0x8001D644, +0x28) ;
+  `ld` reconnaît la case et prend pour le joueur 2 une copie de modèle à lui (`remix/vs2p.py` : les fichiers VS/2P sont
+  ceux de VS/1P avec chaque palette 7 lignes plus bas et u + 128, sauf les polygones de la page 8 à v < 64 : v + 64 ;
+  vérifié identique sur les 5 modèles VS et 3 modèles FR du jeu), trois fichiers de plus à la fin du film d'intro
+  (ENT3, IDX3). Stats : `vs_initRacers` (VS 0x80064DFC, rider dans s2, numéro du coureur en sp + 0x408 : 0 = joueur 1,
+  1 = joueur 2) passe par `rpv`.
+- Place dans l'exe : les blocs de code sont répartis dans les fonctions mortes ; `place()` refuse désormais une branche
+  conditionnelle vers une autre zone (son décalage 16 bits serait tronqué : c'était le cas de `mdl`, `strip`, `nav`,
+  qui ne marchaient que parce que leurs morceaux tombaient côte à côte). 25 petites fonctions mortes de plus (1 280
+  octets), vérifiées contre tous les sauts, branches et pointeurs de tous les fichiers.
+- Vérifié dans l'émulateur (2 manettes) : joueur 1 Jicchi, joueur 2 Nick (écran BOARDER « 2P », portraits, modèles
+  3D du menu, hub « 1P JICCHI / 2P NICK »), course à deux avec les bons modèles et textures, et les paramètres de course
+  de chacun (pointeur +0x54 des coureurs) ; Free Style à un joueur inchangé.
+- Limites : animations et nom en course sont ceux du rider de base ; la voix du joueur 2 n'est pas transposée.
 - Vérifié : émulateur (verrouillé / 100 % / `unlock` sans progression), Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
   patcheur Batocera = build Python.
 
