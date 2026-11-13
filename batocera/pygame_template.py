@@ -114,30 +114,31 @@ def patch(src, dst, log=print, progress=lambda f: None, us=None, cfg=None):
     return len(mods)
 
 NAMES = {f[0]: (f[1] if FR else f[2]).replace('\u2019', "'") for f in M['FEATURES']}
-PRESETS = [(T('Remix complet', 'Full Remix'), list(M['SHOWN'])), (T('100 % a gagner', '100% to earn'), [f for f in M['SHOWN'] if f not in ('unlock', 'special')]), (T('Aucun mod', 'No mods'), [])]
 
 def start_config():
     for src in (CODE_FILE,):
         try:
-            c = M['decode_config'](open(src).read().strip()); c['mods'] = [f for f in c['mods'] if f in M['SHOWN']]; return c
+            c = M['decode_config'](open(src).read().strip())
+            c['mods'] = [f for f in M['SHOWN'] if f != 'unlock' or 'unlock' in c['mods']]; return c   # all mods; 'unlock' as last time
         except Exception: pass
     return {'mods': [f for f in M['SHOWN'] if f != 'unlock'], 'us_music': False, 'skins': []}   # 'Tout débloqué' off by default
 
 def menu(pygame, scr, fonts, cfg, has_us):
     """switch screen: up/down, A / B / X / Y (or Enter) = tick, START (or Space) = build. -> cfg"""
     big, small = fonts; W, H = scr.get_size()
-    rows = [('mod', f) for f in M['SHOWN']] + ([('us', None)] if has_us else []) + [('preset', i) for i in range(len(PRESETS))] + [('go', None)]
+    # every mod is delivered: what can be switched while playing is in the game's REMIX OPTIONS menu (R1 on the mode
+    # select screen); only "everything unlocked" (it changes the save) and the USA music are chosen here
+    rows = [('mod', 'unlock')] + ([('us', None)] if has_us else []) + [('go', None)]
     cur = len(rows) - 1; last_axis = 0; t_in = time.time(); pygame.event.clear()
     while True:
         scr.fill((16, 22, 30))
         scr.blit(big.render("Cool Boarders 2 Remix v" + VERSION, True, (240, 240, 250)), (W // 20, H // 30))
         code = M['encode_config'](cfg['mods'], cfg['us_music'], cfg['skins'])
-        scr.blit(small.render("Code : " + code + T("    (A = cocher, START = construire)", "    (A = tick, START = build)"), True, (143, 211, 255)), (W // 20, H // 30 + big.get_height()))
-        y = H // 30 + big.get_height() + small.get_height() + H // 40; lh = (H - y - H // 30) // len(rows)
+        scr.blit(small.render(T("Tous les mods sont inclus : les reglages sont dans le jeu (R1 sur l'ecran des modes).", "All mods included: the settings are in the game (R1 on the mode screen)."), True, (143, 211, 255)), (W // 20, H // 30 + big.get_height()))
+        y = H // 30 + big.get_height() + small.get_height() + H // 40; lh = min((H - y - H // 30) // len(rows), small.get_height() * 2)
         for i, (k, v) in enumerate(rows):
             if k == 'mod': txt = ('[x] ' if v in cfg['mods'] else '[ ] ') + NAMES[v]
             elif k == 'us': txt = ('[x] ' if cfg['us_music'] else '[ ] ') + T('Musiques de la version americaine', 'Music of the USA version')
-            elif k == 'preset': txt = '>> ' + PRESETS[v][0]
             else: txt = T('>>> CONSTRUIRE LE JEU <<<', '>>> BUILD THE GAME <<<')
             col = (255, 160, 80) if i == cur else (200, 210, 225)
             scr.blit(small.render(txt, True, col), (W // 20 + (0 if k in ('mod', 'us') else W // 40), y + i * lh))
@@ -162,7 +163,6 @@ def menu(pygame, scr, fonts, cfg, has_us):
                 k, v = rows[cur]
                 if k == 'mod': cfg['mods'] = [f for f in M['SHOWN'] if (f in cfg['mods']) != (f == v)]
                 elif k == 'us': cfg['us_music'] = not cfg['us_music']
-                elif k == 'preset': cfg['mods'] = list(PRESETS[v][1])
                 else: return cfg
         time.sleep(0.03)
 

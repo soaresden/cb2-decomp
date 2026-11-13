@@ -678,13 +678,17 @@ def load(path): return json.loads(gzip.decompress(open(path, 'rb').read()))
 # (reserved), bit 3 = 60 Hz (reserved)), [up to 8] ready-to-wear skins (bit i = entry i of the site's skins/index.json);
 # trailing zero bytes dropped, then 1 check byte (crc32 & 255); Crockford base32, "CB2-XXXX-XXXX".
 B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
-IDS = [f[0] for f in FEATURES]
+# bit order of the configuration code: fixed (never reorder; new mods go at the end), the same as the site's seed.js
+IDS = ['unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'crew', 'rear',
+       'news', 'hplive', 'options']
+assert sorted(IDS) == sorted(f[0] for f in FEATURES)
 RETIRED = {'lift'}                       # kept in IDS so that old codes still decode; no longer offered
 SHOWN = [f for f in IDS if f not in RETIRED]
 
 def encode_config(mods, us_music=False, skins=()):
     m = sum(1 << IDS.index(f) for f in mods); s = sum(1 << i for i in skins if 0 <= i < 64)
-    b = bytearray([1, m & 255, m >> 8, 1 if us_music else 0]) + s.to_bytes(8, 'little')
+    # version 1: 2 bytes of mods (codes of 16 mods or fewer stay as they were); version 2: 3 bytes
+    b = (bytearray([1, m & 255, m >> 8]) if m < 0x10000 else bytearray([2, m & 255, (m >> 8) & 255, m >> 16])) + bytes([1 if us_music else 0]) + s.to_bytes(8, 'little')
     while len(b) > 2 and b[-1] == 0: b.pop()
     import zlib; b.append(zlib.crc32(bytes(b)) & 255)
     n = int.from_bytes(b, 'big'); nb = len(b) * 8; k = -(-nb // 5); n <<= k * 5 - nb
@@ -699,8 +703,10 @@ def decode_config(code):
     n = 0
     for c in s: n = n * 32 + B32.index(c)
     nb = len(s) * 5 // 8; n >>= len(s) * 5 - nb * 8; b = n.to_bytes(nb, 'big')
-    if len(b) < 2 or zlib.crc32(b[:-1]) & 255 != b[-1] or b[0] != 1: raise ValueError('code invalide')
-    b = b[:-1] + bytes(12); m = b[1] | b[2] << 8; s = int.from_bytes(b[4:12], 'little')
+    if len(b) < 2 or zlib.crc32(b[:-1]) & 255 != b[-1] or b[0] not in (1, 2): raise ValueError('code invalide')
+    if b[0] == 2: b = b[:-1] + bytes(13); m = b[1] | b[2] << 8 | b[3] << 16; b = b[:1] + b[1:3] + b[4:]
+    else: b = b[:-1] + bytes(12); m = b[1] | b[2] << 8
+    s = int.from_bytes(b[4:12], 'little')
     return {'mods': [f for i, f in enumerate(IDS) if m >> i & 1], 'us_music': bool(b[3] & 1), 'skins': [i for i in range(64) if s >> i & 1]}
 
 if __name__ == '__main__':
