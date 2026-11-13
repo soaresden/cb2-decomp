@@ -321,6 +321,15 @@ def patches():
                 '/SBC2.BIN':0x8006841c,'/TM.BIN':0x80066414,'/VS.BIN':0x800676a0}
     for f,a in flip_sites.items():
         P+=[(f,a,0x8e0207a8,J(lw_['mdf'])),(f,a+4,0x10800003,0),(f,a+8,0,0),(f,a+0xc,None,0),(f,a+0x10,0x00571023,0),(f,a+0x14,0x00571021,0)]
+    # half-pipe (HP): same spin / flip code but the rider is in s1 (the helpers read the rotation through s0):
+    # two relays in the dead func_8002934C (after the Big Air Master test) swap s0 for the call
+    hpc,hpl=asm(['hps:','addiu sp, sp, -8','sw ra, 0(sp)','sw s0, 4(sp)','jal %d'%la['mds'],'move s0, s1','lw ra, 0(sp)','lw s0, 4(sp)','jr ra','addiu sp, sp, 8',
+                 'hpf:','addiu sp, sp, -8','sw ra, 0(sp)','sw s0, 4(sp)','jal %d'%lw_['mdf'],'move s0, s1','lw ra, 0(sp)','lw s0, 4(sp)','jr ra','addiu sp, sp, 8'],0x80029370)
+    assert hpc[-1][0]<0x800293f8
+    for a_,w_ in hpc: P.append(('/SCES_009.92',a_,struct.unpack_from('<I',_ex,a_-0x8000f800)[0],w_))
+    P+=[('/HP.BIN',0x8006649c,0x8e2207a4,J(hpl['hps'])),('/HP.BIN',0x800664a0,0,(18<<21)|(3<<11)|0x21),('/HP.BIN',0x800664a4,0x00521021,(3<<21)|(18<<11)|0x21)]
+    P+=[('/HP.BIN',0x80066584,0x8e2207a8,J(hpl['hpf'])),('/HP.BIN',0x80066588,0x10800003,0),('/HP.BIN',0x8006658c,0,0),('/HP.BIN',0x80066590,0x08019967,0),
+        ('/HP.BIN',0x80066594,0x00571023,0),('/HP.BIN',0x80066598,0x00571021,0)]
     T5_0=(9<<26)|(13<<16); T5_1=T5_0|1     # addiu t5, zero, 0/1
     for f in ['/SBC1.BIN','/TM.BIN','/OMT.BIN','/BP.BIN']:
         d=open(FS+f,'rb').read(); W=lambda i:_st.unpack('<I',d[i:i+4])[0]

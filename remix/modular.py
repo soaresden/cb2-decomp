@@ -70,7 +70,7 @@ EXE_MAP = [   # (lo, hi, feature) in the executable
     (0x8004F920, 0x8004F93F, 'outfits'), (0x8004F96C, 0x8004F97F, 'outfits'), (0x8004F9E0, 0x8004F9EF, 'outfits'),
     (0x8001D140, 0x8001D140, 'outfits'), (0x8001003C, 0x8001003C, 'outfits'), (0x800100B8, 0x800100B8, 'outfits'),
     (0x800100B4, 0x800100B4, 'progress'),
-    (0x800291CC, 0x8002934B, 'skipq'), (0x8002934C, 0x800293F7, 'bam'),
+    (0x800291CC, 0x8002934B, 'skipq'), (0x8002934C, 0x8002936F, 'bam'), (0x80029370, 0x800293F7, 'air'),
 ]
 MODE_MAP = [(0x800643B4, 0x800643B4, 'progress'), (0x800832C8, 0x800836A8, 'progress')]
 MS_MAP = [*[(a, a, 'max') for a in (0x8006E0A8, 0x8006E0AC, 0x8006E120, 0x8006E124, 0x8006E1CC, 0x8006D478, 0x8006DC98, 0x8006E4B8, 0x8006D614, 0x8006D618,
