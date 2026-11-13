@@ -250,12 +250,12 @@ Code : `remix/hplive.py` (HP.BIN seulement).
 
 ## Options dans le jeu (`options`, v26)
 
-Code : `remix/options.py` (MODE_SEL + trois fonctions mortes de l'exe réservées) ; tests dans `rear.py`, `hplive.py`,
+Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées) ; tests dans `rear.py`, `hplive.py`,
 `news.py`.
 
 - Les interrupteurs sont des bits de 0x80057438 (bit à 1 = coupé) : 1 vue arrière, 2 notes du half-pipe en direct,
   4 annonces de déblocage, 8 figures en l'air (`air`), 16 chocs en Boarder Cross (`ramming`), 32 écran large (à 1 =
-  actif : coupé par défaut). Cet octet fait partie
+  actif : coupé par défaut), 64 UNLOCK EVERYTHING fait. Cet octet fait partie
   du bloc 0x80057434..0x8005744D copié dans la sauvegarde mais n'est jamais lu par le jeu (docs/progression.md) : le
   réglage suit la carte mémoire. À 0, tout est actif comme avant.
 - `rear`, `hplive`, `news` lisent leur bit. `air` et `ramming` sont coupés là où leur code vit, dans l'exe (toujours
@@ -267,8 +267,15 @@ Code : `remix/options.py` (MODE_SEL + trois fonctions mortes de l'exe réservée
   seulement lue par les fonctions de vue) passe de 0x1000 à 0xC00 : le jeu calcule lui-même un champ 16:9, à afficher
   étiré en 16:9 (sans le « widescreen hack » de l'émulateur). Valeur reprise du code DuckStation de PeterDelta pour ce
   disque (SCES-00992 : A7059288 10000C00, github.com/PeterDelta/PCSX2). Vérifié : course de Free Style en 16:9.
-- Tampon de primitives du panneau : 0x1000 par image (6 lignes, environ 130 lettres de 20 octets) ; à 0x800 il
-  débordait sur celui de l'autre image et l'écran tombait à 3 images sur 60.
+- UNLOCK EVERYTHING (dernière ligne, bit 64 = fait, affiché ON) : une action, pas un interrupteur. Premier R2 : mot
+  `conf` à 1, trois lignes d'avertissement sous le panneau (`owr`) ; second R2 (`ounl`, dans l'exe) : le bloc de
+  progression reçoit les valeurs d'une partie à 100 % (0x743C/0x743E = 10, 0x7440 |= 0x7F, 0x7442 |= 7,
+  0x7444/0x7446 = 1, 0x7448/0x744A/0x744C = 0x3FF), bit 64 mis, `conf` remis à 0. Bouger le curseur annule
+  l'avertissement. La sauvegarde garde le tout (pas de retour arrière). Sert à essayer tous les modes et toutes les
+  options d'un coup ; débloque aussi Jicchi, Nick et Kelly (porte 100 % de `crew`).
+- Tampon de primitives du panneau : 0x801F8000 + 0x2000 par image (0x801F0000..0x801FF000 n'est pas touché sur cet
+  écran). À 0x800 il débordait sur celui de l'autre image (3 images sur 60) ; à 0x1000, l'avertissement (0xB9C
+  octets sans lui, plus de 0x1000 avec) figeait le jeu.
 - Écran de choix du mode : l'appel de `func_80028BDC` en 0x800643E4 (fonction de la télé, chaque image) passe par
   `opt`. R1 maintenu : panneau REMIX OPTIONS (texte du jeu `func_80012CA0`, cadre sombre) ; L1 descend le curseur
   (ligne dorée), R2 bascule la ligne.
