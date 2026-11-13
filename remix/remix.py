@@ -11,12 +11,12 @@ RM=0x8004fb28
 FLIP_DELAY=4
 PL_V=239; PL_SNOW_U=120; PL_GRAY_U=188; PL_W={'SNOWMAN':61,'GRAY':38}
 TL_N=1; TL_X0=int(__import__('os').environ.get('TL_X0','-40')); TL_DX=int(__import__('os').environ.get('TL_DX','84')); TL_Y0=int(__import__('os').environ.get('TL_Y0','-34')); TL_DY=int(__import__('os').environ.get('TL_DY','0')); TL_RX=int(__import__('os').environ.get('TL_RX','156')); TL_LY=int(__import__('os').environ.get('TL_LY','0x48'),0)
-FLIP_K=int(__import__('os').environ.get('FLIP_K','250'))
-SQ_SH=int(__import__('os').environ.get('SQ_SH','2'))
+FLIP_K=int(__import__('os').environ.get('FLIP_K','0'))
+SQ_SH=int(__import__('os').environ.get('SQ_SH','1'))
 MAXL_X=int(__import__('os').environ.get('MAXL_X','250')); MAXL_Y=int(__import__('os').environ.get('MAXL_Y','90')); MAXL_W=int(__import__('os').environ.get('MAXL_W','30'))
 KD_R=int(__import__('os').environ.get('KD_R','130')); KD_RY=int(__import__('os').environ.get('KD_RY','260')); KD_V=int(__import__('os').environ.get('KD_V','20')); KD_CD=int(__import__('os').environ.get('KD_CD','2'))
 HINT_X=int(__import__('os').environ.get('HINT_X','10')); HINT_Y=int(__import__('os').environ.get('HINT_Y','236')); HINT_F=int(__import__('os').environ.get('HINT_F','1')); HINT1=b'R1 : MAX'; HINT2=b'R1 : NORMAL'
-AIR_K=int(__import__('os').environ.get('AIR_K','45'))
+AIR_K=int(__import__('os').environ.get('AIR_K','0'))
 CAVE_TEX=0x8004f800; CAVE_PL=0x8004f840; CAVE_EN=0x8004f8a0; CAVE_SLOT=0x8004f940; CAVE_PAD=0x8004f980; LOCTBL=0x8004f900
 def jal(a): return (3<<26)|((a>>2)&0x3ffffff)
 def br(w,src,dst): return (w&0xffff0000)|(((dst-(src+4))>>2)&0xffff)
