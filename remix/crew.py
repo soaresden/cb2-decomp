@@ -98,7 +98,10 @@ UPLOAD = 0x8005DB60; WEAR_UPLOADS = [0x80064100, 0x80064124]
 LOADIMAGE = 0x80029B7C; STOREIMAGE = 0x80029BE0; DRAWSYNC = 0x800298B8; QPOLL = 0x80013CE0
 CDMODE = 0x80013C94       # CdControl(CdlSetmode, 0xA0): data reading, as the game's own loads do
 DATA = 0x8001FBC4; DATA_END = 0x8001FCA8
-ALIASV, ACUR, AB, ASTP, BASEV, MODESV, IDX, STATS, PARAMS, ENT = (DATA + o for o in (0, 4, 8, 0xC, 0x10, 0x14, 0x18, 0x24, 0x48, 0x7C))
+ALIASV, ACUR, AB, ASTP, BASEV, MODESV, IDX, STATS, PARAMS, ENT, VPITCH = (DATA + o for o in (0, 4, 8, 0xC, 0x10, 0x14, 0x18, 0x24, 0x48, 0x7C, 0xAC))
+# voices: the base rider's, played higher or lower (SPU pitch, 0x5CE = the game's own): Jicchi -1.5, Nick -4, Kelly +3 semitones
+PLAY = 0x80015D18; VOICE_CH, VOICE_PITCH = 0x100000, 0x5CE
+VOICE_SEMI = [-1.5, -4, 3]
 BASE = [0, 1, 2]
 MODES = (1 << 2) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8)   # Free Style, Big Air, Big Air Master, Halfpipe, Board Park
 STAT_BARS = [(3, 4, 4, 6, 6, 8), (2, 4, 6, 4, 8, 6), (6, 8, 6, 6, 4, 4)]    # BOARDER screen bars (display only)
@@ -197,6 +200,17 @@ def routines(race_regs):
     S += ['cinit:', 'lhu v0, 0x7408(v0)', 'move t4, ra', 'move t5, a0', 'move t6, a1', 'move t3, v0', 'sll a0, v0, 16', 'sra a0, a0, 16',
           f'lui at, {H(ALIASV)}', f'lw a1, {L(ALIASV)}(at)', 'jal aval', 'nop', 'jal setcur', 'move a0, v0',
           'move ra, t4', 'move a0, t5', 'move a1, t6', 'move v0, t3', f'j {CINIT + 8}', 'nop']
+    # play function of the exe (a0 pitch, a1 SPU voice bit, a2 sample, a3 volume): the rider's voice in a race
+    # (voice 20, pitch 0x5CE) with an alias -> its own pitch. Replaces "lui v0 / lhu v0" at the entry. Not aval: its
+    # 'unlock' test reads MAIN_SEL, gone in a race.
+    S += ['vp:', f'lui at, {VOICE_CH >> 16:#x}', 'bne a1, at, vp9', f'addiu at, zero, {VOICE_PITCH}', 'bne a0, at, vp9',
+          'lui at, 0x8006', 'lw at, -0x5158(at)', 'nop', 'addiu at, at, -8', 'bnez at, vp9',
+          # alias chosen (the BOARDER screen already checked it was won), for this base rider, in an allowed mode
+          f'lui at, {H(ALIASV)}', f'lw t0, {L(ALIASV)}(at)', 'nop', 'beqz t0, vp9', f'lui at, {H(BASEV)}', 'addu at, at, t0',
+          f'lbu t1, {L(BASEV)}(at)', 'lui at, 0x8005', 'lh t2, 0x7408(at)', 'lw t3, 0x7420(at)', 'bne t1, t2, vp9',
+          f'lui at, {H(MODESV)}', f'lw at, {L(MODESV)}(at)', 'nop', 'srlv at, at, t3', 'andi at, at, 1', 'beqz at, vp9',
+          'sll t3, t0, 1', f'lui at, {H(VPITCH - 2)}', 'addu at, at, t3', f'lhu a0, {L(VPITCH - 2)}(at)',
+          'vp9:', 'lui v0, 0x8005', 'lhu v0, 0x08a8(v0)', f'j {PLAY + 8}', 'nop']
     S += ['ccom:', 'sh v0, 0x7408(at)', f'lui at, {H(ACUR)}', f'lw t9, {L(ACUR)}(at)', f'lui at, {H(ALIASV)}', f'j {CCOM + 8}', f'sw t9, {L(ALIASV)}(at)']
     # race parameters: replaces "sll v0, R, 4" (delay slot: lui v1, hi); the next instruction (at ra) is addiu v1, v1, lo
     for rr in sorted(set(race_regs)):
@@ -321,7 +335,7 @@ def place(S):
 
 
 # block starts for place(); nx and mdq are not fallen into (an unconditional jump comes before them)
-TOP = {'aval', 'amode', 'setcur', 'navH', 'nx', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'acomp', 'fwx', 'nwx', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
+TOP = {'aval', 'amode', 'setcur', 'navH', 'nx', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'acomp', 'fwx', 'nwx', 'vp', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
 
 
 # ---------------------------------------------------------------------------------------------------- disc layout
@@ -370,6 +384,7 @@ def patches(fs_read, placed):
             + struct.pack('<6h', idx[0], idx[2], idx[4], idx[1], idx[3], idx[5])
             + b''.join(struct.pack('<6h', *s) for s in STAT_BARS) + params)
     data += bytes(ENT - DATA - len(data)) + ent
+    data += b''.join(struct.pack('<H', round(VOICE_PITCH * 2 ** (k / 12))) for k in VOICE_SEMI)
     assert DATA + len(data) <= DATA_END and (ENT - G_FILES) % 8 == 0
     data += bytes((-len(data)) % 4)
     P += [('/SCES_009.92', DATA + i, struct.unpack_from('<I', data, i)[0]) for i in range(0, len(data), 4)]
@@ -394,6 +409,8 @@ def patches(fs_read, placed):
     for f, a in RACE.items(): P.append((f, a - 12, J(3, lb['rp_' + race_regs[f]])))
     for a in MDL_SITES: assert w_ms(a) == J(3, FN_MDL), hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb['mdl'])))
     for a in WEAR_UPLOADS: assert w_ms(a) == J(3, UPLOAD), hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb['wup'])))
+    assert w_ex(PLAY) == 0x3c028005 and w_ex(PLAY + 4) == 0x944208a8          # lui v0, 0x8005 / lhu v0, 0x8a8(v0)
+    P += [('/SCES_009.92', PLAY, J(2, lb['vp'])), ('/SCES_009.92', PLAY + 4, 0)]
     return P
 
 

@@ -147,7 +147,12 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
   et `amode` passent par elle, donc tant que le jeu n'est pas fini les trois alias restent gris dans la rangée de
   têtes et le curseur les saute. Avec `unlock` (mot 0x2403007F en 0x80063EA8), ils sont disponibles d'office.
   L'annonce (CONGRATULATIONS) est faite par le mod `news`.
-- Limites : voix, animations et nom en course sont ceux du rider de base.
+- Voix : celles du rider de base, jouées plus graves ou plus aiguës. La fonction de son de l'exe `func_80015D18`
+  (a0 hauteur, a1 voix SPU, a2 échantillon, a3 volume) passe par `vp` : en course (overlay 8), pour la voix 20
+  (0x100000) à la hauteur normale 0x5CE, avec un alias pour ce rider de base dans un mode permis, la hauteur devient
+  celle de l'alias (Jicchi −1,5, Nick −4, Kelly +3 demi-tons : 1363, 1179, 1767). Pas `aval` ici : son test du mod
+  `unlock` lit MAIN_SEL, absent en course. Vérifié dans l'émulateur (appel forcé : 0x5CE avec Jin, 0x49B avec Nick).
+- Limites : animations et nom en course sont ceux du rider de base.
 - Vérifié : émulateur (verrouillé / 100 % / `unlock` sans progression), Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
   patcheur Batocera = build Python.
 
