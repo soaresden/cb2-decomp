@@ -85,7 +85,17 @@ EXE_BASE = 0x8000F800; OVL = 0x8005AEA8; G_FILES = 0x800583E8
 # dead functions of the exe (never called, no pointer to them anywhere)
 CAVES = [(0x8001E67C, 0x8001E7C4), (0x80013940, 0x80013A34), (0x800169B4, 0x80016AB0), (0x800238E0, 0x80023998),
          (0x80029AE0, 0x80029B7C), (0x80021DA0, 0x80021E38), (0x80022B70, 0x80022C08), (0x80021BB0, 0x80021C38),
-         (0x8001829C, 0x80018320), (0x8001FA0C, 0x8001FA98)]   # (0x800280B8, 0x8002E7D0: mod rear)
+         (0x8001829C, 0x80018320), (0x8001FA0C, 0x8001FA98),   # (0x800280B8, 0x8002E7D0: mod rear)
+         (0x800404E4, 0x80040640), (0x8003EAC4, 0x8003EB80), (0x800123C8, 0x80012448), (0x8001B69C, 0x8001B718),
+         (0x8002DE10, 0x8002DE88), (0x8002E96C, 0x8002E9DC), (0x80027E9C, 0x80027F04), (0x8002C49C, 0x8002C504),
+         (0x800290C8, 0x80029128), (0x8003F028, 0x8003F088), (0x800439C4, 0x80043A24)]
+DATA2 = 0x8003EE98; DATA2_END = 0x8003EF00             # menu models: file entries, rectangles, state
+ENT2, IDX2, RCOL, RCLUT, PENDING, DUMMY = (DATA2 + o for o in (0, 0x18, 0x20, 0x38, 0x50, 0x54))
+MENU_SHOWN = 0x4D575253                                 # 'SRWM' + k in MENU_SAVE: alias k's texture is in VRAM
+MODELS = 0x8007C4E8; FN_MDL = 0x80064A08; MDL_SITES = [0x800602E8, 0x80061580]
+UPLOAD = 0x8005DB60; WEAR_UPLOADS = [0x80064100, 0x80064124]
+LOADIMAGE = 0x80029B7C; STOREIMAGE = 0x80029BE0; DRAWSYNC = 0x800298B8; QPOLL = 0x80013CE0
+CDMODE = 0x80013C94       # CdControl(CdlSetmode, 0xA0): data reading, as the game's own loads do
 DATA = 0x8001FBC4; DATA_END = 0x8001FCA8
 ALIASV, ACUR, AB, ASTP, BASEV, MODESV, IDX, STATS, PARAMS, ENT = (DATA + o for o in (0, 4, 8, 0xC, 0x10, 0x14, 0x18, 0x24, 0x48, 0x7C))
 BASE = [0, 1, 2]
@@ -142,7 +152,9 @@ def routines(race_regs):
     for kind, fn in (('f', FACE), ('n', NAME)):
         S += [f'{kind}wH:', f'lui t9, {H(ALIASV)}', f'j {kind}w', f'addiu t9, t9, {L(ALIASV)}',
               f'{kind}wB:', f'lui t9, {H(ACUR)}', f'addiu t9, t9, {L(ACUR)}',
-              f'{kind}w:', 'addiu sp, sp, -0x30', 'sw ra, 0x28(sp)', 'sw s0, 0x24(sp)', 'lw t0, 0x40(sp)', 'lw t1, 0x44(sp)', 'sw t9, 0x1c(sp)',
+              f'{kind}w:', 'addiu sp, sp, -0x30', 'sw ra, 0x28(sp)', 'sw s0, 0x24(sp)', 'sw t9, 0x1c(sp)',
+              *([f'lui t0, {H(ACUR)}', f'addiu t0, t0, {L(ACUR)}', 'bne t0, t9, fwp', 'nop', 'jal mpoll', 'nop', 'fwp:', 'lw t9, 0x1c(sp)'] if kind == 'f' else []),
+              'lw t0, 0x40(sp)', 'lw t1, 0x44(sp)',
               'sw t0, 0x10(sp)', 'sw t1, 0x14(sp)', f'jal {fn}', 'sw t1, 0x20(sp)', 'move s0, v0',
               'lw t9, 0x1c(sp)', 'lw a0, 0x20(sp)', 'lw a1, 0(t9)', 'jal aval', 'nop', 'beqz v0, ' + kind + 'w9', 'addiu v0, v0, -1']
         if kind == 'f':   # 8-bit 64x64 at VRAM (832 + 32 k, 320): u 64 k, v 64..128; CLUT (928, 320 + k); tpage x 832, y 256
@@ -179,7 +191,59 @@ def routines(race_regs):
               f'bne at, t0, rp9_{rr}', 'nop', 'lh at, 0(ra)', 'sll t1, t1, 4', 'addu at, at, v1', f'lui t0, {H(PARAMS - 16)}', f'addiu t0, t0, {L(PARAMS - 16)}',
               'addu t0, t0, t1', f'j rpe_{rr}', 'subu v0, t0, at',
               f'rp9_{rr}:', f'sll v0, {rr}, 4', f'rpe_{rr}:', 'lw t0, -4(sp)', 'lw t1, -8(sp)', 'jr ra', 'nop']
+    # ---- menu models (BOARDER screen): see menu_chunk()
+    MM = MENU_BUF + M_MAGIC
+    rect = lambda tbl, kreg: [f'addiu t0, {kreg}, -1', 'sll t0, t0, 3', f'lui a0, {H(tbl)}', f'addiu a0, a0, {L(tbl)}', 'addu a0, a0, t0']
+    # mreq(a0 = k): load the model of alias k into MENU_BUF (CD queue), unless already asked
+    S += ['mreq:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'move s0, a0',
+          f'lui at, {H(PENDING)}', f'lw t0, {L(PENDING)}(at)', 'nop', 'beq t0, s0, mr9', 'nop', f'sw s0, {L(PENDING)}(at)',
+          f'lui at, {H(MM)}', f'sw zero, {L(MM)}(at)', f'jal {CDMODE}', 'nop',
+          'sll t0, s0, 1', f'lui at, {H(IDX2 - 2)}', 'addu at, at, t0', f'lh a0, {L(IDX2 - 2)}(at)',
+          f'lui a1, {H(MENU_BUF)}', f'addiu a1, a1, {L(MENU_BUF)}', f'lui a2, {H(DUMMY)}', f'addiu a2, a2, {L(DUMMY)}',
+          f'jal {ENQ}', 'addiu a3, zero, 1',
+          'mr9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'jr ra', 'addiu sp, sp, 0x20']
+    # munsh(): the base rider's texture back in VRAM if an alias's is there
+    S += ['munsh:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', f'lui at, {H(MENU_SAVE)}', f'lw s0, {L(MENU_SAVE)}(at)',
+          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'subu s0, s0, t0', 'addiu t1, s0, -1', 'sltiu t1, t1, 3', 'beqz t1, mu9', 'nop',
+          f'jal {DRAWSYNC}', 'move a0, zero', *rect(RCOL, 's0'), f'lui a1, {H(MENU_SAVE + 0x204)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 0x204)}',
+          *rect(RCLUT, 's0'), f'lui a1, {H(MENU_SAVE + 4)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 4)}',
+          f'jal {DRAWSYNC}', 'move a0, zero', f'lui at, {H(MENU_SAVE)}', f'sw zero, {L(MENU_SAVE)}(at)',
+          'mu9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'jr ra', 'addiu sp, sp, 0x20']
+    # mshow(a0 = k): the base rider's texture saved, alias k's put in its place
+    S += ['mshow:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'move s0, a0', f'lui at, {H(MENU_SAVE)}', f'lw t1, {L(MENU_SAVE)}(at)',
+          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'addu t0, t0, s0', 'beq t0, t1, ms9', 'nop',
+          'jal munsh', 'nop', f'jal {DRAWSYNC}', 'move a0, zero',
+          *rect(RCOL, 's0'), f'lui a1, {H(MENU_SAVE + 0x204)}', f'jal {STOREIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 0x204)}',
+          *rect(RCLUT, 's0'), f'lui a1, {H(MENU_SAVE + 4)}', f'jal {STOREIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 4)}',
+          f'jal {DRAWSYNC}', 'move a0, zero',
+          *rect(RCOL, 's0'), f'lui a1, {H(MENU_BUF + M_IMG)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_BUF + M_IMG)}',
+          *rect(RCLUT, 's0'), f'lui a1, {H(MENU_BUF + M_CLUT)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_BUF + M_CLUT)}',
+          f'jal {DRAWSYNC}', 'move a0, zero',
+          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'addu t0, t0, s0', f'lui at, {H(MENU_SAVE)}', f'sw t0, {L(MENU_SAVE)}(at)',
+          'ms9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'jr ra', 'addiu sp, sp, 0x20']
+    # mdl(a0 = rider): replaces the BOARDER screen's calls to func_80064A08 (model of the rider)
+    S += ['mdl:', 'addiu sp, sp, -0x28', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'sw s1, 0x18(sp)', 'sw s2, 0x1c(sp)', 'move s0, a0',
+          f'lui at, {H(ACUR)}', f'lw a1, {L(ACUR)}(at)', 'jal aval', 'nop', 'move s1, v0', 'beqz s1, md0', 'nop',
+          f'lui at, {H(MM)}', f'lw t0, {L(MM)}(at)', f'lui t1, {H(MENU_MAGIC)}', f'addiu t1, t1, {L(MENU_MAGIC)}', 'addu t1, t1, s1', 'bne t0, t1, mdq', 'nop',
+          'jal mshow', 'move a0, s1',
+          'sll t2, s0, 2', f'lui at, {H(MODELS)}', 'addu at, at, t2', f'lw s2, {L(MODELS)}(at)', f'lui t3, {H(MENU_BUF)}', f'addiu t3, t3, {L(MENU_BUF)}', f'sw t3, {L(MODELS)}(at)',
+          f'jal {FN_MDL}', 'move a0, s0',
+          'sll t2, s0, 2', f'lui at, {H(MODELS)}', 'addu at, at, t2', 'j md9', f'sw s2, {L(MODELS)}(at)',
+          'mdq:', 'jal mreq', 'move a0, s1',
+          'md0:', 'jal munsh', 'nop', f'jal {FN_MDL}', 'move a0, s0',
+          'md9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw s1, 0x18(sp)', 'lw s2, 0x1c(sp)', 'jr ra', 'addiu sp, sp, 0x28']
+    # mpoll(): every frame of the BOARDER screen while a model is being loaded (keeps a0-a3)
+    S += ['mpoll:', f'lui at, {H(PENDING)}', f'lw t0, {L(PENDING)}(at)', 'nop', 'bnez t0, mp1', 'nop', 'jr ra', 'nop',
+          'mp1:', 'addiu sp, sp, -0x28', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'sw a0, 0x18(sp)', 'sw a1, 0x1c(sp)', 'sw a2, 0x20(sp)', 'sw a3, 0x24(sp)', 'move s0, t0',
+          f'jal {QPOLL}', 'nop', f'lui at, {H(MM)}', f'lw t0, {L(MM)}(at)', f'lui t1, {H(MENU_MAGIC)}', f'addiu t1, t1, {L(MENU_MAGIC)}', 'addu t1, t1, s0', 'bne t0, t1, mp9', 'nop',
+          f'lui at, {H(PENDING)}', f'sw zero, {L(PENDING)}(at)', f'lui at, {H(ACUR)}', f'lw t0, {L(ACUR)}(at)', 'nop', 'bne t0, s0, mp9', 'nop',
+          f'lui at, {H(BASEV)}', 'addu at, at, s0', 'jal mdl', f'lbu a0, {L(BASEV)}(at)',
+          'mp9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw a0, 0x18(sp)', 'lw a1, 0x1c(sp)', 'lw a2, 0x20(sp)', 'lw a3, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x28']
+    # wup: the WEAR screen's texture uploads are skipped while an alias's texture is shown
+    S += ['wup:', f'lui at, {H(MENU_SAVE)}', f'lw t0, {L(MENU_SAVE)}(at)', f'lui t1, {H(MENU_SHOWN)}', f'addiu t1, t1, {L(MENU_SHOWN + 1)}', 'subu t0, t0, t1',
+          'sltiu t0, t0, 3', 'beqz t0, wu1', 'nop', 'jr ra', 'nop', 'wu1:', f'j {UPLOAD}', 'nop']
     return S
+
 
 
 def place(S):
@@ -191,10 +255,10 @@ def place(S):
     blocks.append(cur)
     def size(b): return 4 * sum(1 for l in b if not l.endswith(':'))
     caves = [[lo, lo, hi, []] for lo, hi in CAVES]
-    for b in sorted(blocks, key=lambda b: -size(b)):
-        for c in caves:
-            if c[1] + size(b) <= c[2]: c[3].append(b); c[1] += size(b); break
-        else: raise ValueError('plus de place pour ' + b[0])
+    for b in sorted(blocks, key=lambda b: -size(b)):          # best fit, largest first
+        fit = [c for c in caves if c[1] + size(b) <= c[2]]
+        if not fit: raise ValueError('plus de place pour ' + b[0])
+        c = min(fit, key=lambda c: c[2] - c[1]); c[3].append(b); c[1] += size(b)
     labels = {}
     for lo, _, _, bl in caves:
         pc = lo
@@ -207,7 +271,8 @@ def place(S):
     return words, labels
 
 
-TOP = {'aval', 'amode', 'setcur', 'navH', 'fwH', 'nwH', 'ld24', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
+# block starts for place(); nx and mdq are not fallen into (an unconditional jump comes before them)
+TOP = {'aval', 'amode', 'setcur', 'navH', 'nx', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
 
 
 # ---------------------------------------------------------------------------------------------------- disc layout
@@ -248,7 +313,7 @@ def patches(fs_read, placed):
     words, lb = place(routines(race_regs.values()))
     P = [('/SCES_009.92', a, w) for a, w in words]
     # data
-    ent = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed)
+    ent = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[:6])
     idx = [(ENT + 8 * j - G_FILES) // 8 for j in range(6)]
     sb = fs_read('/SBC2.BIN')
     params = b''.join(sb[SBC2_PARAMS - OVL + 16 * s:SBC2_PARAMS - OVL + 16 * s + 16] for s in SBC2_SLOT)
@@ -259,6 +324,13 @@ def patches(fs_read, placed):
     assert DATA + len(data) <= DATA_END and (ENT - G_FILES) % 8 == 0
     data += bytes((-len(data)) % 4)
     P += [('/SCES_009.92', DATA + i, struct.unpack_from('<I', data, i)[0]) for i in range(0, len(data), 4)]
+    # menu models: their files, VRAM rectangles of the base riders (texture column, palette row), state
+    d2 = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[6:9])
+    d2 += struct.pack('<3h', *[(ENT2 + 8 * k - G_FILES) // 8 for k in range(3)]) + bytes(2)
+    d2 += b''.join(struct.pack('<4h', MENU_COL[k], 0, 64, 256) for k in range(3))
+    d2 += b''.join(struct.pack('<4h', 768, MENU_CLUT_Y[k], 256, 1) for k in range(3)) + bytes(8)
+    assert DATA2 + len(d2) <= DATA2_END and (ENT2 - G_FILES) % 8 == 0 and len(d2) == DUMMY + 4 - DATA2
+    P += [('/SCES_009.92', DATA2 + i, struct.unpack_from('<I', d2, i)[0]) for i in range(0, len(d2), 4)]
     # hooks
     ms = fs_read('/MAIN_SEL.BIN'); ex = fs_read('/SCES_009.92')
     w_ms = lambda a: struct.unpack_from('<I', ms, a - OVL)[0]; w_ex = lambda a: struct.unpack_from('<I', ex, a - EXE_BASE)[0]
@@ -271,6 +343,8 @@ def patches(fs_read, placed):
     P += [('/MAIN_SEL.BIN', CINIT, J(2, lb['cinit'])), ('/MAIN_SEL.BIN', CINIT + 4, 0x3c028005),
           ('/MAIN_SEL.BIN', CCOM, J(2, lb['ccom'])), ('/MAIN_SEL.BIN', CCOM + 4, 0x3c018005)]
     for f, a in RACE.items(): P.append((f, a - 12, J(3, lb['rp_' + race_regs[f]])))
+    for a in MDL_SITES: assert w_ms(a) == J(3, FN_MDL), hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb['mdl'])))
+    for a in WEAR_UPLOADS: assert w_ms(a) == J(3, UPLOAD), hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb['wup'])))
     return P
 
 
@@ -316,7 +390,7 @@ def _split(segs, n):
 def ops(disc):
     """the operations of the mod, relative to the player's original disc"""
     rd = disc.read_file
-    blobs = files(rd); first, placed = layout(blobs)
+    blobs = files(rd) + [bytes(M_SIZE)] * 3; first, placed = layout(blobs)
     out = []
     for f, a, new in patches(rd, placed):
         o = (a - EXE_BASE) if f == '/SCES_009.92' else (a - OVL)
@@ -329,6 +403,8 @@ def ops(disc):
     import bundle, cpurider
     p0 = rd(SOURCES[0]); p0a = srcs[0][0]
     for j, (lba, b) in enumerate(placed):
+        if j >= 6:         # menu model: built by the patcher from the ending model and ENDING.FBD
+            out.append(['crewmenu', lba, ENDING_MODELS[j - 6], ENDING_FBD, menu_params(j - 6)]); continue
         if j % 2 == 0:     # model: the CPU model where it lies in PLAYER0.DAT, only the recomputed bytes stored
             src = bundle.parse(p0)[cpurider.CPU[NAMES[j // 2]][0]]; o = p0.find(src); assert o >= 0 and len(src) == len(b)
             segs = []; i = 0
@@ -341,3 +417,47 @@ def ops(disc):
         for k, c in enumerate(chunks):
             out.append(['sec', lba + k, (bytes([0, 0, 0x89 if k == len(chunks) - 1 else 0x08, 0]) * 2).hex(), c])
     return out
+
+
+# ---------------------------------------------------------------------------------------------------- menu models
+# The BOARDER screen shows a 3D model of the rider (TITLE/CHR.DAT: one TMD of 13 parts per rider, 8-bit texture in a
+# 64x256 VRAM column per rider: Yaggi x 512, Jin 576, Cindy 640, palettes on rows 476 + 2 rider). The ending of the
+# game has the same kind of models for the CPU riders (ENDING/S_CHR/ED_CHR41/51/61.DAT: TMD of 16 parts = the 13 of
+# the menu with the hands apart and the board; texture in ENDING/ENDING.FBD). menu_chunk() turns one into a menu
+# model (hands joined to the forearms, board left out, 3040 lower, texture moved to the base rider's column),
+# already "mapped" (absolute pointers) for MENU_BUF where the game code loads it when the rider is selected.
+ENDING_MODELS = ['/ENDING/S_CHR/ED_CHR41.DAT', '/ENDING/S_CHR/ED_CHR51.DAT', '/ENDING/S_CHR/ED_CHR61.DAT']
+ENDING_FBD = '/ENDING/ENDING.FBD'
+MENU_BUF = 0x801C2000; MENU_SAVE = 0x801D2000          # free RAM in the menu (left-over copy of MAIN_SEL.FBD)
+M_CLUT = 0x7800; M_IMG = 0x7A00; M_MAGIC = 0xFA00; M_SIZE = 0xFA04
+MENU_COL = [512, 576, 640]                              # VRAM column of the base rider (Yaggi, Jin, Cindy)
+MENU_CLUT_Y = [476, 478, 480]
+Y_SHIFT = 3040
+# words of a TMD primitive holding indices: mode -> [(word, half, 'v' vertex | 'n' normal)]
+TMD_IDX = {0x34: [(4, 0, 'n'), (4, 1, 'v'), (5, 0, 'n'), (5, 1, 'v'), (6, 0, 'n'), (6, 1, 'v')],
+           0x3C: [(5, 0, 'n'), (5, 1, 'v'), (6, 0, 'n'), (6, 1, 'v'), (7, 0, 'n'), (7, 1, 'v'), (8, 0, 'n'), (8, 1, 'v')],
+           0x30: [(2, 0, 'n'), (2, 1, 'v'), (3, 0, 'n'), (3, 1, 'v'), (4, 0, 'n'), (4, 1, 'v')],
+           0x38: [(2, 0, 'n'), (2, 1, 'v'), (3, 0, 'n'), (3, 1, 'v'), (4, 0, 'n'), (4, 1, 'v'), (5, 0, 'n'), (5, 1, 'v')],
+           0x20: [(2, 0, 'n'), (2, 1, 'v'), (3, 0, 'v'), (3, 1, 'v')],
+           0x28: [(2, 0, 'n'), (2, 1, 'v'), (3, 0, 'v'), (3, 1, 'v'), (4, 0, 'v')],
+           0x24: [(4, 0, 'n'), (4, 1, 'v'), (5, 0, 'v'), (5, 1, 'v')],
+           0x2C: [(5, 0, 'n'), (5, 1, 'v'), (6, 0, 'v'), (6, 1, 'v'), (7, 0, 'v')],
+           0x25: [(5, 0, 'v'), (5, 1, 'v'), (6, 0, 'v')]}         # (flag 1: no light, no normal)
+MENU_PARTS = [[0], [1], [2], [3], [4, 5], [6], [7, 8], [9], [10], [11], [12], [13], [14]]   # ending parts (board out)
+
+
+def menu_params(k, dest=MENU_BUF):
+    (px, py), (cx, cy) = END_TEX[k]
+    return {'dest': dest, 'col': MENU_COL[k], 'cly': MENU_CLUT_Y[k], 'src': [px, py, cx, cy], 'yshift': Y_SHIFT,
+            'parts': MENU_PARTS, 'idx': {str(m): v for m, v in TMD_IDX.items()}, 'clut_off': M_CLUT, 'img_off': M_IMG,
+            'magic_off': M_MAGIC, 'size': M_SIZE, 'magic': MENU_MAGIC + k + 1}
+
+
+def menu_chunk(archive, fbd, k, dest=MENU_BUF):
+    import modular
+    return modular.crew_menu_chunk(archive, fbd, menu_params(k, dest))
+
+
+MENU_MAGIC = 0x4D575243   # 'CRWM' (+ 1..3)
+END_TEX = [((512, 256), (768, 485)), ((576, 256), (768, 486)), ((640, 256), (768, 487))]   # Jicchi, Nick, Kelly in ENDING.FBD
+

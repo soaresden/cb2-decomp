@@ -121,7 +121,7 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
 - Code dans des fonctions jamais appelées de l'exe (aucun `jal`, aucun pointeur, aucun saut dedans, vérifié dans tous
   les fichiers) ; données à 0x8001FBC4.
 - Nouveaux fichiers (modèle et texture des trois riders, `remix/cpurider.py`) : à la fin du film d'intro, juste avant
-  les secteurs du mod `riders` (le film est raccourci de 71 secteurs). Table de fichiers dans l'exe (MSF + taille),
+  les secteurs du mod `riders` (le film est raccourci de 167 secteurs, avec les modèles du menu). Table de fichiers dans l'exe (MSF + taille),
   numéro de fichier = (entrée − 0x800583E8) / 8 (négatif). Secteurs : copies depuis PLAYER0.DAT / ENEMY1 / ENEMY2 ;
   seuls les octets recalculés du modèle (palette, page, u) sont écrits.
 - Portraits : fiches profil de la vidéo `MOVIE/SBCMOVE.STR` (images 318, 344, 330), décodées par le patcheur
@@ -130,8 +130,19 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
   rempli depuis les bords, halo de compression rongé sur 2 pixels, points isolés retirés). Écrites dans `TITLE/MAIN_SEL.FBD`, zone que les écrans du menu n'utilisent pas
   (VRAM x 832..1023, y 320..383) : visages à x 832 / 864 / 896, palettes en x 928 lignes 320..322, noms (dessinés
   par le Remix, 48×32, 4 bits, palette des noms du jeu en 768,464) à x 960 / 972 / 984, y 352.
-- Limites : dans le menu, l'aperçu 3D reste le modèle de Yaggi / Jin / Cindy (modèles du menu dans TITLE/CHR.DAT,
-  chargé en entier, sans place libre) ; voix, animations et nom en course sont ceux du rider de base.
+- Modèle 3D du menu : celui de la fin du jeu (ENDING/S_CHR/ED_CHR41/51/61.DAT : TMD de 16 parties = les 13 du menu,
+  mains à part, planche en plus ; texture dans ENDING/ENDING.FBD, Jicchi x 512 palette 485, Nick 576/486, Kelly
+  640/487). L'opération `crewmenu` du patcheur en fait un modèle de menu (mains jointes aux avant-bras, planche
+  retirée, 3040 plus bas, texture placée dans la colonne du rider de base), déjà « mappé » pour 0x801C2000, avec sa
+  texture (64x256, 8 bits) et sa palette : un fichier par rider (64 004 octets) à la fin du film d'intro.
+  Dans le menu, 0x801C1E00..0x801EDD00 est libre (copie de MAIN_SEL.FBD déjà envoyée en VRAM). Les deux appels de
+  `func_80064A08` (modèle du rider de l'écran BOARDER) passent par `mdl` : pour un alias, le fichier est demandé à
+  la file de lecture du jeu (`func_80013C94` = mode données, `func_80013BD0` vers 0x801C2000), suivie chaque image
+  (`func_80013CE0`, depuis l'habillage du portrait) ; une fois là (mot de fin), la colonne et la palette du rider de
+  base sont sauvées (StoreImage 0x80029BE0, vers 0x801D2000), celles de l'alias envoyées (LoadImage 0x80029B7C) et le
+  modèle est construit avec le pointeur de l'alias à la place de celui de la table 0x8007C4E8 ; en revenant à un
+  autre rider, la sauvegarde est remise. L'écran WEAR n'envoie pas ses textures tant qu'un alias est affiché.
+- Limites : voix, animations et nom en course sont ceux du rider de base.
 - Vérifié : émulateur (Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
   patcheur Batocera = build Python.
 

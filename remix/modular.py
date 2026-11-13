@@ -55,8 +55,8 @@ FEATURES = [   # id, French name, English name, description FR, description EN
      'Sur l’écran « 1st STAGE » : START = jouer les qualifications, SELECT + START = les passer et partir 4e sur 8, au milieu du départ en handicap du Boarder Cross.',
      'On the “1st STAGE” screen: START = play the qualifying, SELECT + START = skip it and start 4th of 8, in the middle of the Boarder Cross handicap start.'),
     ('crew', 'Jicchi, Nick et Kelly jouables', 'Jicchi, Nick and Kelly playable',
-     'Les trois riders de l’ordinateur rejoignent l’écran BOARDER après Irin, avec leur portrait (tiré de la vidéo de la Compétition), leur modèle et leurs stats de course. Free Style, Big Air, Halfpipe et Board Park (pas en Compétition ni en VS). Fin du film d’intro raccourcie d’une demi-seconde.',
-     'The three CPU riders join the BOARDER screen after Irin, with their portrait (from the Competition movie), their model and their race stats. Free Style, Big Air, Halfpipe and Board Park (not in Competition or VS). End of the intro movie half a second shorter.'),
+     'Les trois riders de l’ordinateur rejoignent l’écran BOARDER après Irin, avec leur portrait (tiré de la vidéo de la Compétition), leur modèle 3D (celui de la fin du jeu dans le menu, celui des courses en piste) et leurs stats de course. Free Style, Big Air, Halfpipe et Board Park (pas en Compétition ni en VS). Fin du film d’intro raccourcie d’environ une seconde.',
+     'The three CPU riders join the BOARDER screen after Irin, with their portrait (from the Competition movie), their 3D model (the ending’s in the menu, the race one on the slopes) and their race stats. Free Style, Big Air, Halfpipe and Board Park (not in Competition or VS). End of the intro movie about one second shorter.'),
     ('rear', 'Vue arrière (Rond)', 'Rear view (Circle)',
      'En course, Rond maintenu : la caméra passe devant ton rider et regarde derrière lui (pour voir qui te suit).',
      'In a race, hold Circle: the camera moves in front of your rider and looks back (to see who is following).'),
@@ -275,6 +275,10 @@ def apply(disc, pkg, feats, log=lambda m: None):
             elif t == 'sec': secs[op[1]] = (bytes.fromhex(op[2]), op[3])
             elif t == 'face':
                 ml_, ms_, _ = disc.files[op[2]]; face_op(buf(op[1]), lambda k: disc.user(ml_ + k), ms_ // 2048, op)
+            elif t == 'crewmenu':
+                ch = crew_menu_chunk(orig(op[2]), orig(op[3]), op[4]); nch = -(-len(ch) // 2048); ch += bytes(nch * 2048 - len(ch))
+                for k in range(nch):
+                    secs[op[1] + k] = (bytes([0, 0, 0x89 if k == nch - 1 else 0x08, 0]) * 2, [[1, ch[k * 2048:(k + 1) * 2048].hex()]])
     mods = {}
     loc = {p: (l, s) for p, (l, s, d) in disc.files.items()}
     # MAIN_SEL grown by 'outfits': it moves to the last sectors of the info movie, which is cut accordingly
@@ -530,6 +534,54 @@ def _median_cut(pixels, n):
         bx = sorted(boxes[best], key=lambda q: (q[bc], q[0], q[1], q[2])); m = len(bx) // 2
         boxes[best:best + 1] = [bx[:m], bx[m:]]
     return [(sum(q[0] for q in bx) // len(bx), sum(q[1] for q in bx) // len(bx), sum(q[2] for q in bx) // len(bx)) for bx in boxes]
+
+
+def crew_menu_chunk(archive, fbd, p):
+    """['crewmenu', lba, archive, fbd, p] (mod crew): menu model of a CPU rider built from its ending model (TMD of
+    16 parts in a CHR archive: hands joined to the forearms, board left out, lowered by p['yshift'], texture moved to
+    p['col'] / palette row p['cly']) + its texture from ENDING.FBD; TMD already mapped for p['dest']"""
+    n0 = struct.unpack_from('<I', archive, 4)[0]; t = archive[n0 * 4:4 * struct.unpack_from('<I', archive, 8)[0]]
+    n = struct.unpack_from('<I', t, 8)[0]; parts = []
+    for i in range(n):
+        vt, nv, nt, nn, pt, np_, sc = struct.unpack_from('<7I', t, 12 + 28 * i)
+        verts = [list(struct.unpack_from('<4h', t, 12 + vt + 8 * j)) for j in range(nv)]
+        norms = t[12 + nt:12 + nt + 8 * nn]
+        prims = []; o = 12 + pt
+        for _ in range(np_):
+            ilen = t[o + 1]; prims.append(list(struct.unpack_from('<%dI' % (ilen + 1), t, o))); o += 4 + 4 * ilen
+        if not any((w[0] >> 24) & 4 and (w[2] >> 16) & 0x1f == 5 for w in prims): parts.append((verts, norms, prims))
+    col, cly = p['col'], p['cly']; ncba = (768 >> 4) | (cly << 6)
+    idx = {int(k): v for k, v in p['idx'].items()}
+    out = []
+    for group in p['parts']:
+        V = []; N = bytearray(); P = []
+        for gi in group:
+            verts, norms, prims = parts[gi]; vo, no = len(V), len(N) // 8
+            V += [[x, y + p['yshift'], z, q] for x, y, z, q in verts]; N += norms
+            for w in prims:
+                w = list(w); mode = (w[0] >> 24) & 0xff
+                for wi, half, kind in idx[mode]:
+                    sh = 16 * half; val = ((w[wi] >> sh) & 0xffff) + (vo if kind == 'v' else no)
+                    w[wi] = (w[wi] & ~(0xffff << sh) & 0xffffffff) | (val << sh)
+                if mode & 4:
+                    w[1] = (w[1] & 0xffff) | (ncba << 16)
+                    w[2] = (w[2] & 0xffff) | (((((w[2] >> 16) & 0xffff) & ~0x1f) | (col >> 6)) << 16)
+                P.append(w)
+        out.append((V, N, P))
+    hdr = 12 + 28 * len(out); body = bytearray(); table = []; dest = p['dest']
+    for V, N, P in out:
+        vt = hdr + len(body); body += b''.join(struct.pack('<4h', *v) for v in V)
+        nt = hdr + len(body); body += N
+        pt = hdr + len(body); body += b''.join(struct.pack('<%dI' % len(w), *w) for w in P)
+        table.append((dest + vt, len(V), dest + nt, len(N) // 8, dest + pt, len(P), 0))
+    tmd = struct.pack('<3I', 0x41, 1, len(out)) + b''.join(struct.pack('<7I', *e) for e in table) + bytes(body)
+    assert len(tmd) <= p['clut_off'], len(tmd)
+    px, py, cx, cy = p['src']; vo_ = lambda x, y: 20 + (y * 704 + x - 320) * 2
+    chunk = bytearray(p['size']); chunk[:len(tmd)] = tmd
+    chunk[p['clut_off']:p['clut_off'] + 512] = fbd[vo_(cx, cy):vo_(cx, cy) + 512]
+    chunk[p['img_off']:p['img_off'] + 32768] = b''.join(fbd[vo_(px, py + y):vo_(px, py + y) + 128] for y in range(256))
+    struct.pack_into('<I', chunk, p['magic_off'], p['magic'])
+    return bytes(chunk)
 
 
 def px4(d, op):
