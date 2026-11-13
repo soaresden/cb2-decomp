@@ -86,3 +86,27 @@ Fait en « alias » d'un rider existant (voir `docs/modular.md`) : l'écran BOAR
 charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de course de la Compétition (SBC2
 0x8008F1F8, 16 octets par place : Jicchi 4, Nick 5, Kelly 6). Le second chargeur de fichiers du joueur,
 `func_8001D694` (Halfpipe, Big Air…), range la texture en +0x20 du contexte (au lieu de +0x24 pour `func_8001D1B8`).
+
+## Snowman en Compétition (enquête, v26 — pas encore corrigé)
+
+- Symptôme : en Compétition (mod `riders`), Snowman est « mal assemblé » et penché ; en Free Style il est bon.
+- Modèle : SNOW.PMD (7 objets, contre 12 pour un humain), mis par `riders` à la place 6 du paquet PLAYER.
+  Chaque objet a son GsCOORDINATE2 (0x50 octets, `super` = 0) et un bloc d'animation propre au jeu (pointeur `param`,
+  rotation de type quaternion en unités de 4096) ; Free Style : les 7 objets de Snowman ont des rotations nulles et
+  leurs positions dans le repère du rider (0x8009E2CC…, objets 0x18 octets : attribut, coord, pmd, objet, base, n°) :
+  (-47,-762,-10) (-92,-821,-116) (0,-1326,46) (1,-2088,18) (-19,-491,83, échelle 696) (277,-1474,55) (-224,-1445,33).
+- Animations : fichiers TOD (format libgs) — TOD_MAN0..7 (fichiers 229..236, humains, ~377 Ko) et TOD_SM (237, Snowman,
+  82 Ko). Le Free Style charge les deux (`LoadRaceRiders` : TOD_MANx tiré au hasard dans une table par rider
+  D_80010CE4, puis TOD_SM) et anime Snowman avec TOD_SM. La Compétition (`func_8001CE..`, appel 0x8001D05C) ne charge
+  qu'un TOD_MANx, dans un tampon commun (0x80195394, pointeur en +0x14 du contexte) : les 7 objets de Snowman reçoivent
+  les 7 premiers os d'un humain (posture penchée, morceaux décalés).
+- Essai : charger TOD_SM à la place pour Snowman (0x8001D05C → petite fonction) bloque l'écran d'étape : le même TOD
+  sert aussi aux adversaires simulés, et TOD_SM n'a pas leurs mouvements. Piste : un second tampon (82 Ko) pour le
+  joueur et son pointeur d'animation dirigé dessus, ou un TOD_SM réduit aux mouvements utiles.
+
+## Compteur en bas à gauche (Free Style)
+
+- Les boules rouges : `func_8006CF34` (FREE) dessine jusqu'à 3 grosses boules puis des petites ; le nombre vient du
+  champ +0xCB6 du rider. Ce champ est remis à 0 avec le rider (0x800650A8) et augmente de 1 à chaque (re)départ d'une
+  descente (`func_8005C1C8`, qui vide aussi l'entrée +0xE10 + 4 n) ; une autre branche (0x80072074) le fait passer de
+  1 à 2. C'est donc un compteur de descentes / essais plutôt que de chutes ; ce qu'il change en jeu n'est pas trouvé.
