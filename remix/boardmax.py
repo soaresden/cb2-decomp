@@ -49,9 +49,9 @@ def maxb(FL, ED, hb):
         'bm_mask:', f'lw t4, {FL}(at)', f'lui t5, {hi(MASKV)}', f'lw t7, {lo(MASKV)}(t5)', 'andi t8, t1, 0x1000',
         'bnez t4, bm_m1', 'addiu t9, zero, 0x1000', 'beqz t7, bm_m0', 'nop', 'bnez t8, bm_m1', 'nop',
         'bm_m0:', 'move t9, zero', 'bm_m1:', f'sw t9, {lo(MASKV)}(t5)',
-        # y: under SPECIAL, or one line higher (under TYPE-3) while the SPECIAL of this style is locked
-        'lui t5, 0x8008', 'lh t6, -0x2fc4(t5)', 'lui t9, 0x8005', 'lhu t9, 0x7442(t9)', 'sra t8, t6, 2', 'srlv t9, t9, t8', 'andi t9, t9, 1',
-        f'addiu a3, zero, {LY}', 'bnez t9, bm_y', 'nop', f'addiu a3, zero, {LY - 22}',
+        # y: always under SPECIAL (the SPECIAL line is shown, greyed, even while that board is locked: one line higher
+        # the MAX label sat on top of it)
+        f'addiu a3, zero, {LY}', 'nop', 'nop', 'nop', 'nop', 'nop', 'nop', 'nop', 'nop', 'nop', 'nop',
         'bm_y:', 'move a0, s5', 'lw a1, 0x28(sp)', f'jal {MSP}', f'addiu a2, zero, {LX}',
         'lw ra, 0x2c(sp)', 'nop', 'jr ra', 'addiu sp, sp, 0x30']
 
@@ -122,3 +122,19 @@ def patches(flagb, lbx, exe):
     P = [('/SCES_009.92', a, old(a), w) for a, w in words]
     P += [('/MAIN_SEL.BIN', a, o, n) for a, o, n in sites(l)]
     return P
+
+
+def fix_label_y(ops):
+    """the 'max' ops of a package built from a reference made before this fix: the MAX label's y test (11 words: the
+    second 'lui t5, 0x8008 / lh t6, -0x2fc4(t5)' of maxb .. 'addiu a3, zero, LY - 22') becomes 'addiu a3, zero, LY'
+    + 10 nop (in place: the labels after it do not move)"""
+    from asm import asm
+    exe = sorted((op[2], i) for i, op in enumerate(ops) if op[0] == 'w' and op[1] == '/SCES_009.92')
+    val = {o: ops[i][4] for o, i in exe}
+    old_tail = asm([f'addiu a3, zero, {LY - 22}'], 0)[0][0][1]
+    for o, i in exe:
+        if val.get(o) == 0x3C0D8008 and val.get(o + 4) == 0x85AED03C and val.get(o + 40) == old_tail:
+            new = [asm([f'addiu a3, zero, {LY}'], 0)[0][0][1]] + [0] * 10
+            for k in range(11): ops[[j for oo, j in exe if oo == o + 4 * k][0]][4] = new[k]
+            return 1
+    return 0

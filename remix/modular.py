@@ -224,6 +224,8 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
         if p in O.files and O.files[p][:2] != R.files[p][:2] and p not in grown_files:
             pkg['ops']['riders'].append(['rec', p, R.files[p][0], R.files[p][1]])
     # Jicchi, Nick and Kelly: computed here (not in the reference build), portraits drawn by the patcher itself
+    import boardmax as _bmx
+    _bmx.fix_label_y(pkg['ops']['max'])          # MAX label of the BOARD screen: always under SPECIAL
     import crew as _cw
     pkg['ops']['crew'] = _cw.ops(O)
     import rear as _rv
