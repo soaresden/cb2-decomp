@@ -106,6 +106,7 @@ CDMODE = 0x80013C94       # CdControl(CdlSetmode, 0xA0): data reading, as the ga
 DATA = 0x8001FBC4; DATA_END = 0x8001FCA8
 ALIASV, ACUR, AB, ASTP, BASEV, MODESV, IDX, STATS, PARAMS, ENT, VPITCH = (DATA + o for o in (0, 4, 8, 0xC, 0x10, 0x14, 0x18, 0x24, 0x48, 0x7C, 0xAC))
 ENT3, IDX3, ALIAS2 = DATA + 0xB4, DATA + 0xCC, DATA + 0xD4   # 2 players: player 2's models (files, indices), player 2's alias
+TEN = DATA + 0xD8; MAX_FLAG = 0x8002957C                        # a stat of 10 (MAX on the WEAR screen); mod max's on/off flag
 # voices: the base rider's, played higher or lower (SPU pitch, 0x5CE = the game's own): Jicchi -1.5, Nick -4, Kelly +3 semitones
 PLAY = 0x80015D18; VOICE_CH, VOICE_PITCH = 0x100000, 0x5CE
 VOICE_SEMI = [-1.5, -4, 3]
@@ -197,7 +198,11 @@ def routines(race_regs):
               'move v0, s0', 'lw ra, 0x28(sp)', 'lw s0, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x30']
     # stat bars: replaces "sll v0, v0, 2" (delay slot: addu v0, v0, X) -> v0 = row pointer offset
     for rr, xr in sorted({(r, x) for _, r, x in BARS}):
-        S += [f'bar_{rr}_{xr}:', f'lui at, {H(AB)}', f'lw at, {L(AB)}(at)', f'addiu {rr}, {rr}, 1', f'bne at, {rr}, br_{rr}_{xr}', f'addiu {rr}, {rr}, -1',
+        # WEAR screen (v1, s7; the value is then read at s2 + v0): with MAX on (mod max: its flag is 1), every bar
+        # reads TEN, as maxd does on the BOARDER screen (without the mod the word holds code, never 1)
+        mx = ([f'lui at, {H(MAX_FLAG)}', f'lw at, {L(MAX_FLAG)}(at)', 'nop', 'xori at, at, 1', f'bnez at, bm_{rr}_{xr}', 'nop',
+               f'lui v0, {H(TEN)}', f'addiu v0, v0, {L(TEN)}', 'jr ra', 'subu v0, v0, s2', f'bm_{rr}_{xr}:'] if (rr, xr) == ('v1', 's7') else [])
+        S += [f'bar_{rr}_{xr}:', *mx, f'lui at, {H(AB)}', f'lw at, {L(AB)}(at)', f'addiu {rr}, {rr}, 1', f'bne at, {rr}, br_{rr}_{xr}', f'addiu {rr}, {rr}, -1',
               f'lui at, {H(ASTP)}', f'lw v0, {L(ASTP)}(at)', 'jr ra', 'nop',
               f'br_{rr}_{xr}:', f'subu v0, v0, {xr}', 'sll v0, v0, 2', 'jr ra', f'addu v0, v0, {xr}']
     # file loads of the player's rider (P1 model / texture)
@@ -426,6 +431,7 @@ def patches(fs_read, placed):
     data += bytes(ENT3 - DATA - len(data)) + b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[9:12])
     data += struct.pack('<3h', *[(ENT3 + 8 * k - G_FILES) // 8 for k in range(3)]) + bytes(2) + struct.pack('<I', 0)
     assert (ENT3 - G_FILES) % 8 == 0 and DATA + len(data) == ALIAS2 + 4
+    data += struct.pack('<hh', 10, 0); assert DATA + len(data) == TEN + 4 <= DATA_END
     assert DATA + len(data) <= DATA_END and (ENT - G_FILES) % 8 == 0
     data += bytes((-len(data)) % 4)
     P += [('/SCES_009.92', DATA + i, struct.unpack_from('<I', data, i)[0]) for i in range(0, len(data), 4)]
