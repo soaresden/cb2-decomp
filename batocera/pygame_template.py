@@ -124,7 +124,7 @@ def start_config():
     return {'mods': list(M['SHOWN']), 'us_music': False, 'skins': []}
 
 def menu(pygame, scr, fonts, cfg, has_us):
-    """switch screen: up/down, A (or Enter) = tick, START (or Space) = build, B = back to the full Remix. -> cfg"""
+    """switch screen: up/down, A / B / X / Y (or Enter) = tick, START (or Space) = build. -> cfg"""
     big, small = fonts; W, H = scr.get_size()
     rows = [('mod', f) for f in M['SHOWN']] + ([('us', None)] if has_us else []) + [('preset', i) for i in range(len(PRESETS))] + [('go', None)]
     cur = len(rows) - 1; last_axis = 0; t_in = time.time(); pygame.event.clear()
@@ -155,7 +155,7 @@ def menu(pygame, scr, fonts, cfg, has_us):
                 if a != last_axis: mv = a
                 last_axis = a
             elif ev.type == pygame.JOYBUTTONDOWN:
-                act = 'go' if ev.button in (7, 9, 11) else 'ok' if ev.button in (0, 2) else None
+                act = 'go' if ev.button in (7, 9, 11) else 'ok' if ev.button in (0, 1, 2, 3) else None   # any face button ticks (A is 0 or 1 depending on the pad)
             cur = (cur + mv) % len(rows)
             if act == 'go': return cfg
             if act == 'ok':
