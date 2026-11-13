@@ -27,7 +27,7 @@ DELTA_B64 = "__DELTA__"
 DELTA_US_B64 = "__DELTA_US__"     # Remix for the USA version (phase 1)
 MODS_B64 = "__MODS__"             # modular Remix package (remix/modular.py)
 OUT_BASE = "Cool Boarders 2 Remix (Europe)"
-SEARCH_DIRS = ["/userdata/roms/psx", "/userdata/roms", os.path.dirname(os.path.abspath(__file__))]
+SEARCH_DIRS = ["/userdata/roms/psx", os.path.dirname(os.path.abspath(__file__))]
 
 # ================================================================ disc access (tools/cb2disc.py of cb2-decomp)
 __DISC__
@@ -55,25 +55,36 @@ def is_remix(disc):
     return any(exe[o + 4:o + 7])
 
 def find_sources(log):
-    """-> [(path, Disc)] originals, [paths] already patched, [(path, Disc)] USA discs (CHD)"""
+    """-> [(path, Disc)] originals, [paths] already patched, [(path, Disc)] USA discs (CHD).
+    Only .chd / .bin whose name looks like Cool Boarders 2 are opened first (opening a CHD reads and decompresses
+    some of it: slow without the lzma module); the other files of roms/psx only if none of them is the game."""
     orig, done, usa = [], [], []
-    for d in SEARCH_DIRS:
-        if not os.path.isdir(d): continue
-        for root_, dirs, files in os.walk(d):
-            if root_.count(os.sep) - d.count(os.sep) > 1: dirs[:] = []
-            for fn in sorted(files):
-                low = fn.lower()
-                if not (low.endswith('.chd') or low.endswith('.bin')): continue
-                p = os.path.join(root_, fn)
-                if any(p == q for q, _ in orig) or p in done: continue
-                try:
-                    disc = Disc(p)
-                    if '/SCUS_943.58' in disc.files and disc.kind == 'chd': usa.append((p, disc)); continue
-                    if '/SCES_009.92' not in disc.files: continue
-                except Exception:
-                    continue
-                if is_remix(disc): done.append(p)
-                else: orig.append((p, disc))
+    def names(dirs, depth):
+        seen = set()
+        for d in dirs:
+            if not os.path.isdir(d): continue
+            for root_, sub, files in os.walk(d):
+                if root_.count(os.sep) - d.count(os.sep) >= depth: sub[:] = []
+                for fn in sorted(files):
+                    p = os.path.join(root_, fn)
+                    if fn.lower().endswith(('.chd', '.bin')) and p not in seen: seen.add(p); yield p
+    looks = re.compile(r'cool.?boarders.?2|coolboarders2|\bcb2\b|sces.?009.?92|scus.?943.?58', re.I)
+    cands = list(names(SEARCH_DIRS, 2))
+    first = [p for p in cands if looks.search(os.path.basename(p))]
+    rest = [p for p in names(["/userdata/roms/psx"], 2) if p not in first]
+    for group in (first, rest):
+        for p in group:
+            try:
+                disc = Disc(p)
+                if '/SCUS_943.58' in disc.files and disc.kind == 'chd': usa.append((p, disc)); continue
+                if '/SCES_009.92' not in disc.files: continue
+            except Exception:
+                continue
+            if is_remix(disc): done.append(p)
+            else: orig.append((p, disc))
+        if orig: break
+        if group is first and rest: log(T("Pas de fichier au nom de Cool Boarders 2 : je regarde les autres jeux PSX (lent)...", "No file named like Cool Boarders 2: checking the other PSX games (slow)..."))
+    _log('sources', [p for p, _ in orig], done, [p for p, _ in usa])
     return orig, done, usa
 
 def patch(src, dst, log=print, progress=lambda f: None, us=None, cfg=None):
