@@ -126,7 +126,8 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
   seuls les octets recalculés du modèle (palette, page, u) sont écrits.
 - Portraits : fiches profil de la vidéo `MOVIE/SBCMOVE.STR` (images 318, 344, 330), décodées par le patcheur
   (`mdec_decode`, MDEC version 2, entiers seulement : `disc.js` donne les mêmes octets), détourées, réduites à 64×64
-  (affichées en 64×80), 95 couleurs. Écrites dans `TITLE/MAIN_SEL.FBD`, zone que les écrans du menu n'utilisent pas
+  (affichées en 64×80), 94 couleurs + un contour sombre (fond blanc ou noir
+  rempli depuis les bords, halo de compression rongé sur 2 pixels, points isolés retirés). Écrites dans `TITLE/MAIN_SEL.FBD`, zone que les écrans du menu n'utilisent pas
   (VRAM x 832..1023, y 320..383) : visages à x 832 / 864 / 896, palettes en x 928 lignes 320..322, noms (dessinés
   par le Remix, 48×32, 4 bits, palette des noms du jeu en 768,464) à x 960 / 972 / 984, y 352.
 - Limites : dans le menu, l'aperçu 3D reste le modèle de Yaggi / Jin / Cindy (modèles du menu dans TITLE/CHR.DAT,

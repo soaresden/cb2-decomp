@@ -458,6 +458,9 @@ def _face(sector, nsec, card, ncol):
     def isbg(c):
         if white: return min(c) >= 236 and max(c) - min(c) <= 16
         return max(c) <= 48
+    def fringe(c):   # the light (or dark) halo of the compression around the drawing
+        if white: return min(c) >= 196 and max(c) - min(c) <= 40
+        return max(c) <= 72
     bg = [[False] * w for _ in range(h)]
     stack = [(x, y) for x in range(w) for y in (0, h - 1)] + [(x, y) for y in range(h) for x in (0, w - 1)]
     while stack:
@@ -468,6 +471,10 @@ def _face(sector, nsec, card, ncol):
         if x < w - 1: stack.append((x + 1, y))
         if y > 0: stack.append((x, y - 1))
         if y < h - 1: stack.append((x, y + 1))
+    for _ in range(2):   # the halo next to the background goes too (two pixels deep at most)
+        add = [(x, y) for y in range(h) for x in range(w) if not bg[y][x] and fringe(px[y][x])
+               and ((x > 0 and bg[y][x - 1]) or (x < w - 1 and bg[y][x + 1]) or (y > 0 and bg[y - 1][x]) or (y < h - 1 and bg[y + 1][x]))]
+        for x, y in add: bg[y][x] = True
     small = []
     for dy in range(64):
         sy0, sy1 = dy * h // 64, (dy + 1) * h // 64
@@ -480,7 +487,18 @@ def _face(sector, nsec, card, ncol):
                     if bg[y][x]: continue
                     q = px[y][x]; r += q[0]; g += q[1]; b += q[2]; c += 1
             small.append(None if c == 0 or c * 2 < t else (r // c, g // c, b // c))
-    pal = _median_cut([q for q in small if q is not None], ncol - 1)
+    for _ in range(2):   # specks: an opaque pixel with at most one opaque neighbour (4-connected) becomes transparent
+        nxt = list(small)
+        for i in range(4096):
+            if small[i] is None: continue
+            x, y = i % 64, i // 64
+            on = (x > 0 and small[i - 1] is not None) + (x < 63 and small[i + 1] is not None) + (y > 0 and small[i - 64] is not None) + (y < 63 and small[i + 64] is not None)
+            if on <= 1: nxt[i] = None
+        small = nxt
+    ink = [i for i in range(4096) if small[i] is None and (
+        (i % 64 > 0 and small[i - 1] is not None) or (i % 64 < 63 and small[i + 1] is not None) or
+        (i >= 64 and small[i - 64] is not None) or (i < 4032 and small[i + 64] is not None))]
+    pal = _median_cut([q for q in small if q is not None], ncol - 2)
     idx = []
     for q in small:
         if q is None: idx.append(0); continue
@@ -489,7 +507,8 @@ def _face(sector, nsec, card, ncol):
             d = (q[0] - c[0]) ** 2 + (q[1] - c[1]) ** 2 + (q[2] - c[2]) ** 2
             if d < bd: bd = d; best = i
         idx.append(best + 1)
-    clut = [0] + [((c[0] >> 3) | (c[1] >> 3) << 5 | (c[2] >> 3) << 10) or 0x8000 for c in pal]
+    for i in ink: idx[i] = len(pal) + 1   # a dark outline around the picture, like the ink of the game's portraits
+    clut = [0] + [((c[0] >> 3) | (c[1] >> 3) << 5 | (c[2] >> 3) << 10) or 0x8000 for c in pal] + [0x0842]
     return idx, clut + [0] * (ncol - len(clut))
 
 
