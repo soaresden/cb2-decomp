@@ -44,3 +44,15 @@ boutons de la manette (`g_padButtons`, bits actifs : 0x10 Triangle, 0x20 Rond, 0
 - Les zones libres réutilisées par le Remix commencent parfois juste après un *delay slot* (0x8002A02C, 0x80028BF0).
 - *Load delay* MIPS : une valeur lue par `lw` n'est utilisable qu'une instruction plus tard.
 - t0 / t1 sont souvent encore utilisés par l'appelant (boucle des barres de stats de MAIN_SEL).
+
+## Riders du joueur et riders de l'ordinateur (test sur le jeu d'origine, v25)
+
+- `g_rider` (0x80057408) du joueur : 0 Yaggi, 1 Jin, 2 Cindy, 3 Irin, 4 Boss, 5 Gray, 6 Snowman. Forcé à 7 avant une
+  course de Free Style, rien ne se charge (retour au classement) : **Jicchi, Nick et Kelly n'ont pas de place de joueur**.
+- Modèles du joueur (`DATA/CHR/FR/1P` et `2P`) : 4 corps (FRM1, FRM2, FRFM1, FRFM2) + BOSS, GRAY, SNOW, et une texture
+  par veste / pantalon dans `FR/FBD*` (FRMx_jp.FBD, 17 428 octets).
+- Riders de l'ordinateur (Compétition, ordre YAGGI JIN CINDY IRIN JICCHI NICK KELLY BOSS) : modèles basse définition
+  dans `PLAYER0.DAT` / `PLAYER1.DAT` (paquets de 8), textures en colonnes de 32 pixels dans `ENEMY1.FBD`.
+- Les rendre jouables demande : une place dans la liste de l'écran BOARDER (nom, portrait, stats), des numéros de rider
+  au-delà de 6 acceptés par les tables indexées par rider (stats, animations, voix, plaques de nom…), et un modèle +
+  une texture de joueur (le modèle basse définition de l'ordinateur, ou un corps FRM/FRFM avec sa texture agrandie).
