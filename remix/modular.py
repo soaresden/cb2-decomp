@@ -89,7 +89,7 @@ EXE_MAP = [   # (lo, hi, feature) in the executable
     (0x8004F920, 0x8004F93F, 'outfits'), (0x8004F96C, 0x8004F97F, 'outfits'), (0x8004F9E0, 0x8004F9EF, 'outfits'),
     (0x8001D140, 0x8001D140, 'outfits'), (0x8001003C, 0x8001003C, 'outfits'), (0x800100B8, 0x800100B8, 'outfits'),
     (0x800100B4, 0x800100B4, 'progress'),
-    (0x800291CC, 0x8002934B, 'skipq'), (0x80013940, 0x80013A33, 'skipq'), (0x80015008, 0x80015008, 'skipq'), (0x8002934C, 0x8002936F, 'bam'), (0x80029370, 0x800293F7, 'air'),
+    (0x800291CC, 0x8002934B, 'skipq'), (0x80013940, 0x80013A33, 'skipq'), (0x800149D8, 0x800149D8, 'skipq'), (0x8002934C, 0x8002936F, 'bam'), (0x80029370, 0x800293F7, 'air'),
 ]
 MODE_MAP = [(0x800643B4, 0x800643B4, 'progress'), (0x800832C8, 0x800836A8, 'progress')]
 MS_MAP = [*[(a, a, 'max') for a in (0x8006E0A8, 0x8006E0AC, 0x8006E120, 0x8006E124, 0x8006E1CC, 0x8006D478, 0x8006DC98, 0x8006E4B8, 0x8006D614, 0x8006D618,
@@ -98,7 +98,7 @@ MS_MAP = [*[(a, a, 'max') for a in (0x8006E0A8, 0x8006E0AC, 0x8006E120, 0x8006E1
           (0x800614B8, 0x800614B8, 'max'), (0x800626E4, 0x800626E4, 'max'), (0x80063FC8, 0x80063FCC, 'riders'), (0x80064044, 0x80064044, 'riders'),
           (0x800605B4, 0x80062180, 'outfits'), (0x800640EC, 0x80064210, 'outfits')]
 SBC_MAP = {'/FREE.BIN': [(0x8005D5A4, 0x8005D5A4, 'lift')],
-           '/SBC1.BIN': [(0x8005B058, 0x8005B058, 'skipq'), (0x800832DC, 0x800832DC, 'riders'), (0x8008D8C8, 0x8008D910, 'riders')],
+           '/SBC1.BIN': [(0x8005B058, 0x8005B058, 'skipq'), (0x80071BD4, 0x80071D37, 'skipq'), (0x80062AF0, 0x80062AF0, 'skipq'), (0x800629E4, 0x800629E4, 'skipq'), (0x800832DC, 0x800832DC, 'riders'), (0x8008D8C8, 0x8008D910, 'riders')],
            '/SBC2.BIN': [(0x8005FF70, 0x8005FF70, 'ramming'), (0x80064D70, 0x80064D70, 'riders'), (0x800666EC, 0x800666F0, 'riders'),
                          (0x80066CB4, 0x80066CB8, 'riders'), (0x80090300, 0x80090420, 'riders'), (0x800847AC, 0x800847AC, 'riders'), (0x800902A8, 0x800902F0, 'riders')],
            '/TM.BIN': [(0x8005CCC0, 0x8005CCC0, 'bam'), (0x80075738, 0x80075758, 'bam'), (0x80074CFC, 0x80074CFC, 'bam'), (0x80094F18, 0x80095538, 'bam')]}
@@ -242,7 +242,9 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     pkg['ops']['skipq'] = [op for op in pkg['ops']['skipq'] if not (op[0] == 'w' and op[2] + 0x8000F800 in _skq.SELECT_SITES)]
     pkg['ops']['skipq'] += _skq.select_ops(O.read_file('/SCES_009.92'))   # SELECT alone on the 1st STAGE screen
     pkg['ops']['skipq'] = [op for op in pkg['ops']['skipq'] if not (op[0] == 'w' and _skq.TX <= op[2] + 0x8000F800 < _skq.TX_END or op[0] == 'w' and op[2] + 0x8000F800 == _skq.TX_SITE)]
-    pkg['ops']['skipq'] += _skq.text_ops(O.read_file('/SCES_009.92'))     # v68: PUSH SELECT TO SKIP TO RACE
+    pkg['ops']['skipq'] += _skq.text_ops(O.read_file('/SCES_009.92'))     # v68: SELECT TO SKIP TO RACE
+    pkg['ops']['skipq'] = [op for op in pkg['ops']['skipq'] if not (op[0] == 'w' and op[1] == '/SBC1.BIN' and (_skq.SK2 <= op[2] + 0x8005AEA8 < _skq.SK2_END or op[2] + 0x8005AEA8 in [_skq.SK2_SITE, _skq.SK2_SITE2]))]
+    pkg['ops']['skipq'] += _skq.try2_ops(O.read_file('/SBC1.BIN'))         # v68: SELECT skips the 2nd try
     # Snowman in the competition: his own animations (TOD_SM) and hierarchy (remix/snowtod.py, docs/racer.md)
     import snowtod as _sn
     pkg['ops']['riders'] = _sn.merge(O, pkg['ops']['riders'])

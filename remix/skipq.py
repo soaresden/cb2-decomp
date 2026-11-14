@@ -112,3 +112,35 @@ def text_ops(exe):
     w = lambda a: struct.unpack_from('<I', exe, a - 0x8000F800)[0]
     assert w(TX_SITE) == JL(RAND) and w(TX) == 0x27BDFF80
     return [['w', '/SCES_009.92', a - 0x8000F800, w(a), x] for a, x in c + [(TX_SITE, JL(l['sktx']))]]
+
+
+# v68: skip the 2nd try of the qualifying. SBC1's stage loop (func_80062804) runs each try with func_8005BFB8 (the
+# jump, then its results screen; called at 0x800629E4 and 0x80062AF0), which returns 2 after the 1st try (on to the
+# 2nd) and 1 after the 2nd (the stage is over; logged in the emulator). `sk2` (dead function func_80071BD4 of SBC1)
+# turns the 2 into a 1 when SELECT is held as it returns (pad copy 0x8004FBF0, refreshed by the system every frame;
+# competition, mode 0): on the 1st try's results, START with SELECT held, the stage ends (the 2nd try stays "not
+# played") and the Boarder Cross loads. (SELECT alone does not leave that screen: its START test is not found.)
+SK2, SK2_END = 0x80071BD4, 0x80071D38
+SK2_SITE, RESULTS = 0x80062AF0, 0x8005BFB8
+SK2_SITE2 = 0x800629E4                      # its other call (the stage loop's first state)
+
+
+def try2_code():
+    data = SK2_END - 8                    # ra
+    H = lambda a: (a + 0x8000) >> 16; L = lambda a: a - (H(a) << 16)
+    S = ['sk2:', f'lui t9, {H(data)}', f'sw ra, {L(data)}(t9)', f'jal {RESULTS:#x}', 'nop',
+         f'lui t9, {H(data)}', f'lw ra, {L(data)}(t9)', 'addiu t0, zero, 2', 'bne v0, t0, s29',
+         'lui t1, 0x8005', 'lw t2, 0x7420(t1)', 'lhu t4, -0x410(t1)', 'bnez t2, s29', 'andi t4, t4, 0x100',
+         'beqz t4, s29', 'nop', 'addiu v0, zero, 1',
+         's29:', 'jr ra', 'nop']
+    c, l = asm(S, SK2)
+    assert c[-1][0] < data
+    return c, l
+
+
+def try2_ops(sbc1):
+    import struct
+    c, l = try2_code()
+    w = lambda a: struct.unpack_from('<I', sbc1, a - 0x8005AEA8)[0]
+    assert w(SK2_SITE) == JL(RESULTS) and w(SK2_SITE2) == JL(RESULTS)
+    return [['w', '/SBC1.BIN', a - 0x8005AEA8, w(a), x] for a, x in c + [(SK2_SITE, JL(l['sk2'])), (SK2_SITE2, JL(l['sk2']))]]

@@ -56,3 +56,15 @@ retirée des caves de crew qui ne l'utilisait pas) appelle ClearOTag puis lie la
 par-dessus les images), avec la routine de texte du jeu (`func_80012CA0`, structure de police de l'écran en sp +
 0x2228, palette 0x733E), dans un tampon de primitives privé (0x801F6000, deux moitiés). Vérifié : visible au-dessus
 de l'image de la piste, rien au démarrage, SELECT passe toujours au Boarder Cross.
+
+## Sauter le 2e essai (v69)
+
+La boucle de l'épreuve de SBC1 (`func_80062804`) joue chaque essai avec `func_8005BFB8` (le saut puis ses résultats ;
+appelée en 0x800629E4 et 0x80062AF0), qui rend 2 après le 1er essai (on enchaîne le 2e) et 1 après le 2e (épreuve
+finie) — relevé dans l'émulateur par un journal posé sur ces appels. `sk2` (fonction morte `func_80071BD4` de SBC1)
+change ce 2 en 1 si SELECT est tenu à ce moment (copie de manette 0x8004FBF0, rafraîchie par le système à chaque
+image ; Compétition, mode 0) : sur les résultats du 1er essai, START avec SELECT tenu (≈ une demi-seconde) termine
+l'épreuve, le 2e essai reste « non joué » (-1) et le Boarder Cross se charge. SELECT seul ne quitte pas cet écran
+(son test de START n'a pas été trouvé : les tests 0x800 de `func_8005BFB8` changés en 0x900 n'y font rien).
+Vérifié : SELECT + START → mode 1, 2e essai à -1 ; START seul → 2e essai joué ; SELECT sur « 1st STAGE » → toujours
+le Boarder Cross directement.
