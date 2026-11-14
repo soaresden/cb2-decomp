@@ -182,7 +182,12 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
 - Vérifié dans l'émulateur (2 manettes) : joueur 1 Jicchi, joueur 2 Nick (écran BOARDER « 2P », portraits, modèles
   3D du menu, hub « 1P JICCHI / 2P NICK »), course à deux avec les bons modèles et textures, et les paramètres de course
   de chacun (pointeur +0x54 des coureurs) ; Free Style à un joueur inchangé.
-- Limites : animations et nom en course sont ceux du rider de base ; la voix du joueur 2 n'est pas transposée.
+- Limites : animations et nom en course sont ceux du rider de base.
+- Versus, vérifié dans le code (v28) : la seule « voix » d'une course est le grognement de collision du rider (canal
+  0x100000 à 0x5CE, échantillons 0xD / 0xE de la banque de voix : FREE `func_80074768`, SBC2 `func_800746F4`) ; dans
+  VS, un seul appel (`func_80073BF0`, collision entre les deux riders, un seul échantillon, sans joueur) : pas de voix
+  propre au joueur 2 à transposer (`vp` applique celle de l'alias du joueur 1). Le relais `func_8007E62C` (VS) /
+  `func_8007F134` (FREE) n'est appelé par personne. L'écran RESULTS du VS n'a ni noms ni têtes (« 1P / 2P » et scores).
 - Vérifié : émulateur (verrouillé / 100 % / `unlock` sans progression), Free Style, Big Air, Halfpipe, Board Park ; crew seul et avec tous les mods) ; JS = Python ;
   patcheur Batocera = build Python.
 
