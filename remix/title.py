@@ -46,3 +46,34 @@ def draw(d):
                 pix[Y0 + y, X0 + x] = ok[((P - a[y, x, :3].astype(int)) ** 2).sum(1).argmin()]
     d[HDR:HDR + W * H] = pix.tobytes()
     return bytes(d)
+
+
+# ---- signature (mod `sign`, v83): "Mod by soaresden - 11-2026" under the copyright line, in the copyright's style
+# (Liberation Sans, light grey, on the black of the picture), each pixel blended on black then mapped to the nearest
+# colour of the image's palette. Computed at build time, as the word.
+SIGN_FONT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fonts', 'LiberationSans-Regular.ttf')
+SIGN_TEXT, SIGN_SIZE, SIGN_Y, SIGN_RGB = 'Mod by soaresden - 11-2026', 10, 229, (200, 200, 200)
+
+
+def sign_mask():
+    f = ImageFont.truetype(SIGN_FONT, SIGN_SIZE)
+    m = Image.new('L', (W, 24), 0); ImageDraw.Draw(m).text((0, 0), SIGN_TEXT, font=f, fill=255)
+    m = m.crop(m.getbbox()); return np.array(m)
+
+
+def sign(d):
+    """d: bytes of CB2T1E/CB2T2E.FBD (with or without the word) -> new bytes"""
+    d = bytearray(d)
+    clut = np.frombuffer(bytes(d[20:HDR]), '<u2')
+    pal = np.stack([(clut & 31) << 3, ((clut >> 5) & 31) << 3, ((clut >> 10) & 31) << 3], -1).astype(int)
+    ok = np.array([i for i in range(1, 256) if clut[i] != 0]); P = pal[ok]
+    pix = np.frombuffer(bytes(d[HDR:HDR + W * H]), np.uint8).reshape(H, W).copy()
+    m = sign_mask(); h, w = m.shape; x0 = (W - w) // 2
+    for y in range(h):
+        for x in range(w):
+            a = int(m[y, x])
+            if a < 40: continue
+            c = np.array(SIGN_RGB) * a // 255
+            pix[SIGN_Y + y, x0 + x] = ok[((P - c) ** 2).sum(1).argmin()]
+    d[HDR:HDR + W * H] = pix.tobytes()
+    return bytes(d)

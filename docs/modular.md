@@ -775,3 +775,11 @@ champs (0x4, 0x8, 0xA, 0xC, 0xE) ne changent pas le saut. `jmx` (dans le code mo
 activant WIDESCREEN 16:9 sur l'écran REMIX, trois lignes sous la liste (conf = 2, le même emplacement que
 l'avertissement d'UNLOCK EVERYTHING) : SET YOUR EMULATOR TO 16:9 / FOR THIS GAME. ON A REAL TV, / SET THE TV TO 16:9
 (WIDE). Vérifié : onglet AIR, message, ligne de Yaggi à 8192 (4096 réglage coupé), vue arrière en Free Style.
+
+v83 : **signature sur l'écran titre** (nouveau mod `sign`, coché par défaut, bit 18 du code de configuration) :
+« Mod by soaresden - 11-2026 » sous le copyright (y 229, centré, Liberation Sans 10 px gris clair, chaque pixel mélangé
+au noir puis ramené à la couleur la plus proche de la palette de l'image ; `title.sign`). Comme le mot REMIX, il est
+calculé au moment de construire le paquet, sans aucun pixel du jeu. Deux jeux d'opérations (`remix/titlesign.py`) :
+`sign` ('bs' sur CB2T1E / CB2T2E à leur place, après ceux de BRAND) et `sign_r` (les secteurs entiers des copies
+déplacées par `riders`, qui portent déjà le mot : copies du disque du joueur + les nouveaux pixels) ; apply() (Python et
+JS) prend `sign_r` à la place de `sign` quand `riders` est coché. Vérifié dans l'émulateur avec et sans `riders`.

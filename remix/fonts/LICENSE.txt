@@ -5,3 +5,7 @@ GRAY / SNOWMAN dessinées dans le jeu) qui utilise la police n'est pas, de ce fa
 NotoSans-BlackItalic.ttf : Noto Sans (https://notofonts.github.io/), © The Noto Project Authors.
 Licence SIL Open Font License 1.1 (https://openfontlicense.org) : libre d'utilisation, de modification et de
 redistribution, y compris dans des documents ; ici le mot « REMIX » de l'écran titre.
+
+LiberationSans-Regular.ttf : Liberation Fonts (https://github.com/liberationfonts), © Red Hat, Inc.
+Licence SIL Open Font License 1.1 (https://openfontlicense.org) ; ici la signature « Mod by soaresden » de l'écran
+titre (mod sign).

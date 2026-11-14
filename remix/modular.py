@@ -73,6 +73,9 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('news', 'Annonces de déblocage', 'Unlock announcements',
      'De retour au menu après une course, un bandeau qui brille annonce ce que tu viens de gagner : Boss, Gray, Snowman, planche SPECIAL, Mirror, Hard, nouvelles pistes, trophée, et les 100 % (CONGRATULATIONS, avec Jicchi, Nick et Kelly si leur mod est coché).',
      'Back in the menu after a race, a shining banner tells what you just won: Boss, Gray, Snowman, SPECIAL board, Mirror, Hard, new courses, trophy, and the 100 % (CONGRATULATIONS, with Jicchi, Nick and Kelly if their mod is on).'),
+    ('sign', 'Signature sur l’écran titre', 'Signature on the title screen',
+     'Sur l’écran titre, sous le copyright : « Mod by soaresden - 11-2026 », discret, dans le style du copyright. Décoche pour un écran titre sans signature.',
+     'On the title screen, under the copyright line: “Mod by soaresden - 11-2026”, small, in the copyright’s style. Untick for a title screen without it.'),
 ]
 INPUT = 'input'   # shared pad hook (needed by 'max' and 'air')
 BRAND = 'brand'   # "REMIX" on the title screen: with any mod (already inside the moved title files when 'riders' is on)
@@ -300,6 +303,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     if 'max' in feats or 'air' in feats: feats.append(INPUT)
     if INPUT in feats and 'air' not in feats: feats.append('input_noair')
     if feats and 'riders' not in feats and pkg['ops'].get(BRAND): feats.append(BRAND)
+    if 'sign' in feats and 'riders' in feats and 'sign_r' in pkg['ops']: feats[feats.index('sign')] = 'sign_r'   # v83: the moved title files
     files = {}; recs = {}; secs = {}
     origs = {}
     def orig(p):
@@ -308,7 +312,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     def buf(p):
         if p not in files: files[p] = bytearray(orig(p))
         return files[p]
-    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'crew', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'rear', 'news', 'hplive', 'radar', 'options', INPUT, 'input_noair', BRAND) if f in feats]
+    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'crew', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'rear', 'news', 'hplive', 'radar', 'options', INPUT, 'input_noair', BRAND, 'sign', 'sign_r') if f in feats]
     for feat in order:
         for op in pkg['ops'][feat]:
             t = op[0]
@@ -769,7 +773,7 @@ def load(path): return json.loads(gzip.decompress(open(path, 'rb').read()))
 B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 # bit order of the configuration code: fixed (never reorder; new mods go at the end), the same as the site's seed.js
 IDS = ['unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'crew', 'rear',
-       'news', 'hplive', 'options', 'radar']
+       'news', 'hplive', 'options', 'radar', 'sign']
 assert sorted(IDS) == sorted(f[0] for f in FEATURES)
 RETIRED = {'lift'}                       # kept in IDS so that old codes still decode; no longer offered
 SHOWN = [f for f in IDS if f not in RETIRED]
