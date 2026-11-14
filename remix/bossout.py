@@ -26,7 +26,9 @@ DRAW = 0x80061DE8                         # lui v0, 0x8005 / lh v0, 0x742A(v0) (
 UPDN = 0x80062198                         # lh v0, 0(s5) (up / down)
 LR = [0x80061FFC, 0x800620CC]             # lh v0, 0(s5) (right, left)
 LHS5 = 0x86A20000
-CG_MODES = (1 << 2) | (1 << 5) | (1 << 7) | (1 << 8)   # modes with Cindy's ending outfit (one player)
+# Cindy's ending outfit (v58): off since v59 (the race model looked bad: thin, dark streaks on the legs); the code stays
+CG_ON = False
+CG_MODES = (1 << 2) | (1 << 5) | (1 << 7) | (1 << 8) if CG_ON else 0   # modes with it (one player)
 PREV = 0x800640AC                         # func_800640AC: addiu sp, sp, -0x1830 / sw s4, 0x1828(sp)
 TEX_SITES = {0x8001D55C: (4, 's4', 'ld24'), 0x8001D644: (0xE, 's4', 'ld24'), 0x8001D938: (4, 's2', 'ld20')}   # (jacket offset, menu struct)
 TOP = {'bossk', 'ensd', 'ensu', 'ensr', 'ensp', 'btc_ld24', 'btc_ld20'} | {f'bt{a:x}' for a in TEX_SITES}
@@ -44,7 +46,7 @@ def routines(mm, magic, menu_save, shown):
     # for it and shows the usual one meanwhile), so it is there when the outfit is chosen
     S = ['bossk:', 'move t7, ra', 'jal aval', 'nop', 'move ra, t7',
          'bnez v0, bk9', 'addiu t0, zero, 4', 'addiu t3, zero, 1', 'beq s0, t0, bk1', 'addiu t4, zero, 2',
-         'bne s0, t4, bk9', 'move v0, zero', 'addiu t0, zero, 5', 'addiu t3, zero, 6',
+         'bne s0, t4, bk9' if CG_ON else 'b bk9', 'move v0, zero', 'addiu t0, zero, 5', 'addiu t3, zero, 6',
          'bk1:', f'lui at, {H(mm)}', f'lw t1, {L(mm)}(at)', f'lui t2, {H(magic)}', f'addiu t2, t2, {L(magic)}', 'addu t2, t2, t0',
          'bne t1, t2, bk9', 'move v0, t0',
          f'lui at, {H(BOUT)}', f'lw t1, {L(BOUT)}(at)', 'nop', 'beq t1, t3, bk9', 'nop', 'move v0, zero',

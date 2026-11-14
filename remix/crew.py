@@ -483,7 +483,8 @@ def patches(fs_read, placed):
     d2 += b''.join(struct.pack('<2h', MENU_CLUT_Y[k], MENU_CLUT_H[k]) for k in range(NMENU)) + bytes(8)
     assert len(d2) == RECT + 8 - DATA2 and DATA2 + len(d2) <= DATA2_END and (ENT2 - G_FILES) % 8 == 0
     P += [('/SCES_009.92', DATA2 + i, struct.unpack_from('<I', d2, i)[0]) for i in range(0, len(d2), 4)]
-    dg = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[14:16]); assert ENTG + len(dg) <= ENTG_END and (ENTG - G_FILES) % 8 == 0
+    dg = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[14:16]) if bossout.CG_ON else b''
+    assert ENTG + len(dg) <= ENTG_END and (ENTG - G_FILES) % 8 == 0
     P += [('/SCES_009.92', ENTG + i, struct.unpack_from('<I', dg, i)[0]) for i in range(0, len(dg), 4)]
     # hooks
     ms = fs_read('/MAIN_SEL.BIN'); ex = fs_read('/SCES_009.92')
@@ -634,6 +635,7 @@ _CGP = None
 def cg_files(rd):
     """room for the race model and texture of Cindy's ending outfit (built by the patcher: sizes only)"""
     import modular
+    if not bossout.CG_ON: return []
     p = cg_params(rd)
     return [bytes(len(modular.cg_pmd(rd(cgrider.FS_CG), rd(cgrider.FS_CINDY_RACE), p))), bytes(17428)]
 

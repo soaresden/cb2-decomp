@@ -28,6 +28,7 @@ def asm(lines,org,syms=None):
             off,base=a[1].rstrip(')').split('(')
             op={'lw':0x23,'sw':0x2b,'lh':0x21,'lhu':0x25,'sh':0x29,'lb':0x20,'lbu':0x24,'sb':0x28}[m]
             w=I(op,base,a[0],imm(off))
+        elif m=='b': w=(4<<26)|br(a[0])
         elif m=='beq': w=(4<<26)|(r(a[0])<<21)|(r(a[1])<<16)|br(a[2])
         elif m=='bne': w=(5<<26)|(r(a[0])<<21)|(r(a[1])<<16)|br(a[2])
         elif m=='beqz': w=(4<<26)|(r(a[0])<<21)|br(a[1])

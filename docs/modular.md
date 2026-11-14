@@ -569,3 +569,8 @@ rouges tombent juste), plus fine, à talons, queue de cheval, sans planche (15 p
   - Le tout en entiers : disc.js fait les mêmes octets (vérifié).
 - Vérifié dans l'émulateur : WEAR (7 tenues en Free Style, 6 en Compétition), Free Style et Halfpipe avec elle, Jicchi
   et Boss en noir inchangés. Non testé : VS, Big Air, Board Park.
+
+v59 : **tenue inédite de Cindy retirée** (`bossout.CG_ON = False`). En course, le modèle converti était trop maigre et
+couvert de traînées sombres sur les jambes : pas présentable. La 7e tenue n'est plus proposée (WEAR : 6 tenues), le
+menu ne précharge plus son modèle, ses fichiers de course ne sont plus construits. Le code (cgrider.py, cg_* de
+modular.py et disc.js, ldg, modèle de menu 5) reste, inactif, pour une reprise.
