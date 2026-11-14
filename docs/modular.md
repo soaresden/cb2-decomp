@@ -428,3 +428,5 @@ Noto Sans Black Italic, dégradé doré, contour, penché), en petit (taille 16 
 SPRT avec son DR_TPAGE (`dlogo`) ; atténué quand le curseur est ailleurs, il pulse quand le curseur est dessus.
 
 v46 : dans l'écran REMIX, « TRIANGLE BACK » devient un triangle dessiné (deux POLY_F3 : contour vert façon bouton PlayStation, `dtri`, la police du menu n'a pas ce signe) suivi de BACK, et REAR VIEW (CIRCLE) devient REAR VIEW (O).
+
+v47 : l'aide de l'écran REMIX montre des flèches gauche / droite dessinées (deux POLY_F3 de plus dans `dtri`) à la place de « L R » : les onglets se changent avec la croix.

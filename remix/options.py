@@ -108,8 +108,9 @@ def logo():
     px = np.zeros((h, W), np.uint8); px[:, :w] = idx
     pix = bytes((px[:, 0::2] | (px[:, 1::2] << 4)).astype(np.uint8).flatten())
     return W, h, pix, cl
-HELP = 'X ON/OFF   L R TAB     BACK'          # a drawn triangle in the gap (dtri; the menu font has none)
-TRI_X, TRI_Y = -132 + 21 * 8 + 2, 102          # its left edge and top (8 pixels a letter)
+HELP = 'X ON/OFF       TAB     BACK'          # drawn signs in the gaps (dtri; the menu font has none): Left / Right arrows, Triangle
+TRI_X, TRI_Y = -132 + 21 * 8 + 2, 102          # the Triangle's left edge and top (8 pixels a letter)
+ARROW_X = -132 + 11 * 8 + 1                    # the Left arrow (Right: + 12)
 
 
 def data():
@@ -122,8 +123,11 @@ def data():
     put('lrect', struct.pack('<4h', LOGO_VRAM[0], LOGO_VRAM[1], W // 4, Hh)); put('crect', struct.pack('<4h', LOGO_CLUT[0], LOGO_CLUT[1], 16, 1))
     put('lclut', struct.pack('<16H', *cl)); put('lpix', pix); put('blink', bytes(4))
     X, Y = TRI_X, TRI_Y; xy = lambda x, y: (y & 0xffff) << 16 | (x & 0xffff)
-    put('tri', struct.pack('<8I', 0x20000000, xy(X + 5, Y + 4), xy(X + 2, Y + 9), xy(X + 8, Y + 9),
-                                  0x2050D080, xy(X + 5, Y - 1), xy(X - 1, Y + 11), xy(X + 11, Y + 11)))
+    A, G = ARROW_X, 0x20E0E0E0                    # as light as the help's letters
+    put('tri', struct.pack('<16I', 0x20000000, xy(X + 5, Y + 4), xy(X + 2, Y + 9), xy(X + 8, Y + 9),
+                                   0x2050D080, xy(X + 5, Y - 1), xy(X - 1, Y + 11), xy(X + 11, Y + 11),
+                                   G, xy(A, Y + 5), xy(A + 8, Y), xy(A + 8, Y + 10),
+                                   G, xy(A + 20, Y + 5), xy(A + 12, Y), xy(A + 12, Y + 10)))
     put('on', b'ON\0'); put('off', b'OFF\0'); put('help', HELP.encode() + b'\0')
     for i, (name, _) in enumerate(TABS): put('t%d' % i, name.encode() + b'\0')
     put('cnts', bytes(len(l) for _, l in TABS))
@@ -226,7 +230,7 @@ def routines(D):
          ['dh1:', 'addiu t4, zero, -132', 'addiu t5, zero, 102', *la('t6', D['help']), *la('t7', D['rgbh']), 'jal drw', 'nop',
           'jal dtri', 'nop', 'j box', 'nop']
     # dtri: the Triangle button (outline in the PlayStation's green: a black POLY_F3 inside a green one; table tri)
-    S += ['dtri:', 'move t9, ra', *la('t8', D['tri']), 'addiu t7, t8, 32',
+    S += ['dtri:', 'move t9, ra', *la('t8', D['tri']), 'addiu t7, t8, 64',
           'dtr1:', 'lui t0, 0x400', 'sw t0, 0(s6)', 'lw t0, 0(t8)', 'lw t1, 4(t8)', 'lw t2, 8(t8)', 'lw t3, 12(t8)',
           'sw t0, 4(s6)', 'sw t1, 8(s6)', 'sw t2, 12(s6)', 'sw t3, 16(s6)', 'move a0, s6', 'jal dlnk', 'addiu s6, s6, 20',
           'addiu t8, t8, 16', 'bne t8, t7, dtr1', 'nop', 'jr t9', 'nop']
