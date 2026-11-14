@@ -40,10 +40,10 @@ DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data (code since v37)
 import toggles
 SCR_DATA = toggles.SCREEN[0]           # the screen's data: start of MODE_SEL's 84th sector
 X0, X1, Y0, DY = -150, 70, -64, 13
-LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'UNLOCK NEWS', 'AIR CONTROL', 'BOARDER CROSS RAMMING', 'WIDESCREEN 16:9',
+LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', 'AIR CONTROL', 'BOARDER CROSS RAMMING', 'WIDESCREEN 16:9',
          'RACE RADAR LINE', 'RACE RANKING',
          # the other mods (remix/toggles.py: bits 8..16, in the order of toggles.BITS)
-         'SPECIAL BOARDS ALWAYS', 'HARD + MIRROR', 'BOSS GRAY SNOWMAN IN COMP', 'HIDDEN OUTFITS FOR GIRLS', 'CAN MAX RIDERS AND BOARD',
+         'SPECIAL BOARDS ALWAYS', 'NEW HARD+MIRROR CUP', 'BOSS GRAY SNOWMAN IN COMP', 'HIDDEN OUTFITS FOR GIRLS', 'CAN MAX RIDERS AND BOARD',
          'BIG AIR MASTER KEYS SHOWN',
          'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY PLAYABLE',
          'FALLS AS A NUMBER',                   # bit 17 (radar.py: one ball and x13 instead of the row of balls)
