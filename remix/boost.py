@@ -412,6 +412,7 @@ if __name__ == '__main__':
 # (`exs`, on the "not SAVE" path) gives the menu's result -1, the GAME OVER's EXIT: back to the title.
 EX_CAVE, EX_CAVE_END = 0x80070D08, 0x80070E9C             # dead function of SBC2
 EX_DRAW_SITE, EX_BOUND, EX_SEL_SITE, EX_BACK = 0x80085D3C, 0x80083310, 0x80083390, 0x80083548
+EX_SAVE_TEST, EX_SAVE, EX_OTHER = 0x80083354, 0x80083360, 0x80083380   # "addiu v0, 2 / bne v1, v0": the SAVE test
 EX_SPR = (0x9088, 40, 16, 0x747B, 22)                      # EXIT (GAME OVER menu)
 EX_X, EX_Y = 144, 0x60 + 0x18 * 3
 SPRITE_FN, TPAGE_FN = 0x800129C0, 0x80012BDC
@@ -422,19 +423,26 @@ def exit_ops(disc):
     assert w2(EX_DRAW_SITE) == 0x02C02021 and w2(EX_BOUND) == 0x24420001 and w2(EX_SEL_SITE) == 0x24020001
     assert w2(EX_SEL_SITE + 4) == J(2, EX_BACK) and w2(EX_SEL_SITE + 8) == 0xAE62003C
     spr = EX_CAVE_END - 12
-    S = ['exd:', 'addiu sp, sp, -0x28', 'sw ra, 0x20(sp)', 'addiu at, zero, 3', 'bne s5, at, ex9', 'nop',
-         'lw t0, 0x38(fp)', 'addiu t1, zero, 0x60', 'bne t0, at, ex1', 'nop', 'lbu t1, 0xc0(sp)',      # caller's 0x98
+    # v77: EXIT is line s5 (2 + the SAVE flag: after a save the game clears the flag and SAVE goes away)
+    S = ['exd:', 'addiu sp, sp, -0x28', 'sw ra, 0x20(sp)', 'addiu at, zero, 2', 'slt at, s5, at', 'bnez at, ex9', 'nop',
+         'lw t0, 0x38(fp)', 'addiu t1, zero, 0x60', 'bne t0, s5, ex1', 'nop', 'lbu t1, 0xc0(sp)',      # caller's 0x98
          'ex1:', 'sw t1, 0x14(sp)', *la('t2', spr), 'sw t2, 0x10(sp)', 'move a0, s6', 'move a1, s2',
-         f'addiu a2, zero, {EX_X}', f'jal {SPRITE_FN:#x}', f'addiu a3, zero, {EX_Y}',
+         'sll a3, s5, 1', 'addu a3, a3, s5', 'sll a3, a3, 3', 'addiu a3, a3, 0x60',
+         f'jal {SPRITE_FN:#x}', f'addiu a2, zero, {EX_X}',
          'move a0, s6', 'move a1, v0', *la('t2', spr), f'jal {TPAGE_FN:#x}', 'lhu a2, 8(t2)', 'move s2, v0',
          'ex9:', 'lw ra, 0x20(sp)', 'addiu sp, sp, 0x28', 'move a0, s6', 'jr ra', 'move a1, s2',
          # exs: X on the menu, not SAVE: v1 = cursor (1 = GEAR SELECT, 3 = EXIT)
-         'exs:', 'addiu v0, zero, 1', 'addiu at, zero, 3', 'bne v1, at, es1', 'nop', 'addiu v0, zero, -1',
-         'es1:', f'j {EX_BACK:#x}', 'sw v0, 0x3c(s3)']
+         'exs:', 'lw at, 0x34(s3)', 'addiu v0, zero, 1', 'addiu at, at, 2', 'bne v1, at, es1', 'nop', 'addiu v0, zero, -1',
+         'es1:', f'j {EX_BACK:#x}', 'sw v0, 0x3c(s3)',
+         # exv (X, in place of "cursor == 2: SAVE"): SAVE only while the flag is up, else the other lines
+         'exv:', 'lw at, 0x34(s3)', 'addiu t9, zero, 0xa', 'beqz at, ev1', 'addiu v0, zero, 2', 'bne v1, v0, ev1', 'nop',
+         f'j {EX_SAVE:#x}', 'nop', 'ev1:', f'j {EX_OTHER:#x}', 'nop']
     c, l = asm(S, EX_CAVE); assert c[-1][0] < spr
     blob = struct.pack('<HHHHH', *EX_SPR) + bytes(2)
     c += [(spr + i, struct.unpack_from('<I', blob, i)[0]) for i in range(0, 12, 4)]
-    c += [(EX_DRAW_SITE, J(3, l['exd'])), (EX_BOUND, 0x24420002), (EX_SEL_SITE, J(2, l['exs'])), (EX_SEL_SITE + 4, 0)]
+    assert w2(EX_SAVE_TEST) == 0x24020002 and w2(EX_SAVE_TEST + 4) == 0x14620009 and w2(EX_SAVE) == 0x2419000B and w2(EX_OTHER) == 0x2418000D
+    c += [(EX_DRAW_SITE, J(3, l['exd'])), (EX_BOUND, 0x24420002), (EX_SEL_SITE, J(2, l['exs'])), (EX_SEL_SITE + 4, 0),
+          (EX_SAVE_TEST, J(2, l['exv'])), (EX_SAVE_TEST + 4, 0)]
     return [['w', '/SBC2.BIN', a - OVL, w2(a), x] for a, x in c]
 
 

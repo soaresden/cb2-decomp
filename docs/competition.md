@@ -79,3 +79,8 @@ menu du GAME OVER (`func_80085804`, RETRY / EXIT) rend -1 pour EXIT. Le Remix (b
 le sprite EXIT du GAME OVER (`exd`, sur la sortie de la boucle des lignes, 0x80085D3C), laisse le curseur descendre
 d'une ligne de plus (0x80083310 : drapeau + 2) et, X sur EXIT (`exs`, sur le chemin « pas SAVE » 0x80083390), rend -1 :
 retour au titre, comme le EXIT du GAME OVER. Vérifié dans l'émulateur (manche gagnée : CPU à 60 s de handicap).
+
+v77 : après un SAVE, le jeu remet le drapeau SAVE (+ 0x34) à 0 et la ligne SAVE disparaît : EXIT devient la 3e ligne.
+`exd` dessine EXIT en ligne 2 + drapeau, `exs` reconnaît EXIT à « curseur == drapeau + 2 », et le test du X sur SAVE
+(0x80083354 « curseur == 2 ») passe par `exv`, qui ne le prend que si le drapeau est levé. Vérifié : manche gagnée →
+SAVE (« Save successful ») → EXIT → titre → Compétition LOAD → la coupe reprend à la manche 2 (Sunset Downhill).
