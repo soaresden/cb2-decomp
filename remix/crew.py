@@ -90,6 +90,7 @@ CAVES = [(0x80013940, 0x80013A34), (0x800169B4, 0x80016AB0), (0x800238E0, 0x8002
          (0x8002DE10, 0x8002DE88), (0x8002E96C, 0x8002EA10), (0x80027E9C, 0x80027F04), (0x8002C49C, 0x8002C504),
          (0x800290C8, 0x80029128), (0x8003F028, 0x8003F088), (0x800439C4, 0x80043A24),
          (0x80017BF8, 0x80017C9C), (0x8002043C, 0x8002050C), (0x80021A88, 0x80021B28), (0x800312C4, 0x80031374), (0x80028078, 0x800280B8),
+         (0x8001829C, 0x80018320), (0x80031180, 0x8003120C),   # v54: given by remix/options.py (unused there)
          # v26 (2 players): small unreferenced functions, checked against every jump, branch and pointer of every file
          # (0x80031180, 0x8003BD98, 0x80040AA4, 0x8001829C, 0x8003EAC4, 0x800123C8: mod options)
          (0x80013BA0, 0x80013BD0), (0x80020288, 0x800202C4), (0x80020394, 0x800203BC), (0x80028D78, 0x80028DB4), (0x80028E18, 0x80028E40),
@@ -99,7 +100,7 @@ CAVES = [(0x80013940, 0x80013A34), (0x800169B4, 0x80016AB0), (0x800238E0, 0x8002
 DATA2 = 0x8003EE98; DATA2_END = 0x8003EF00             # menu models: file entries, rectangles, state
 ENT2, IDX2, RCOL, RCLUT, PENDING, DUMMY = (DATA2 + o for o in (0, 0x18, 0x20, 0x38, 0x50, 0x54))
 MENU_SHOWN = 0x4D575253                                 # 'SRWM' + k in MENU_SAVE: alias k's texture is in VRAM
-MODELS = 0x8007C4E8; FN_MDL = 0x80064A08; MDL_SITES = [0x800602E8, 0x80061580]
+MODELS = 0x8007C4E8; FN_MDL = 0x80064A08; MUSIC = 0x800171B4; MDL_SITES = [0x800602E8, 0x80061580]
 UPLOAD = 0x8005DB60; WEAR_UPLOADS = [0x80064100, 0x80064124]
 LOADIMAGE = 0x80029B7C; STOREIMAGE = 0x80029BE0; DRAWSYNC = 0x800298B8; QPOLL = 0x80013CE0
 CDMODE = 0x80013C94       # CdControl(CdlSetmode, 0xA0): data reading, as the game's own loads do
@@ -295,9 +296,12 @@ def routines(race_regs):
     # mpoll(): every frame of the BOARDER screen while a model is being loaded (keeps a0-a3)
     S += ['mpoll:', f'lui at, {H(PENDING)}', f'lw t0, {L(PENDING)}(at)', 'nop', 'bnez t0, mp1', 'nop', 'jr ra', 'nop',
           'mp1:', 'addiu sp, sp, -0x28', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'sw a0, 0x18(sp)', 'sw a1, 0x1c(sp)', 'sw a2, 0x20(sp)', 'sw a3, 0x24(sp)', 'move s0, t0',
-          f'jal {QPOLL}', 'nop', f'lui at, {H(MM)}', f'lw t0, {L(MM)}(at)', f'lui t1, {H(MENU_MAGIC)}', f'addiu t1, t1, {L(MENU_MAGIC)}', 'addu t1, t1, s0', 'bne t0, t1, mp9', 'nop',
-          f'lui at, {H(PENDING)}', f'sw zero, {L(PENDING)}(at)', f'lui at, {H(ACUR)}', f'lw t0, {L(ACUR)}(at)', 'nop', 'bne t0, s0, mp9', 'nop',
-          f'lui at, {H(BASEV)}', 'addu at, at, s0', 'jal mdl', f'lbu a0, {L(BASEV)}(at)',
+          f'jal {QPOLL}', 'nop', f'lui at, {H(MM)}', f'lw t0, {L(MM)}(at)', f'lui t1, {H(MENU_MAGIC)}', f'addiu t1, t1, {L(MENU_MAGIC)}', 'addu t1, t1, s0', 'bne t0, t1, mp9',
+          f'lui at, {H(PENDING)}', f'sw zero, {L(PENDING)}(at)',
+          # the read stopped the menu's CD music (data mode): it starts again, as MAIN_SEL's entry starts it (v54)
+          'addiu a0, zero, 3', f'jal {MUSIC}', 'addiu a1, zero, 2',
+          f'lui at, {H(ACUR)}', f'lw t0, {L(ACUR)}(at)', 'nop', 'bne t0, s0, mp9', f'lui at, {H(BASEV)}',
+          'addu at, at, s0', 'jal mdl', f'lbu a0, {L(BASEV)}(at)',
           'mp9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw a0, 0x18(sp)', 'lw a1, 0x1c(sp)', 'lw a2, 0x20(sp)', 'lw a3, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x28']
     # strip(a0 = primitive buffer, a1 = rider under the cursor, a2 = the name tag's primitive) -> v0 = buffer after the
     # 10 heads (POLY_FT4 written here, linked right after the name tag: drawn over the screen like it)
@@ -349,10 +353,19 @@ def place(S):
     blocks.append(cur)
     def size(b): return 4 * sum(1 for l in b if not l.endswith(':'))
     caves = [[lo, lo, hi, []] for lo, hi in CAVES]
-    for b in sorted(blocks, key=lambda b: -size(b)):          # best fit, largest first
-        fit = [c for c in caves if c[1] + size(b) <= c[2]]
-        if not fit: raise ValueError('plus de place pour ' + b[0])
-        c = min(fit, key=lambda c: c[2] - c[1]); c[3].append(b); c[1] += size(b)
+    order = sorted(blocks, key=lambda b: -size(b))            # best fit, largest first; backtracking when stuck (v54)
+    def fit_all(i):
+        if i == len(order): return True
+        b = order[i]; tried = set()
+        for c in sorted((c for c in caves if c[1] + size(b) <= c[2]), key=lambda c: c[2] - c[1]):
+            room = c[2] - c[1]
+            if room in tried: continue
+            tried.add(room); c[3].append(b); c[1] += size(b)
+            if fit_all(i + 1): return True
+            c[3].pop(); c[1] -= size(b)
+        return False
+    import sys; sys.setrecursionlimit(10000)
+    if not fit_all(0): raise ValueError('plus de place pour les routines de crew')
     cave_of = {}; bad = []
     for lo, _, _, bl in caves:
         for l in (l for b in bl for l in b):

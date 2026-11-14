@@ -17,7 +17,9 @@ CAVE, CAVE_END = 0x8007EDA4, 0x8007EDA4 + 0x66C
 NAME_SITE, NAME_FN, BOX = 0x80075908, 0x8006A820, 0x800756DC
 LEVEL = 0x8009CF10
 FONT_PRINT = 0x8008FFF4
-GX, GY, GDY = -152, -60, 12
+GX, GY, GDY = 70, -60, 12           # GRAY IN n (top right, under the grade's name)
+SPRITE, SPR_TAB, PRIMS = 0x800133B0, 0x80093A18, 0x80058E0C   # the end screen's grade names (10-byte entries)
+NX_, NY_, NSCALE = 112, -92, 0x100
 TL, TL_END = 0x800953B0, 0x800953B0 + 0x1E8
 
 
@@ -28,24 +30,26 @@ def J(op, t): return (op << 26) | ((t >> 2) & 0x3ffffff)
 
 def code():
     D = CAVE                     # data: FLAG, RA, STR1 (12), STR2 (12), STR3 (12)
-    FLAG, RA, S1, S2, S3 = D, D + 4, D + 8, D + 20, D + 32
-    data = struct.pack('<II', 0, 0) + b'GRADE 00/10\0' + b'GRAY IN 00\0\0' + b'GRAY OK!\0\0\0\0'
+    FLAG, RA, S1, S2, S3, RGB = D, D + 4, D + 8, D + 20, D + 32, D + 44
+    data = struct.pack('<II', 0, 0) + b'GRADE 00/10\0' + b'GRAY IN 00\0\0' + b'GRAY OK!\0\0\0\0' + bytes([0x80, 0x80, 0x80, 0])
     la = lambda r, a: [f'lui {r}, {H(a)}', f'addiu {r}, {r}, {L(a)}']
     pr = lambda s, y: ['addiu a0, s5, 4', 'lui a1, 0x800a', 'lw a1, -0x2084(a1)', *la('a2', s), f'addiu a3, zero, {GX}',
                        f'addiu t0, zero, {y}', 'sw t0, 0x10(sp)', f'jal {FONT_PRINT}', 'sw zero, 0x14(sp)']
     S = ['nxw:', f'lui t0, {H(D)}', f'sw ra, {L(RA)}(t0)', 'addiu t1, zero, 1', f'sw t1, {L(FLAG)}(t0)',
-         f'jal {BOX}', 'nop', f'lui t0, {H(D)}', f'sw zero, {L(FLAG)}(t0)', 'addiu sp, sp, -0x20',
-         f'lui t1, {H(LEVEL)}', f'lh t1, {L(LEVEL)}(t1)', 'nop', 'sw t1, 0x18(sp)', 'addiu t2, t1, -1', 'bgez t2, g1', 'nop', 'move t2, zero',
+         f'jal {BOX}', 'nop', f'lui t0, {H(D)}', f'sw zero, {L(FLAG)}(t0)', 'addiu sp, sp, -0x30',
+         f'lui t1, {H(LEVEL)}', f'lh t1, {L(LEVEL)}(t1)', 'nop', 'sw t1, 0x20(sp)', 'addiu t2, t1, -1', 'bgez t2, g1', 'nop', 'move t2, zero',
          'g1:', 'sra t2, t2, 1', 'slti at, t2, 11', 'bnez at, g2', 'nop', 'addiu t2, zero, 10',
-         'g2:', *la('t3', S1 + 6), 'addiu t4, zero, 10', 'divu t2, t4', 'mflo t5', 'mfhi t6', 'addiu t5, t5, 0x30', 'addiu t6, t6, 0x30',
-         'addiu t7, zero, 0x30', 'bne t5, t7, g3', 'nop', 'addiu t5, zero, 0x20', 'g3:', 'sb t5, 0(t3)', 'sb t6, 1(t3)',
-         *pr(S1, GY),
-         'lw t1, 0x18(sp)', 'addiu t7, zero, 21', 'subu t7, t7, t1', 'blez t7, g5', 'nop',
+         # the grade's name, as on the end screen: entry 10 - g of the sprite table, half size
+         'g2:', 'addiu t3, zero, 10', 'subu t3, t3, t2', 'sll t4, t3, 2', 'addu t4, t4, t3', 'sll t4, t4, 1', *la('a2', SPR_TAB), 'addu a2, a2, t4',
+         'addiu a0, s5, 4', f'lui a1, {H(PRIMS)}', f'lw a1, {L(PRIMS)}(a1)', f'addiu a3, zero, {NX_}', f'addiu t0, zero, {NY_}', 'sw t0, 0x10(sp)',
+         'sw zero, 0x14(sp)', f'addiu t0, zero, {NSCALE}', 'sw t0, 0x18(sp)', *la('t0', RGB), 'sw t0, 0x1c(sp)',
+         f'jal {SPRITE}', 'nop', f'lui at, {H(PRIMS)}', f'sw v0, {L(PRIMS)}(at)',
+         'lw t1, 0x20(sp)', 'addiu t7, zero, 21', 'subu t7, t7, t1', 'blez t7, g5', 'nop',
          *la('t3', S2 + 8), 'addiu t4, zero, 10', 'divu t7, t4', 'mflo t5', 'mfhi t6', 'addiu t5, t5, 0x30', 'addiu t6, t6, 0x30',
          'addiu t4, zero, 0x30', 'bne t5, t4, g4', 'nop', 'addiu t5, zero, 0x20', 'g4:', 'sb t5, 0(t3)', 'sb t6, 1(t3)',
-         *pr(S2, GY + GDY), 'j g6', 'nop',
-         'g5:', *pr(S3, GY + GDY),
-         'g6:', 'addiu sp, sp, 0x20', f'lui t0, {H(D)}', f'lw ra, {L(RA)}(t0)', 'nop', 'jr ra', 'nop',
+         *pr(S2, GY), 'j g6', 'nop',
+         'g5:', *pr(S3, GY),
+         'g6:', 'addiu sp, sp, 0x30', f'lui t0, {H(D)}', f'lw ra, {L(RA)}(t0)', 'nop', 'jr ra', 'nop',
          'nnm:', f'lui t0, {H(D)}', f'lw t0, {L(FLAG)}(t0)', 'nop', 'bnez t0, nn9', 'nop', f'j {NAME_FN}', 'nop', 'nn9:', 'jr ra', 'nop']
     c, l = asm(S, D + len(data))
     assert c[-1][0] < CAVE_END
@@ -61,7 +65,7 @@ def merge(disc, bam_ops):
     out = [op for op in bam_ops if not (op[0] == 'w' and op[1] == '/TM.BIN' and op[2] + OVL in keys)]
     # tl's second call of the trick box (the NEXT entry) -> nxw
     calls = sorted(op[2] + OVL for op in out if op[0] == 'w' and op[1] == '/TM.BIN' and TL <= op[2] + OVL < TL_END
-                   and op[4] in (J(3, BOX), J(3, l['nxw'])))
+                   and (op[4] == J(3, BOX) or (op[4] >> 26 == 3 and CAVE <= ((op[4] & 0x3ffffff) << 2 | 0x80000000) < CAVE_END)))
     assert len(calls) == 2, [hex(a) for a in calls]
     for op in out:
         if op[0] == 'w' and op[1] == '/TM.BIN' and op[2] + OVL == calls[1]: op[4] = J(3, l['nxw'])

@@ -487,3 +487,11 @@ appelle la boîte de figure par `nxw`, qui lève un drapeau ; l'appel de la lign
 passe par `nnm`, qui la saute pendant ce temps : la figure suivante ne montre que ses touches. Les deux lignes sont
 écrites avec la police du jeu (0x8008FFF4) dans l'emplacement de table d'ordre suivant celui de `tl` (qui décale tout ce
 qui est lié dans le sien). Code dans la fonction morte func_8007EDA4 de TM. Vérifié dans l'émulateur.
+
+v54 : **Big Air Master** : la note est dessinée comme sur l'écran de fin (le sprite du nom de la note, table
+D_80093A18 de 11 entrées de 10 octets, routine func_800133B0, taille normale) en haut à droite, avec « GRAY IN n » /
+« GRAY OK! » dessous ; NEXT garde son libellé et les touches. **Musique du menu** : charger le modèle de Jicchi, Nick ou
+Kelly passe le lecteur en mode données (func_80013C94), ce qui arrêtait la musique CD de l'écran BOARDER pour de bon
+(mesuré dans l'émulateur : volume 6500 → 0) ; `mpoll` la relance à la fin du chargement comme l'entrée de MAIN_SEL
+(func_800171B4(3, 2)) : le volume reste à ~6700. Pour la place : `crew` reçoit deux fonctions mortes de l'exe que le mod
+options gardait sans s'en servir (0x8001829C, 0x80031180), et `place` de crew essaie toutes les répartitions.
