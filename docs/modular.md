@@ -314,7 +314,8 @@ Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D
   du HUD : trois rangées (la place devant le joueur, la sienne, celle derrière ; 1er à 3e quand il mène, 6e à 8e quand
   il est dernier ; place = coureur + 0x58) en x 76, y -24, 18 pixels d'écart : la place (« 1ST »…, texte de SBC2
   `func_8008AFC8` avec la police D_8009BBC0, couleur par `func_8008B354` : or, argent, bronze, blanc, qui scintille avec
-  VSync(-1)), la tête (contour jaune pour le joueur) et le pourcentage de la piste fait (progression × 100 / 255), sur
+  VSync(-1)), la tête (contour jaune pour le joueur) et le pourcentage de la piste fait (progression × 100 / 255, sur deux
+  chiffres : « 03% »), sur
   un cadre sombre translucide (TILE 0x62 précédé d'une page en mode moitié-moitié). Le texte prend ses primitives à
   D_80058E0C, que la fonction de la barre garde dans s2 et réécrit à la fin : `rtext` les synchronise autour de
   l'appel (sans ça, les deux se recouvraient et le jeu se figeait). Mots libres du cadre de pile pendant `rad` : 0x24,

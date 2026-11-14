@@ -138,11 +138,11 @@ def code(aliasv, basev, modesv):
           'rr4:', 'move a1, s0', 'jal rhead', f'addiu a0, zero, {PX + 26}',
           'lbu t2, 3(s1)', 'nop', 'bne t2, s4, rr5', 'nop', f'addiu a0, zero, {PX + 26}', 'jal rbox', 'move a1, s0',
           'rr5:', 'jal rtp', 'nop',
-          # percentage of the course: progress * 100 / 255, written as "N%", "NN%" or "100%"
+          # percentage of the course: progress * 100 / 255, written on two digits ("03%"), or "100%"
           'lw a0, 0x60(sp)', f'jal {PROGRESS}', 'lh a1, 0(s1)', 'addiu t0, zero, 100', 'mult v0, t0', 'mflo t0', 'addiu t1, zero, 255',
           'divu t0, t1', 'mflo t0', *la('a2', DATA + PCT), 'move t2, a2', 'addiu t4, zero, 10', 'slti at, t0, 100', 'bnez at, rp5', 'nop',
           'addiu t5, zero, 0x31', 'sb t5, 0(t2)', 'addiu t2, t2, 1', 'addiu t0, t0, -100', 'addiu t5, zero, 0x30', 'sb t5, 0(t2)', 'j rp6', 'addiu t2, t2, 1',
-          'rp5:', 'slti at, t0, 10', 'bnez at, rp6', 'nop', 'divu t0, t4', 'mflo t5', 'mfhi t0', 'addiu t5, t5, 0x30', 'sb t5, 0(t2)', 'addiu t2, t2, 1',
+          'rp5:', 'divu t0, t4', 'mflo t5', 'mfhi t0', 'addiu t5, t5, 0x30', 'sb t5, 0(t2)', 'addiu t2, t2, 1',
           'rp6:', 'addiu t0, t0, 0x30', 'sb t0, 0(t2)', 'addiu t5, zero, 0x25', 'sb t5, 1(t2)', 'sb zero, 2(t2)',
           f'lui a0, {H(FONT)}', f'lw a0, {L(FONT)}(a0)', 'addiu a1, zero, 0x80', 'addiu a2, zero, 0x80', f'jal {TEXT_RGB}', 'addiu a3, zero, 0x80',
           *la('a2', DATA + PCT), f'addiu a3, zero, {PX + 45}', 'jal rtext', 'addiu t0, s0, 4',
