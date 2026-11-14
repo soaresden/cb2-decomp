@@ -46,3 +46,13 @@ principale avant l'entrée de l'overlay) : il attend START ou CROIX (masque 0x84
 et 0x800149B4). Le mod `skipq` ajoute SELECT (0x940) : SELECT seul quitte l'écran, et il est encore enfoncé (copie de la
 manette 0x8004FBF0) quand l'étape commence, donc les qualifications sont passées. Vérifié dans l'émulateur : SELECT →
 « 2nd STAGE BOARDER CROSS » (mode 1, compteur d'étapes + 1) ; START → qualifications jouées.
+
+## Texte « SELECT TO SKIP TO RACE » (v68)
+
+Sous PRESS START de l'écran « 1st STAGE » (Compétition, mode 0, épreuve 0 de la manche), une ligne jaune. L'écran
+(`func_80014450`) vide sa table d'ordre de 2 entrées à chaque image (ClearOTag en 0x800149D8) puis lie tous ses
+sprites dans l'entrée 0 : le dernier lié est dessiné en premier. `sktx` (fonction morte `func_80013940` de l'exe,
+retirée des caves de crew qui ne l'utilisait pas) appelle ClearOTag puis lie la ligne en premier (dessinée en dernier,
+par-dessus les images), avec la routine de texte du jeu (`func_80012CA0`, structure de police de l'écran en sp +
+0x2228, palette 0x733E), dans un tampon de primitives privé (0x801F6000, deux moitiés). Vérifié : visible au-dessus
+de l'image de la piste, rien au démarrage, SELECT passe toujours au Boarder Cross.

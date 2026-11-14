@@ -68,3 +68,47 @@ def select_ops(exe):
         o = a - 0x8000F800; w = int.from_bytes(exe[o:o + 4], 'little'); assert w == 0x32020840, hex(w)   # andi v0, s0, 0x840
         out.append(['w', '/SCES_009.92', o, w, 0x32020940])
     return out
+
+
+# v68: "SELECT TO SKIP TO RACE", one yellow line under PRESS START on the "1st STAGE" screen (competition, mode 0,
+# stage 0 of the round): the screen's per-frame ClearOTag call (0x800149D8; its ordering table has 2 entries, every
+# sprite goes to entry 0, the last linked drawn first) goes through `sktx` (dead function func_80013940 of the exe):
+# ClearOTag, then the line, linked first into entry 0 (so drawn last, on top of the pictures), with the game's text
+# routine (func_80012CA0, the screen's own font structure at sp + 0x2228, palette 0x733E), into a private primitive
+# buffer (0x801F6000, two halves by frame).
+TX, TX_END = 0x80013940, 0x80013A34
+TX_SITE, RAND = 0x800149D8, 0x80029D08   # v68: the screen's ClearOTag call (entry 0 first: drawn last, on top)
+TX_LINES, TX_RIGHT, TX_Y, TX_DY, TX_RGB = [b'SELECT TO SKIP TO RACE'], 301, 82, 12, (128, 128, 0)   # one yellow line under PRESS START
+TX_PRIMS = 0x801F6000
+
+
+def text_code():
+    data = TX_END - 0x28                     # ra, half, OT entry, colour, string
+    H = lambda a: (a + 0x8000) >> 16; L = lambda a: a - (H(a) << 16)
+    S = ['sktx:', f'lui t9, {H(data)}', f'sw ra, {L(data)}(t9)', f'sw a0, {L(data) + 8}(t9)', f'jal {RAND:#x}', 'nop', f'lui t9, {H(data)}',
+         'lui t1, 0x8005', 'lw t2, 0x7420(t1)', 'lw t3, 0x745c(t1)', 'nop', 'or t2, t2, t3', 'bnez t2, sk9', 'nop',
+         f'lw t3, {L(data) + 4}(t9)', 'nop', 'xori t3, t3, 1', f'sw t3, {L(data) + 4}(t9)', 'sll t3, t3, 10',
+         f'lui a1, {TX_PRIMS >> 16:#x}', f'ori a1, a1, {TX_PRIMS & 0xffff:#x}', 'addu a1, a1, t3',
+         f'lw a0, {L(data) + 8}(t9)', 'addiu a2, sp, 0x2228', 'addiu a3, zero, 0x733e',
+         *[x for k, t in enumerate(TX_LINES) for x in (
+             *(['move a0, s4', 'move a1, v0', 'addiu a2, sp, 0x2228', 'addiu a3, zero, 0x733e'] if k else []),
+             f'addiu t0, zero, {TX_RIGHT - 8 * len(t)}', 'sw t0, 0x10(sp)', f'addiu t0, zero, {TX_Y + TX_DY * k}', 'sw t0, 0x14(sp)',
+             f'lui t0, {H(data + 16 + sum(len(u) + 1 for u in TX_LINES[:k]))}', f'addiu t0, t0, {L(data + 16 + sum(len(u) + 1 for u in TX_LINES[:k]))}', 'sw t0, 0x18(sp)',
+             *([] if k else [f'lui t0, {H(data + 12)}', f'addiu t0, t0, {L(data + 12)}', 'sw t0, 0x1c(sp)', 'sw zero, 0x20(sp)']),
+             'jal 0x80012CA0', 'nop')],
+         'sk9:', f'lui t9, {H(data)}', f'lw ra, {L(data)}(t9)', 'nop', 'jr ra', 'nop']
+    c, l = asm(S, TX)
+    assert c[-1][0] < data, hex(c[-1][0])
+    import struct
+    blob = bytes(12) + bytes([*TX_RGB, 32]) + b''.join(t + b'\0' for t in TX_LINES)
+    blob += bytes(-len(blob) % 4); assert data + len(blob) <= TX_END
+    c += [(data + i, struct.unpack_from('<I', blob, i)[0]) for i in range(0, len(blob), 4)]
+    return c, l
+
+
+def text_ops(exe):
+    import struct
+    c, l = text_code()
+    w = lambda a: struct.unpack_from('<I', exe, a - 0x8000F800)[0]
+    assert w(TX_SITE) == JL(RAND) and w(TX) == 0x27BDFF80
+    return [['w', '/SCES_009.92', a - 0x8000F800, w(a), x] for a, x in c + [(TX_SITE, JL(l['sktx']))]]

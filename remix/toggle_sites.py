@@ -13,6 +13,6 @@ SITES = {
     'special': [('/MAIN_SEL.BIN', 0x8005b0c4), ('/MAIN_SEL.BIN', 0x80069d00), ('/MAIN_SEL.BIN', 0x80069d84), ('/MAIN_SEL.BIN', 0x80069f74), ('/MAIN_SEL.BIN', 0x8006a000), ('/MAIN_SEL.BIN', 0x8006a238), ('/MAIN_SEL.BIN', 0x8006a2cc), ('/MAIN_SEL.BIN', 0x8006a338), ('/MAIN_SEL.BIN', 0x8006b4f0), ('/MAIN_SEL.BIN', 0x8006bca0), ('/MAIN_SEL.BIN', 0x8006c1cc), ('/MAIN_SEL.BIN', 0x8006c2b4), ('/MAIN_SEL.BIN', 0x8006c5c8), ('/MAIN_SEL.BIN', 0x8006c910)],
     'hardmirror': [('/MODE_SEL.BIN', 0x8005b81c), ('/MODE_SEL.BIN', 0x800647dc)],
     'progress': [('/MODE_SEL.BIN', 0x800643b4)],
-    'skipq': [('/SBC1.BIN', 0x8005b058), ('/SCES_009.92', 0x800149b4), ('/SCES_009.92', 0x80014984)],
+    'skipq': [('/SBC1.BIN', 0x8005b058), ('/SCES_009.92', 0x800149b4), ('/SCES_009.92', 0x80014984), ('/SCES_009.92', 0x80015008)],
     'bam': [('/TM.BIN', 0x8005ccc0), ('/TM.BIN', 0x80075758), ('/TM.BIN', 0x80075738), ('/TM.BIN', 0x800953b0), ('/TM.BIN', 0x800953b4), ('/TM.BIN', 0x80094f18), ('/TM.BIN', 0x80094f1c), ('/TM.BIN', 0x80074cfc), ('/TM.BIN', 0x80075908)],
 }
