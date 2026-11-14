@@ -50,7 +50,7 @@ LINES = ['REAR VIEW (O)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', '
          'UNLOCK EVERYTHING',                   # line i = bit i of the flags word (bit set = off)
          'SSX STYLE BOOST',                    # bit 19 (remix/boost.py, with the mod radar)
          'RETRY ROUND (3 PER CUP)',            # bit 20 (remix/boost.py: RETRY on GAME OVER replays the Boarder Cross)
-         'PARK ICONS JICCHI NICK KELLY',     # (v61..v64; v65: bit 16 does both, this line is in no tab)
+         'SSX STYLE BOOST',                  # bit 21: v66 the boost in the Free Style (v61..v64: PARK ICONS, now bit 16)
          # v64: per game mode values of the switches found in several modes (bits 22..30; COMP keeps bit 3 for AIR
          # CONTROL): REAR VIEW for COMP, FREE, AIR, PIPE, PARK, AIR CONTROL for FREE, AIR, PIPE, PARK. On the mode
          # select screen `pmd` copies the REAR VIEW of the mode under the cursor into bit 0 (read by the mod rear in the
@@ -86,7 +86,7 @@ def L(a): return a - (H(a) << 16)
 
 # the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
 TABS = [('COMP', [22, 19, 20, 15, 6, 7, 17, 3, 4, 9, 10]),        # v63: one tab per game mode, then the game-wide ones
-        ('FREE', [23, 27]),                                        # (v64: REAR VIEW / AIR CONTROL with their own bit
+        ('FREE', [23, 21, 27]),                                        # (v64: REAR VIEW / AIR CONTROL with their own bit
         ('AIR', [13, 24, 28]),                                     # in each mode)
         ('PIPE', [1, 25, 29]),
         ('PARK', [16, 26, 30]),

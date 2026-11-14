@@ -92,7 +92,26 @@ def li(r, v):
 def xy(x, y): return ((y & 0xffff) << 16) | (x & 0xffff)
 
 
-def main_code(tables):
+# v66: the boost in the Free Style too (FREE.BIN: the same race loop, the racer's fields from about 0x4800 on 8 bytes
+# lower). Per race overlay: where the player's racer pointer is, the velocity, the function the hook replaced, the
+# jacket tables, the switch (REMIX screen: COMP bit 19, FREE bit 21)
+SBC2_P = dict(riders=RIDERS, vel=VEL, tail=SBC2_TAIL, jtab=JTAB, jpal=JPAL, bit=BOOST_BIT)
+FREE_SITE, FREE_TAIL = 0x8005EFAC, 0x8006D274    # jal func_8006D274 in FREE's race loop (func_8005EEB0, s0 = the racer)
+FREE_ENTRY, FREE_ENTRY_TAIL = 0x8005AED0, 0x8001BFD4   # free_entry's call of func_8001BFD4
+FREE_SLOT = 0x801F3FFC                     # the racer pointer, stored by the FREE hook (`bft`)
+FREE_CAVES = [(0x80070A40, 0x80070E4C), (0x8008F534, 0x8008F878), (0x8007F378, 0x8007F528), (0x80094864, 0x800949D4),
+              (0x8006CD10, 0x8006CE78), (0x80072D1C, 0x80072E80), (0x80094C40, 0x80094D08), (0x800617C8, 0x80061868),
+              (0x8006A8D0, 0x8006A948)]    # dead functions of FREE.BIN (as BP's: the same engine)
+FREE_BFT = (0x80093A44, 0x80093B50)        # `bft` and the jacket tables
+FREE_BIT = 21
+FREE_JPAL = FREE_BFT[0] + 0x40; FREE_JTAB = FREE_JPAL + 4 * len(JPAL_WORDS)     # after bft (in FREE: no room left at BASE)
+assert FREE_JTAB + len(JTAB_BYTES) <= FREE_BFT[1]
+FREE_P = dict(riders=FREE_SLOT, vel=VEL - 8, tail=FREE_TAIL, jtab=FREE_JTAB, jpal=FREE_JPAL, bit=FREE_BIT)
+
+
+def main_code(tables, P=None):
+    P = P or SBC2_P
+    RIDERS, VEL, SBC2_TAIL, JTAB, JPAL, BOOST_BIT = P['riders'], P['vel'], P['tail'], P['jtab'] or tables['jtab'], P['jpal'] or tables['jpal'], P['bit']
     V = lambda o: f'{o}(s1)'
     S = ['bsnap:', f'lui t0, {H(SNAPR)}', f'lw t1, {L(SNAPR)}(t0)', 'lui t2, 0x8005', 'bnez t1, bsn9', 'lw t3, 0x7420(t2)',
          'addiu t4, zero, 1', 'bne t3, t4, bsn9', 'lw t3, 0x745c(t2)', 'nop', 'bne t3, t4, bsn9', 'lw t3, 0x7458(t2)', 'nop',
@@ -110,6 +129,7 @@ def main_code(tables):
           'lui t2, 0x8005', 'sw zero, 0x7420(t2)', 'sw zero, 0x745c(t2)', 'addiu t4, zero, 2', f'sw t4, {L(SNAPR)}(t0)',
           f'j {BX_AGAIN}', 'nop',
           'rr9:', f'j {EXIT_BACK}', 'slti v0, s0, 5']
+    if P is not SBC2_P: S = []                  # FREE: no cup snapshot / retry
     S += ['bmain:', 'addiu sp, sp, -0x70', 'sw ra, 0x10(sp)', 'sw a0, 0x14(sp)', 'sw a1, 0x18(sp)', 'sw a2, 0x1c(sp)', 'sw a3, 0x20(sp)',
          'sw s0, 0x24(sp)', 'sw s1, 0x28(sp)', 'sw s2, 0x2c(sp)', 'sw s3, 0x30(sp)', 'sw s4, 0x34(sp)', 'sw s5, 0x38(sp)',
          'sw s6, 0x3c(sp)', 'sw s7, 0x40(sp)',
@@ -270,30 +290,34 @@ def main_code(tables):
     return S
 
 
-def image():
-    """the words copied to BASE: MAGIC, the code, the tables"""
+def image(P=None):
+    """the words copied to BASE: MAGIC, the code, the tables (FREE: the jacket tables too)"""
     def build(tables):
-        c, l = asm(main_code(tables), BASE + 4)
+        c, l = asm(main_code(tables, P), BASE + 4)
         return c, l
-    c, l = build({'wtab': 0, 'dirs': 0})
+    c, l = build({'wtab': 0, 'dirs': 0, 'jtab': 0, 'jpal': 0})
     t0 = c[-1][0] + 4
+    tb = JTAB_BYTES + bytes(-len(JTAB_BYTES) % 4)
     tables = {'wtab': t0, 'dirs': t0 + 4 * len(WTAB)}
+    tables['jpal'] = tables['dirs'] + 4 * len(DIRS); tables['jtab'] = tables['jpal'] + 4 * len(JPAL_WORDS)
     c, l = build(tables)
     words = [MAGIC] + [w for _, w in c] + WTAB + [(dx & 0xffff) | ((dy & 0xffff) << 16) for dx, dy in DIRS]
+    if P is not None and P['jtab'] is None:
+        words += JPAL_WORDS + list(struct.unpack('<%dI' % (len(tb) // 4), tb))
     assert BASE + 4 * len(words) <= BASE_END and VARS + VARS_LEN <= 0x801F3FF0
     return words, l
 
 
-def sbc1_code(img):
+def sbc1_code(img, CAVES=CAVES, SBC1_TAIL=SBC1_TAIL, snap=True):
     """`bins`: copies the image to BASE (in pieces: CAVES), clears VARS, FlushCache, then the call it replaces"""
     def S(chunks):
         out = ['bins:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw a0, 0x14(sp)', 'sw a1, 0x18(sp)', 'sw a2, 0x1c(sp)', *la('t1', BASE)]
         for k, (src, n) in enumerate(chunks):
             out += [*la('t0', src), *la('t2', src + 4 * n), f'bi{k}:', 'lw t3, 0(t0)', 'addiu t0, t0, 4', 'sw t3, 0(t1)',
                     f'bne t0, t2, bi{k}', 'addiu t1, t1, 4']
-        out += [f'lui t1, {H(SNAPR)}', f'lw t5, {L(SNAPR)}(t1)', 'lui t2, 0x8005', f'sw zero, {L(SNAPR)}(t1)', 'addiu t6, zero, 2',
+        if snap: out += [f'lui t1, {H(SNAPR)}', f'lw t5, {L(SNAPR)}(t1)', 'lui t2, 0x8005', f'sw zero, {L(SNAPR)}(t1)', 'addiu t6, zero, 2',
                 'beq t5, t6, bit1', 'lw t3, 0x7458(t2)', 'lw t4, 0x745c(t2)',     # SNAPR 2: a retry, not a new cup
-                'nop', 'or t3, t3, t4', 'bnez t3, bit1', 'nop', f'sw zero, {L(TRIES)}(t1)', 'bit1:']
+                'nop', 'or t3, t3, t4', 'bnez t3, bit1', 'nop', f'sw zero, {L(TRIES)}(t1)', 'bit1:'] if snap else []
         out += [*la('t1', VARS), *la('t2', VARS + VARS_LEN), 'biz:', 'sw zero, 0(t1)', 'addiu t1, t1, 4', 'bne t1, t2, biz', 'nop',
                 f'jal {FLUSH}', 'nop', 'lw ra, 0x10(sp)', 'lw a0, 0x14(sp)', 'lw a1, 0x18(sp)', 'lw a2, 0x1c(sp)',
                 f'j {SBC1_TAIL}', 'addiu sp, sp, 0x20']
@@ -342,7 +366,22 @@ def ops(disc):
     c2 = c2 + [(SAVE_SITE, 0x10000004)]
     out += [['w', '/SBC2.BIN', a - OVL, w2(a), x] for a, x in c2 + [(SBC2_SITE, J(3, l2['btr'])),
                                                                       (EXIT_SITE, J(2, l2['rtr'])), (EXIT_SITE + 4, 0x00408021)]]
-    return out
+    return out + free_ops(disc)
+
+
+def free_ops(disc):
+    """v66: the Free Style: FREE's entry copies its own image (the boost with FREE_P) to BASE; its race loop's call of
+    func_8006D274 goes through `bft` (racer s0 -> FREE_SLOT; bsnap -> bmain when BASE holds MAGIC)"""
+    fr = disc.read_file('/FREE.BIN'); wf = lambda a: struct.unpack_from('<I', fr, a - OVL)[0]
+    assert wf(FREE_SITE) == J(3, FREE_TAIL) and wf(FREE_ENTRY) == J(3, FREE_ENTRY_TAIL)
+    img, l = image(FREE_P)
+    c1, l1 = sbc1_code(img, FREE_CAVES, FREE_ENTRY_TAIL, snap=False)
+    S = ['bft:', f'lui at, {H(FREE_SLOT)}', f'sw s0, {L(FREE_SLOT)}(at)', f'lui t0, {H(BASE)}', f'lw t0, {L(BASE)}(t0)', *li('t1', MAGIC),
+         'bne t0, t1, bf9', 'nop', f'j {l["bmain"]}', 'nop', 'bf9:', f'j {FREE_TAIL}', 'nop']
+    c2, l2 = asm(S, FREE_BFT[0]); assert c2[-1][0] < FREE_JPAL
+    tb = JTAB_BYTES + bytes(-len(JTAB_BYTES) % 4)
+    c2 += [(FREE_JPAL + 4 * i, w) for i, w in enumerate(JPAL_WORDS)] + [(FREE_JTAB + i, struct.unpack_from('<I', tb, i)[0]) for i in range(0, len(tb), 4)]
+    return [['w', '/FREE.BIN', a - OVL, wf(a), x] for a, x in c1 + c2 + [(FREE_ENTRY, J(3, l1['bins'])), (FREE_SITE, J(3, l2['bft']))]]
 
 
 if __name__ == '__main__':

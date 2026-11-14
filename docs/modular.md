@@ -650,3 +650,12 @@ riders et les lettres du Board Park ensemble ; `bpletters.OPT_BIT` passe de 21 �
 des modes, sous le logo REMIX (police du menu) : Bas depuis REMIX la choisit (si le mod progress est là : son hook
 0x800643B4 n'est plus `jal func_8002E228`, et son interrupteur 14 est actif), X affiche la page de progression (`pw`
 met SELECT dans les mots de manette du jeu tant que `pg` vaut 1), Triangle / Rond / X la ferme. Vérifié.
+
+v66 : **boost SSX en Free Style** (`remix/boost.py`, `free_ops`) : FREE.BIN a la même boucle de course que SBC2 (son
+appel de func_8006D274 en 0x8005EFAC, s0 = le rider) et les champs du rider décalés de 8 octets à partir de ~0x4800
+(vitesse en + 0x48E8). L'entrée de FREE (appel de func_8001BFD4 en 0x8005AED0) copie sa propre image du boost
+(`image(FREE_P)` : sans l'instantané / RETRY de la coupe) à BASE, depuis 10 fonctions mortes de FREE (les mêmes que
+BP) ; `bft` (0x80093A44) range s0 dans FREE_SLOT (0x801F3FFC) et saute à bmain ; tables de vestes après bft.
+Interrupteur propre : bit 21 (SSX STYLE BOOST, onglet FREE ; le bit des PARK ICONS jusqu'à la v64). Vérifié : jauge
+pleine, 120 images avec R2 → 30 % de distance en plus (140 km/h contre 103), jauge 480 → 377, traînée affichée ;
+Boarder Cross identique mot pour mot.
