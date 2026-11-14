@@ -2,7 +2,7 @@
 # Cool Boarders 2 Remix v__VER__ : patcheur pour Batocera (systeme "Pygame").
 # Mets ce fichier dans /userdata/roms/pygame/ puis lance-le depuis le systeme Pygame.
 # Il cherche le Cool Boarders 2 (PAL, SCES-00992) d'origine dans /userdata/roms/psx (.chd ou .bin/.cue)
-# et ecrit "Cool Boarders 2 Remix (Europe).chd" (ou .bin + .cue) a cote. Rien n'est telecharge.
+# et ecrit "Cool Boarders 2 Remix v__VER__ (Europe).chd" (ou .bin + .cue) a cote. Rien n'est telecharge.
 # En ligne de commande : python3 CB2_Remix_Patcher.pygame source.chd destination.chd [usa.chd]
 # Si le CHD de Cool Boarders 2 (USA) est aussi dans roms/psx, il propose de mettre ses musiques dans le Remix.
 # Interrupteurs : un ecran liste les mods (croix haut/bas, A = cocher, START = construire). Le code de configuration
@@ -213,7 +213,7 @@ def main():
     orig, done, usa = find_sources(say)
     usa_orig = [(p, d) for p, d in usa if not is_remix(d)]
     if not orig and usa_orig:      # only the USA version: the US Remix
-        s, disc = usa_orig[0]; dst = os.path.join(os.path.dirname(s), "Cool Boarders 2 Remix (USA).chd")
+        s, disc = usa_orig[0]; dst = os.path.join(os.path.dirname(s), "Cool Boarders 2 Remix v" + VERSION + " (USA).chd")
         say(T("Source (USA) : ", "Source (USA): ") + s); say(T("Creation : ", "Writing: ") + dst)
         say(T("Remix US, 1re version : tout debloque + Hard/Mirror (L1+R1+X)", "US Remix, 1st version: everything unlocked + Hard/Mirror (L1+R1+X)"))
         try:
@@ -234,7 +234,7 @@ def main():
         if cfg['skins']: say(T("(les tenues du code se mettent avec le site : ignorees ici)", "(outfits in the code are added by the web site: ignored here)"))
         try: open(CODE_FILE, 'w').write(code + '\n')
         except Exception: pass
-        dst = os.path.join(os.path.dirname(s), OUT_BASE.replace('Remix', 'Remix ' + code[4:]) + ext)
+        dst = os.path.join(os.path.dirname(s), OUT_BASE.replace('Remix', 'Remix v' + VERSION) + ext)
         say(T("Code : ", "Code: ") + code + "  (" + (', '.join(NAMES[f] for f in cfg['mods']) or 'no mod') + ")")
         say(T("Source : ", "Source: ") + s); say(T("Creation : ", "Writing: ") + dst)
         last = [0]
