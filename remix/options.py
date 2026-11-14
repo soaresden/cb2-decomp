@@ -40,7 +40,7 @@ DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data (code since v37)
 import toggles
 SCR_DATA = toggles.SCREEN[0]           # the screen's data: start of MODE_SEL's 84th sector
 X0, X1, Y0, DY = -150, 70, -64, 13
-LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', 'AIR CONTROL', 'BOARDER CROSS RAMMING', 'WIDESCREEN 16:9',
+LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', 'AIR CONTROL', 'MAKE RIDERS FALL AGAINST THEM', 'WIDESCREEN 16:9',
          'RACE RADAR LINE', 'RACE RANKING',
          # the other mods (remix/toggles.py: bits 8..16, in the order of toggles.BITS)
          'SPECIAL BOARDS ALWAYS', 'NEW HARD+MIRROR CUP', 'BOSS GRAY SNOWMAN IN COMP', 'HIDDEN OUTFITS FOR GIRLS', 'CAN MAX RIDERS AND BOARD',
@@ -171,7 +171,7 @@ def routines(D):
           'lw t3, 0x24(sp)', f'lui t1, {H(FLAGS)}', f'lw t0, {L(FLAGS)}(t1)', f'lui t1, {INV >> 16:#x}', f'ori t1, t1, {INV & 0xffff:#x}',
           'xor t0, t0, t1', 'srlv t0, t0, t3', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']), 'beqz t0, di3', 'nop',
           *la('t6', D['off']), *la('t7', D['rgboff']),
-          'di3:', 'addiu t4, zero, 104', 'lw t5, 0x28(sp)', 'jal drw', 'nop',
+          'di3:', 'addiu t4, zero, 112', 'lw t5, 0x28(sp)', 'jal drw', 'nop',
           'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', 'j di1', 'nop']
     wl = lambda i: ['addiu t4, zero, -132', f'addiu t5, zero, {64 + 12 * i}', *la('t6', D['w%d' % i]), *la('t7', D['rgbt']), 'jal drw', 'nop']
     S += ['dh:', *lw('t0', 'conf'), 'beqz t0, dh1', 'nop'] + [x for i in range(len(WARN)) for x in wl(i)] + \
