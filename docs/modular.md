@@ -421,3 +421,8 @@ avec l'image dans quatre fonctions mortes de SBC1 : func_8007E4D8, func_80073F20
 la 1re épreuve passe toujours avant le Boarder Cross. SBC2 : l'appel de la fonction des chutes (0x8005F33C, une fois
 par image, après la physique) passe par `btr` (fin de la fonction morte de données du radar) : `bmain` si l'image
 est là (mot MAGIC), sinon la fonction d'origine ; `bmain` garde a0..a3 et finit par elle.
+
+v45 : l'entrée REMIX sous le panneau OPTIONS et le titre de l'écran REMIX sont le REMIX de l'écran titre (`title.word` :
+Noto Sans Black Italic, dégradé doré, contour, penché), en petit (taille 16 → 60 × 25), calculé à la construction en
+16 couleurs, envoyé chaque image dans la VRAM libre de l'écran des modes (x 448, y 0 ; palette en y 64) et dessiné en
+SPRT avec son DR_TPAGE (`dlogo`) ; atténué quand le curseur est ailleurs, il pulse quand le curseur est dessus.

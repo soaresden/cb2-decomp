@@ -84,7 +84,30 @@ UP, RIGHT, DOWN, LEFT, TRI, CIRC, CROSS = 0x1000, 0x2000, 0x4000, 0x8000, 0x10, 
 PADV = 0x800832BA                      # MODE_SEL's pad words (held, ...: 0x800832BA..0x800832C5), set by func_8005CCE4
 PAD_CALL, PAD_FN = 0x8005CB94, 0x8005CCE4
 CURSOR, OPTIONS_ITEM = 0x80070B2C, 5   # the mode select cursor (COMPETITION 0 .. BOARD PARK 4, OPTIONS 5)
-LABEL_XY = (78, 92)                    # "REMIX" under the OPTIONS sign
+LABEL_XY = (78, 92)                    # "REMIX" under the OPTIONS sign (menu font, before v45)
+# v45: the label and the screen's title are the title screen's REMIX (title.word: Noto Sans Black Italic, gold gradient,
+# outline, tilted), made small at build time, 16 colours, sent to free VRAM of the mode select (x 448.., y 0; palette
+# y 64) every frame and drawn as a SPRT (+ DR_TPAGE); the label is dim, and pulses when the cursor is on it
+LOGO_SIZE, LOGO_VRAM, LOGO_CLUT = 16, (448, 0), (448, 64)
+LOGO_XY, LOGO_TITLE_XY = (76, 80), (-152, -116)
+LOADIMAGE = 0x80029B7C
+
+
+def logo():
+    """-> (width, height, 4-bit pixels (rows of width / 2 bytes), 16 colours (15-bit, 0 = transparent))"""
+    import title, numpy as np
+    from PIL import Image
+    a = title.word('REMIX', LOGO_SIZE, 8); al = a[..., 3] > 0; ys, xs = np.where(al)
+    a = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1]; al = a[..., 3] > 0
+    h, w = al.shape; W = (w + 3) // 4 * 4
+    assert W <= 64 and h <= 60, (w, h)
+    q = Image.fromarray(a[..., :3].copy()).quantize(15, method=Image.MEDIANCUT, dither=Image.NONE)
+    idx = np.array(q) + 1; idx[~al] = 0
+    pal = np.array(q.getpalette()[:45]).reshape(15, 3)
+    cl = [0] + [0x8000 | (b >> 3) << 10 | (g >> 3) << 5 | (r >> 3) for r, g, b in pal]
+    px = np.zeros((h, W), np.uint8); px[:, :w] = idx
+    pix = bytes((px[:, 0::2] | (px[:, 1::2] << 4)).astype(np.uint8).flatten())
+    return W, h, pix, cl
 HELP = 'X ON/OFF   L R TAB   TRIANGLE BACK'
 
 
@@ -94,6 +117,9 @@ def data():
     for n in ('prev', 'sel', 'open', 'tab', 'item', 'conf', 'alive'): put(n, bytes(4))
     put('rgbt', bytes([255, 200, 40, 32])); put('rgbn', bytes([90, 100, 120, 32])); put('rgbs', bytes([90, 210, 255, 32]))
     put('rgbon', bytes([90, 230, 120, 32])); put('rgboff', bytes([110, 110, 120, 32])); put('rgbh', bytes([150, 150, 150, 32]))
+    W, Hh, pix, cl = logo()
+    put('lrect', struct.pack('<4h', LOGO_VRAM[0], LOGO_VRAM[1], W // 4, Hh)); put('crect', struct.pack('<4h', LOGO_CLUT[0], LOGO_CLUT[1], 16, 1))
+    put('lclut', struct.pack('<16H', *cl)); put('lpix', pix); put('blink', bytes(4))
     put('title', b'REMIX\0'); put('on', b'ON\0'); put('off', b'OFF\0'); put('help', HELP.encode() + b'\0')
     for i, (name, _) in enumerate(TABS): put('t%d' % i, name.encode() + b'\0')
     put('cnts', bytes(len(l) for _, l in TABS))
@@ -153,10 +179,27 @@ def routines(D):
           'sll v1, s1, 2', 'addu v1, v1, s1', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw s5, 4(v1)', 'sll v0, s1, 13',
           f'lui s6, {H(PRIMS)}', 'addu s6, s6, v0', f'addiu s6, s6, {L(PRIMS)}',
           *lw('t0', 'open'), 'beqz t0, opl', 'nop', 'j drs', 'nop', 'opl:',
-          *la('t7', D['rgbn']), *lw('t0', 'sel'), 'beqz t0, dl1', 'nop', *la('t7', D['rgbs']),
-          'dl1:', f'addiu t4, zero, {LABEL_XY[0]}', f'addiu t5, zero, {LABEL_XY[1]}', *la('t6', D['title']), 'jal drw', 'nop', 'j out', 'nop']
+          *lw('t1', 'blink'), 'addiu t1, t1, 1', *sw('t1', 'blink'),
+          'lui t7, 0x60', 'ori t7, t7, 0x6060', *lw('t0', 'sel'), 'beqz t0, dl1', 'andi t1, t1, 16',
+          'lui t7, 0x80', 'beqz t1, dl1', 'ori t7, t7, 0x8080', 'lui t7, 0xb0', 'ori t7, t7, 0xb0b0',
+          'dl1:', f'addiu t4, zero, {LOGO_XY[0]}', f'addiu t5, zero, {LOGO_XY[1]}', 'jal dlogo', 'nop', 'j out', 'nop']
+    # dlogo: the logo at (t4, t5), modulation t7 (0x808080 = as is): sent to VRAM, SPRT + DR_TPAGE linked into s5
+    W, Hh, _, _ = logo()
+    TP = 0xE1000400 | (LOGO_VRAM[0] >> 6) | ((LOGO_VRAM[1] >> 8) << 4)
+    CW = (LOGO_CLUT[1] << 6) | (LOGO_CLUT[0] >> 4)
+    S += ['dlogo:', 'sw ra, 0x2c(sp)', 'sw t4, 0x10(sp)', 'sw t5, 0x14(sp)', 'sw t7, 0x18(sp)',
+          *la('a0', D['lrect']), *la('a1', D['lpix']), f'jal {LOADIMAGE}', 'nop',
+          *la('a0', D['crect']), *la('a1', D['lclut']), f'jal {LOADIMAGE}', 'nop',
+          'lui t0, 0x400', 'sw t0, 0(s6)', 'lw t7, 0x18(sp)', 'lui t1, 0x6400', 'or t7, t7, t1', 'sw t7, 4(s6)',
+          'lw t4, 0x10(sp)', 'lw t5, 0x14(sp)', 'andi t4, t4, 0xffff', 'sll t5, t5, 16', 'or t4, t4, t5', 'sw t4, 8(s6)',
+          f'lui t0, {CW}', f'ori t0, t0, {(LOGO_VRAM[1] & 255) << 8}', 'sw t0, 12(s6)', f'lui t0, {Hh}', f'ori t0, t0, {W}', 'sw t0, 16(s6)',
+          'move a0, s6', 'jal dlnk', 'addiu s6, s6, 20',
+          'lui t0, 0x100', 'sw t0, 0(s6)', f'lui t0, {TP >> 16:#x}', f'ori t0, t0, {TP & 0xffff:#x}', 'sw t0, 4(s6)',
+          'move a0, s6', 'jal dlnk', 'addiu s6, s6, 8', 'lw ra, 0x2c(sp)', 'nop', 'jr ra', 'nop']
+    S += ['dlnk:', 'lw t1, 0(s5)', 'lui t2, 0xff', 'ori t2, t2, 0xffff', 'lw t3, 0(a0)', 'and t4, t1, t2', 'lui t5, 0xff00', 'and t3, t3, t5',
+          'or t3, t3, t4', 'sw t3, 0(a0)', 'and t1, t1, t5', 'and t4, a0, t2', 'or t1, t1, t4', 'jr ra', 'sw t1, 0(s5)']
     # drs: the screen
-    S += ['drs:', 'addiu t4, zero, -140', 'addiu t5, zero, -104', *la('t6', D['title']), *la('t7', D['rgbt']), 'jal drw', 'nop',
+    S += ['drs:', f'addiu t4, zero, {LOGO_TITLE_XY[0]}', f'addiu t5, zero, {LOGO_TITLE_XY[1]}', 'lui t7, 0x80', 'ori t7, t7, 0x8080', 'jal dlogo', 'nop',
           'move s7, zero',
           'dt1:', 'sw s7, 0x30(sp)', 'sll t0, s7, 2', *la('t1', D['ttab']), 'addu t1, t1, t0', 'lw t6, 0(t1)',
           'addiu t0, zero, 88', 'mult s7, t0', 'mflo t4', 'addiu t4, t4, -132', 'addiu t5, zero, -80',
@@ -196,7 +239,7 @@ def routines(D):
     return S
 
 
-TOP = {'pw', 'ounl', 'opt', 'drs', 'di1', 'dh', 'drw', 'box', 'out', 'oap', 'tins'}
+TOP = {'pw', 'ounl', 'opt', 'drs', 'di1', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk'}
 
 
 def place(S, tables, extra=()):
