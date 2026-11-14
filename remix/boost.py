@@ -14,9 +14,10 @@
 #   - air (racer + 0x3E != 0): pending + 1, + 2 while a trick motion plays (racer + 0x6C4 != 47, the plain air),
 #     + 1 while a trick button is held (L1 L2 R1 triangle circle square); a stumble (+ 0x740) loses it;
 #   - landing: LAND frames later, without a stumble, meter += pending (+ BONUS after an air of 15 frames or more);
-#   - R2 held on the ground, meter > 0, no stumble: the move of this frame is made 1.5 times (half of it added to the
-#     five copies of the position: + 0x2C, 0x84, 0x134, 0x4A74, 0xDC, as the race's own updates write them), meter
-#     - COST, the trail shown TRAILF more frames;
+#   - R2 held on the ground, meter > 0, no stumble: the racer's velocity (+ 0x48F0, three words, about 400 x the move
+#     of a frame) grows by 1/32 each frame while the move is under CAP (normal top speed ~ 230; v43..v47 added half
+#     the move to the position afterwards, which the camera showed as jerks), meter - COST, the trail shown TRAILF
+#     more frames;
 #   - a move of more than 4000 (a new race, a retry) clears everything.
 # Drawing: the bar (ordering-table entry BAR_ENT: light border, black inside, the meter in the rider's colour, the
 # pending part translucent white, quarter ticks; a full bar blinks) and the trail (entry TRAIL_ENT, drawn before the
@@ -39,7 +40,7 @@ FLUSH = 0x8003CB2C
 OPT_FLAGS, BOOST_BIT = 0x80057438, 19
 RIDERS, G_RIDER, PAD = 0x8009B9A8, 0x80057408, 0x8004FBF0
 WS, PRIMS = 0x80058E20, 0x80058E0C
-COP = [0x2C, 0x84, 0x134, 0x4A74, 0xDC]
+VEL, CAP = 0x48F0, 310                     # the racer's velocity (about 400 x its move per frame); boost cap (move per frame)
 MAX, COST, BONUS, LAND, TRAILF = 480, 4, 25, 10, 10
 NH, ZMIN = 8, 60
 TRAIL_ENT, BAR_ENT = 12, 4
@@ -103,11 +104,14 @@ def main_code(tables):
           'bg3:', 'andi t5, t2, 2', 'beqz t5, bhist', 'nop', 'bnez t1, bhist', 'nop',
           f'lw t4, {V(METER)}', 'nop', 'blez t4, bhist', 'nop', f'addiu t4, t4, -{COST}', 'bgez t4, bb1', 'nop', 'move t4, zero',
           'bb1:', f'sw t4, {V(METER)}', f'addiu t5, zero, {TRAILF + 1}', f'sw t5, {V(BFR)}',
-          'sra s5, s5, 1', 'sra s6, s6, 1', 'sra s7, s7, 1']
-    for o in COP + [None]:
-        b, p = ('s1', 0) if o is None else ('s0', o)
-        S += [f'lw t6, {p}({b})', f'lw t7, {p + 4}({b})', f'lw t8, {p + 8}({b})', 'addu t6, t6, s5', 'addu t7, t7, s6', 'addu t8, t8, s7',
-              f'sw t6, {p}({b})', f'sw t7, {p + 4}({b})', f'sw t8, {p + 8}({b})']
+          # speed of this frame ~ max(|d|) + (the two others) / 4; below CAP, the velocity (racer + VEL) grows by 1/32
+          'sra t5, s5, 31', 'xor t6, s5, t5', 'subu t6, t6, t5', 'sra t5, s6, 31', 'xor t7, s6, t5', 'subu t7, t7, t5',
+          'sra t5, s7, 31', 'xor t8, s7, t5', 'subu t8, t8, t5', 'addu t9, t6, t7', 'addu t9, t9, t8', 'move t5, t6',
+          'slt at, t5, t7', 'beqz at, bv1', 'nop', 'move t5, t7', 'bv1:', 'slt at, t5, t8', 'beqz at, bv2', 'nop', 'move t5, t8',
+          'bv2:', 'subu t9, t9, t5', 'sra t9, t9, 2', 'addu t5, t5, t9', f'slti at, t5, {CAP}', 'beqz at, bhist', 'nop',
+          f'lw t6, {VEL}(s0)', f'lw t7, {VEL + 4}(s0)', f'lw t8, {VEL + 8}(s0)', 'sra t5, t6, 5', 'addu t6, t6, t5',
+          'sra t5, t7, 5', 'addu t7, t7, t5', 'sra t5, t8, 5', 'addu t8, t8, t5',
+          f'sw t6, {VEL}(s0)', f'sw t7, {VEL + 4}(s0)', f'sw t8, {VEL + 8}(s0)']
     # history: shift, the position now at HIST
     S += ['bhist:', *la('t0', VARS + HIST + 12 * (NH - 1)), *la('t1', VARS + HIST),
           'bh1:', 'lw t2, -12(t0)', 'lw t3, -8(t0)', 'lw t4, -4(t0)', 'sw t2, 0(t0)', 'sw t3, 4(t0)', 'sw t4, 8(t0)',

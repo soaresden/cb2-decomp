@@ -403,9 +403,11 @@ REMIX (bit 19 des options, actif par défaut ; le tableau des onglets passe à 1
   ces points restent « en attente » (en blanc translucide dans la barre) et ne comptent qu'à une réception propre
   (10 images sans chute, + 0x740), avec 25 de bonus après 15 images en l'air ; une chute les perd. Exemple mesuré :
   un saut avec grab de 17 images = 41 + 25.
-- **R2 au sol** (jauge > 0, pas de chute) : le déplacement de l'image est fait 1,5 fois (la moitié ajoutée aux cinq copies
-  de la position : + 0x2C, 0x84, 0x134, 0x4A74, 0xDC), jauge − 4 par image (une jauge pleine = 120 images, 4,8 s).
-  Mesuré : +24 % de distance sur 60 images (la moitié en boost), sans chute.
+- **R2 au sol** (jauge > 0, pas de chute) : la vitesse du rider (+ 0x48F0, trois mots, environ 400 × son déplacement par
+  image) augmente de 1/32 à chaque image tant que le déplacement reste sous 310 (vitesse de pointe normale ~ 230) :
+  une vraie accélération, que la caméra suit (v43..v47 ajoutaient la moitié du déplacement à la position après la
+  physique : la caméra le montrait par à-coups). Jauge − 4 par image (une jauge pleine = 120 images, 4,8 s).
+  Mesuré (v48) : +35 % de distance sur 120 images, montée de 220 à ~315 par image en une seconde, compteur 123 km/h.
 - **Barre** sous les temps (x −140, y −54, 80 × 6, entrée 4 de la table d'ordre) : bord clair, fond noir, jauge à la
   couleur du rider (table par `g_rider`), traits aux quarts ; pleine, elle clignote en blanc ; elle flashe à chaque gain.
 - **Traînée** (entrée 12, avant le HUD) : les 8 dernières positions projetées par la vue (GsWSMATRIX 0x80058E20,
