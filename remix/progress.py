@@ -2,7 +2,7 @@
 # (hidden riders, Mirror, Hard, Hard + Mirror, SPECIAL boards, Free Style trophies, percentage).
 # Code + strings go after the end of MODE_SEL.BIN, which grows by one sector (the file then moves to the last
 # sectors of the credits movie STAFFE.STR, cut by 0.5 s; its heap starts after it); the letters are drawn by the game's own text routine (func_80012CA0, menu font at VRAM
-# (512,48), 8x12) into a private primitive buffer at 0x801F2000 / 0x801F4000 (free RAM below the stack, double
+# (512,48), 8x12) into a private primitive buffer at 0x801F4000 / 0x801F6000 (0x801F2000: the options' switches) (free RAM below the stack, double
 # buffered). Hook: the TV function of MODE_SEL calls func_8002E228 (frame buffer index) at 0x800643B4.
 import struct
 from asm import asm
@@ -45,7 +45,7 @@ def block():
              f'lui t0, {ph}', f'lhu t0, {pl}(t0)', 'nop', f'andi t0, t0, {SELECT}', 'beqz t0, out',
              'sll v1, v0, 2', 'addu v1, v1, v0', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw v1, 4(v1)', 'sll v0, v0, 13',
              f'addiu s5, v1, {OTOFF}',                                  # OT entry (front)
-             'lui s6, 0x801f', 'addu s6, s6, v0', 'ori s6, s6, 0x2000',
+             'lui s6, 0x801f', 'addu s6, s6, v0', 'ori s6, s6, 0x4000',
              # counts: N (0x30) = riders + Mirror + Hard + boards + trophies (38), S (0x3c) boards, T (0x38) trophies
              'lui s7, 0x8005', 'lhu a0, 0x7440(s7)', 'nop', 'srl a0, a0, 4', 'jal pc', 'andi a0, a0, 7', 'move t3, v0',
              'lhu a0, 0x7442(s7)', 'jal pc', 'andi a0, a0, 7', 'sw v0, 0x3c(sp)', 'addu t3, t3, v0',

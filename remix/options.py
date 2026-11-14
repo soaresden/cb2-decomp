@@ -1,8 +1,9 @@
-# In-game options (mod `options`, v26): on the mode select screen, hold R1 to show the REMIX OPTIONS panel; while R1
-# is held, L1 moves the cursor and R2 switches the line on or off: rear view (mod rear), live half-pipe marks
-# (hplive), unlock announcements (news), air control (air), Boarder Cross ramming (ramming).
+# In-game options (mod `options`, v26..v28): on the mode select screen, hold R1 to show the REMIX OPTIONS panel; while R1
+# is held, L1 moves the cursor (the list of 18 lines scrolls, 10 shown) and R2 switches the line on or off: rear view
+# (mod rear), live half-pipe marks (hplive), unlock announcements (news), air control (air), Boarder Cross ramming
+# (ramming), widescreen, race radar line and ranking (radar), every other mod (remix/toggles.py), UNLOCK EVERYTHING.
 #
-# The switches are bits of the halfword 0x80057438 (bit set = off; bits 8.. in 0x80057439), in the progress block that
+# The switches are bits of the word 0x80057438 (bit set = off; line i = bit i), in the progress block that
 # the game saves on the memory card but never reads (see docs/progression.md; INIT zeroes it): they follow the save.
 #   - radar tests bit 64 (the line) and bit 128 (the ranking panel);
 #   - rear, hplive, news test their bit themselves;
@@ -27,13 +28,19 @@ R1, L1, R2 = 0x8, 0x4, 0x2
 PRIMS = 0x801F8000
 CAVES = [(0x800654A8, 0x8006562C), (0x8006F680, 0x8006F71C), (0x8006F7C4, 0x8006F83C),   # MODE_SEL (after crewrank's code in the first)
          (0x80031180, 0x8003120C), (0x8003BD98, 0x8003BE10), (0x80040AA4, 0x80040B0C),     # exe: dead functions kept for this mod
-         (0x8001829C, 0x80018320), (0x8003EAC4, 0x8003EB30), (0x800123C8, 0x80012448)]   # (0x8003EB30.. : snowtod)     # (see crew.CAVES)
+         (0x8001829C, 0x80018320), (0x8003EAC4, 0x8003EB30), (0x800123C8, 0x80012448),   # (0x8003EB30.. : snowtod)     # (see crew.CAVES)
+         (0x80083844, 0x80083C00)]    # end of MODE_SEL's 82nd sector (after the progress page; padded when it is absent)
 DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data
-X0, X1, Y0, DY = -150, 70, -56, 13
-LINES = [('REAR VIEW (CIRCLE)', 1), ('LIVE HALF-PIPE MARKS', 2), ('UNLOCK NEWS', 4), ('AIR CONTROL', 8), ('BOARDER CROSS RAMMING', 16),
-         ('WIDESCREEN 16:9', 32), ('RACE RADAR LINE', 64), ('RACE RANKING', 128), ('UNLOCK EVERYTHING', 256)]
-INV = 32 | 256                         # lines whose bit set means ON (off by default)
-UNLOCK_LINE = 8                        # an action, not a switch: R2 shows the warning, R2 again unlocks (bit 256 = done)
+X0, X1, Y0, DY = -150, 70, -64, 13
+LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'UNLOCK NEWS', 'AIR CONTROL', 'BOARDER CROSS RAMMING', 'WIDESCREEN 16:9',
+         'RACE RADAR LINE', 'RACE RANKING',
+         # the other mods (remix/toggles.py: bits 8..16, in the order of toggles.BITS)
+         'SPECIAL BOARDS', 'HARD + MIRROR', 'BOSS GRAY SNOWMAN COMP.', 'HIDDEN OUTFITS', 'MAX STATS AND BOARD', 'BIG AIR MASTER',
+         'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY',
+         'UNLOCK EVERYTHING']                   # line i = bit i of the flags word (bit set = off)
+UNLOCK_LINE = len(LINES) - 1           # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
+INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
+VIS = 10                               # lines shown at a time: the list scrolls with the cursor
 WARN = ['R2 AGAIN UNLOCKS ALL RIDERS,', 'COURSES, BOARDS, MIRROR, HARD,', 'TROPHIES. SAVED. NO UNDO!']     # <= 30 letters (box)
 # the progress block as a 100 % game (remix/progress.py): courses, riders (Boss, Gray, Snowman), SPECIAL boards,
 # Mirror, Hard, the 30 Free Style trophies; the save keeps it
@@ -72,30 +79,32 @@ def routines(D):
     la = lambda r, a: [f'lui {r}, {H(a)}', f'addiu {r}, {r}, {L(a)}']
     n = len(LINES)
     S = ['opt:', 'addiu sp, sp, -0x50', 'sw ra, 0x4c(sp)', 'sw s5, 0x40(sp)', 'sw s6, 0x44(sp)', 'sw s7, 0x48(sp)',
-         f'jal {HOOK_FN}', 'nop', 'sw v0, 0x34(sp)', 'jal oap', 'nop',
+         f'jal {HOOK_FN}', 'nop', 'sw v0, 0x34(sp)', 'jal oap', 'nop', 'jal tins', 'nop',
          f'lui t0, {H(PAD)}', f'lhu t1, {L(PAD)}(t0)', f'lui t2, {H(D["prev"])}', f'lw t3, {L(D["prev"])}(t2)', f'sw t1, {L(D["prev"])}(t2)',
          f'andi t0, t1, {R1}', 'bnez t0, op1', 'nop', 'j out', 'nop',
          'op1:', 'nor t4, t3, zero', 'and t4, t4, t1', f'lw t5, {L(D["cur"])}(t2)', f'andi t0, t4, {L1}', 'beqz t0, op2', 'addiu t5, t5, 1',
          f'slti t0, t5, {n}', 'bnez t0, op3', 'nop', 'move t5, zero', 'op3:', f'sw t5, {L(D["cur"])}(t2)', f'sw zero, {L(D["conf"])}(t2)',
-         'op2:', f'lw t5, {L(D["cur"])}(t2)', f'lui t0, {H(FLAGS)}', f'lhu t6, {L(FLAGS)}(t0)', f'andi t7, t4, {R2}', 'beqz t7, op4', 'addiu t7, zero, 1',
+         'op2:', f'lw t5, {L(D["cur"])}(t2)', f'lui t0, {H(FLAGS)}', f'lw t6, {L(FLAGS)}(t0)', f'andi t7, t4, {R2}', 'beqz t7, op4', 'addiu t7, zero, 1',
          f'addiu t8, zero, {UNLOCK_LINE}', 'bne t5, t8, op5', 'nop', 'j ounl', 'nop', 'op5:',
-         'sllv t7, t7, t5', 'xor t6, t6, t7', f'sh t6, {L(FLAGS)}(t0)',
+         'sllv t7, t7, t5', 'xor t6, t6, t7', f'sw t6, {L(FLAGS)}(t0)',
          'op4:', 'sw t6, 0x38(sp)', 'sw t5, 0x24(sp)', 'j odr', 'nop']
     # odr: the panel
     S += ['odr:', 'sll v1, s1, 2', 'addu v1, v1, s1', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw s5, 4(v1)', 'sll v0, s1, 13',
           f'lui s6, {H(PRIMS)}', 'addu s6, s6, v0', f'addiu s6, s6, {L(PRIMS)}',
           f'addiu t4, zero, {X0}', f'addiu t5, zero, {Y0}', *la('t6', D['title']), *la('t7', D['rgbt']), 'jal drw', 'nop',
-          'move s7, zero',
+          'lw s7, 0x24(sp)', 'nop', f'addiu s7, s7, -{VIS // 2}', 'bgez s7, ol0', 'nop', 'move s7, zero',
+          'ol0:', f'slti t0, s7, {len(LINES) - VIS + 1}', 'bnez t0, ol2', 'nop', f'addiu s7, zero, {len(LINES) - VIS}',
+          'ol2:', 'sw s7, 0x3c(sp)',
           'ol:', 'sw s7, 0x30(sp)', 'sll t0, s7, 2', *la('t1', D['tab']), 'addu t1, t1, t0', 'lw t6, 0(t1)', f'addiu t4, zero, {X0 + 8}',
-          'sll t5, s7, 3', 'addu t5, t5, s7', 'sll t0, s7, 2', 'addu t5, t5, t0', f'addiu t5, t5, {Y0 + DY}', 'sw t5, 0x28(sp)',
+          'lw t5, 0x3c(sp)', 'nop', 'subu t5, s7, t5', f'addiu t0, zero, {DY}', 'mult t5, t0', 'mflo t5', f'addiu t5, t5, {Y0 + DY}', 'sw t5, 0x28(sp)',
           *la('t7', D['rgbn']), 'lw t0, 0x24(sp)', 'nop', 'bne t0, s7, ol1', 'nop', *la('t7', D['rgbt']),
           'ol1:', 'jal drw', 'nop', 'j ost', 'nop']
-    S += ['ost:', 'lw s7, 0x30(sp)', 'lw t0, 0x38(sp)', 'nop', f'xori t0, t0, {INV}', 'srlv t0, t0, s7', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']),
+    S += ['ost:', 'lw s7, 0x30(sp)', 'lw t0, 0x38(sp)', f'lui t1, {INV >> 16:#x}', f'ori t1, t1, {INV & 0xffff:#x}', 'xor t0, t0, t1', 'srlv t0, t0, s7', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']),
           'beqz t0, os', 'nop', *la('t6', D['off']), *la('t7', D['rgboff']),
           'os:', f'addiu t4, zero, {X1}', 'lw t5, 0x28(sp)', 'jal drw', 'nop',
-          'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', f'slti t0, s7, {n}', 'beqz t0, os9', 'nop', 'j ol', 'nop', 'os9:', 'j owr', 'nop']
+          'lw s7, 0x30(sp)', 'lw t1, 0x3c(sp)', 'addiu s7, s7, 1', f'addiu t1, t1, {VIS}', 'slt t0, s7, t1', 'beqz t0, os9', 'nop', 'j ol', 'nop', 'os9:', 'j owr', 'nop']
     # owr: the warning of the unlock line, while it waits for the second R2
-    wl = lambda i: [f'addiu t4, zero, {X0 + 8}', f'addiu t5, zero, {Y0 + DY * (n + 1 + i)}', *la('t6', D['w%d' % i]), *la('t7', D['rgbt']), 'jal drw', 'nop']
+    wl = lambda i: [f'addiu t4, zero, {X0 + 8}', f'addiu t5, zero, {Y0 + DY * (VIS + 1 + i)}', *la('t6', D['w%d' % i]), *la('t7', D['rgbt']), 'jal drw', 'nop']
     S += ['owr:', f'lui t0, {H(D["conf"])}', f'lw t0, {L(D["conf"])}(t0)', 'nop', 'beqz t0, owx', 'nop', *wl(0), *wl(1), 'j ow2', 'nop', 'owx:', 'j box', 'nop']
     S += ['ow2:'] + [x for i in range(2, len(WARN)) for x in wl(i)] + ['j box', 'nop']
     # ounl: R2 on the unlock line (t0 = H(FLAGS), t6 = flags, t2 = H(data)): first press = warning, second = unlock
@@ -103,8 +112,8 @@ def routines(D):
           'oun1:', f'sw zero, {L(D["conf"])}(t2)', 'lui t8, 0x8005']
     for o, v, k in UNLOCK:
         S += ([f'lhu t9, {o}(t8)', 'nop', f'ori t9, t9, {v}'] if k == 'o' else [f'addiu t9, zero, {v}']) + [f'sh t9, {o}(t8)']
-    S += ['ori t6, t6, 256', f'sh t6, {L(FLAGS)}(t0)', 'j op4', 'nop']
-    yb = Y0 + DY * (n + 1 + len(WARN))
+    S += [f'lui t8, {(1 << UNLOCK_LINE) >> 16:#x}', 'or t6, t6, t8', f'sw t6, {L(FLAGS)}(t0)', 'j op4', 'nop']
+    yb = Y0 + DY * (VIS + 1 + len(WARN))
     S += ['drw:', 'sw ra, 0x2c(sp)', 'sw t4, 0x10(sp)', 'sw t5, 0x14(sp)', 'sw t6, 0x18(sp)', 'sw t7, 0x1c(sp)', 'sw zero, 0x20(sp)',
           'move a0, s5', 'move a1, s6', f'lui a2, {H(FONT)}', f'addiu a2, a2, {L(FONT)}', f'jal {TEXT}', f'addiu a3, zero, {CLUT}',
           'lw ra, 0x2c(sp)', 'move s6, v0', 'jr ra', 'nop']
@@ -114,6 +123,8 @@ def routines(D):
           'lui t1, 0xff00', 'and t0, t0, t1', 'and t3, s6, t2', 'or t0, t0, t3', 'j out', 'sw t0, 0(s5)']
     S += ['out:', 'lw v0, 0x34(sp)', 'lw ra, 0x4c(sp)', 'lw s5, 0x40(sp)', 'lw s6, 0x44(sp)', 'lw s7, 0x48(sp)', 'jr ra', 'addiu sp, sp, 0x50']
     # oap: apply the switches to the PATCH words (table ptab: address, on, off, bit), FlushCache after a write
+    import toggles
+    S += toggles.installer(la)
     S += ['oap:', f'lui t0, {H(FLAGS)}', f'lbu t6, {L(FLAGS)}(t0)', *la('t0', D['ptab']), f'addiu t5, t0, {16 * len(PATCH)}', 'move t9, zero',
           'oa1:', 'lw t1, 0(t0)', 'lw t2, 4(t0)', 'lw t3, 8(t0)', 'lw t4, 12(t0)', 'lw t7, 0(t1)', 'and t4, t4, t6', 'beqz t4, oa2', 'move t8, t2',
           'move t8, t3', 'oa2:', 'beq t7, t8, oa3', 'nop', 'beq t7, t2, oa4', 'nop', 'bne t7, t3, oa3', 'nop',
@@ -122,7 +133,7 @@ def routines(D):
     return S
 
 
-TOP = {'opt', 'odr', 'ost', 'drw', 'box', 'out', 'oap', 'owr', 'ow2', 'ounl'}
+TOP = {'opt', 'odr', 'ost', 'drw', 'box', 'out', 'oap', 'owr', 'ow2', 'ounl', 'tins'}
 
 
 def place(S, tables, extra=()):
@@ -169,7 +180,7 @@ def place(S, tables, extra=()):
 def build():
     d, D = data()
     ptab = b''.join(struct.pack('<4I', a, on, off, bit) for a, on, off, bit in PATCH)
-    strs = [('l%d' % i, t) for i, (t, b) in enumerate(LINES)] + [('w%d' % i, t) for i, t in enumerate(WARN)]
+    strs = [('l%d' % i, t) for i, t in enumerate(LINES)] + [('w%d' % i, t) for i, t in enumerate(WARN)]
     blobs = lambda tabaddr: [('tab', b''.join(struct.pack('<I', tabaddr['l%d' % i]) for i in range(len(LINES)))), ('ptab', ptab)] + \
         [(k, t.encode() + bytes(4 - len(t) % 4)) for k, t in strs]
     D2 = dict(D); D2.update({k: 0 for k in ['tab', 'ptab'] + [k for k, _ in strs]})      # first pass: where the tables land
@@ -181,13 +192,16 @@ def build():
     return words, lab, d
 
 
-def ops(disc):
+def ops(disc, pkg=None):
+    """pkg: the other mods' operations (their switches, remix/toggles.py)"""
     ms = disc.read_file('/MODE_SEL.BIN'); ex = disc.read_file('/SCES_009.92')
     where = lambda a: ('/MODE_SEL.BIN', ms, OVL) if a >= OVL else ('/SCES_009.92', ex, 0x8000F800)
     assert struct.unpack_from('<I', ms, HOOK - OVL)[0] == J(3, HOOK_FN)
     c, l, d = build()
     P = [(a, x) for a, x in c] + [(DATA[0] + i, struct.unpack_from('<I', d, i)[0]) for i in range(0, len(d), 4)] + [(HOOK, J(3, l['opt']))]
-    out = []
+    import toggles
+    out = toggles.ops(pkg) if pkg is not None else [['padto', '/MODE_SEL.BIN', toggles.FILE_END]]   # padto first
     for a, x in P:
-        f, b, base = where(a); out.append(['w', f, a - base, struct.unpack_from('<I', b, a - base)[0], x])
+        f, b, base = where(a); o = a - base
+        out.append(['w', f, o, struct.unpack_from('<I', b, o)[0] if o + 4 <= len(b) else 0, x])
     return out

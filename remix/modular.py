@@ -11,6 +11,7 @@ Operations
   ['b', file, offset, hexbytes]      bytes of a file
   ['bs', file, offset, segs]         bytes of a file: [[0, len, src] copied from the original file at src | [1, hex]]
   ['append', file, hexbytes]         bytes added at the end of a file (MAIN_SEL grows: it then moves, see below)
+  ['padto', file, size]              zeros added up to that size (MODE_SEL before the options' block)
   ['px4', file, hdr, W, clear, tr, blits]  4-bit image: rectangles of the original copied (see px4)
   ['rec', path, lba, size]           directory record of a file
   ['sec', lba, subheader_hex, ops]   whole sector: ops = [[0, len, src_addr] copy from the original disc | [1, hex]]
@@ -67,8 +68,8 @@ FEATURES = [   # id, French name, English name, description FR, description EN
      'En Boarder Cross de la Compétition : un classement à la Mario Kart à droite (ta place, celle de devant et celle de derrière, avec la tête du rider et l’écart en secondes avec toi : -1.2 pour celui de devant, +0.8 pour celui de derrière ; 1er doré, 2e argent, 3e bronze, qui scintillent), et la petite barre de progression du haut devient une grande ligne en bas de l’écran avec la tête de chaque rider. Chacun se règle dans les options du jeu (RACE RANKING, RACE RADAR LINE).',
      'In the competition’s Boarder Cross: a Mario Kart style ranking on the right (your place, the one ahead and the one behind, with the rider’s head and the gap to you in seconds: -1.2 for the one ahead, +0.8 for the one behind; 1st gold, 2nd silver, 3rd bronze, shimmering), and the small progress bar at the top becomes a long line at the bottom of the screen with each rider’s head. Each can be switched in the in-game options (RACE RANKING, RACE RADAR LINE).'),
     ('options', 'Options dans le jeu', 'In-game options',
-     'Sur l’écran de choix du mode, maintiens R1 : le panneau REMIX OPTIONS s’affiche ; L1 descend d’une ligne, R2 active ou coupe : vue arrière, notes du half-pipe en direct, annonces de déblocage, figures en l’air, chocs en Boarder Cross, écran large 16:9 (coupé au départ : à utiliser avec l’image étirée en 16:9 et sans le « widescreen hack » de l’émulateur), ligne de course et classement du Boarder Cross. Dernière ligne, UNLOCK EVERYTHING : un premier R2 affiche un avertissement, un second débloque tout d’un coup (riders, pistes, planches SPECIAL, Mirror, Hard, trophées : la sauvegarde devient 100 %, sans retour arrière) pour tout essayer. Le réglage est gardé dans ta sauvegarde.',
-     'On the mode select screen, hold R1: the REMIX OPTIONS panel shows; L1 moves down a line, R2 switches it on or off: rear view, live half-pipe marks, unlock announcements, air control, Boarder Cross ramming, widescreen 16:9 (off at first: use it with the picture stretched to 16:9 and without the emulator’s widescreen hack), the Boarder Cross race line and ranking. Last line, UNLOCK EVERYTHING: a first R2 shows a warning, a second one unlocks everything at once (riders, courses, SPECIAL boards, Mirror, Hard, trophies: the save becomes 100 %, no undo) to try it all. The setting is kept in your save.'),
+     'Sur l’écran de choix du mode, maintiens R1 : le panneau REMIX OPTIONS s’affiche ; L1 descend d’une ligne, R2 active ou coupe : vue arrière, notes du half-pipe en direct, annonces de déblocage, figures en l’air, chocs en Boarder Cross, écran large 16:9 (coupé au départ : à utiliser avec l’image étirée en 16:9 et sans le « widescreen hack » de l’émulateur), ligne de course et classement du Boarder Cross, et tous les autres mods un par un (planches SPECIAL, Hard + Mirror, Boss/Gray/Snowman en championnat, tenues cachées, MAX, Big Air Master, page de progression, qualifications au choix, Jicchi/Nick/Kelly : coupé, le jeu redevient celui d’origine à cet endroit, dès que tu quittes l’écran des modes). La liste défile avec le curseur. Dernière ligne, UNLOCK EVERYTHING : un premier R2 affiche un avertissement, un second débloque tout d’un coup (riders, pistes, planches SPECIAL, Mirror, Hard, trophées : la sauvegarde devient 100 %, sans retour arrière) pour tout essayer. Le réglage est gardé dans ta sauvegarde.',
+     'On the mode select screen, hold R1: the REMIX OPTIONS panel shows; L1 moves down a line, R2 switches it on or off: rear view, live half-pipe marks, unlock announcements, air control, Boarder Cross ramming, widescreen 16:9 (off at first: use it with the picture stretched to 16:9 and without the emulator’s widescreen hack), the Boarder Cross race line and ranking, and every other mod one by one (SPECIAL boards, Hard + Mirror, Boss/Gray/Snowman in the championship, hidden outfits, MAX, Big Air Master, progress page, optional qualifying, Jicchi/Nick/Kelly: switched off, the game is back to the original there, as soon as you leave the mode select screen). The list scrolls with the cursor. Last line, UNLOCK EVERYTHING: a first R2 shows a warning, a second one unlocks everything at once (riders, courses, SPECIAL boards, Mirror, Hard, trophies: the save becomes 100 %, no undo) to try it all. The setting is kept in your save.'),
     ('news', 'Annonces de déblocage', 'Unlock announcements',
      'De retour au menu après une course, un bandeau qui brille annonce ce que tu viens de gagner : Boss, Gray, Snowman, planche SPECIAL, Mirror, Hard, nouvelles pistes, trophée, et les 100 % (CONGRATULATIONS, avec Jicchi, Nick et Kelly si leur mod est coché).',
      'Back in the menu after a race, a shining banner tells what you just won: Boss, Gray, Snowman, SPECIAL board, Mirror, Hard, new courses, trophy, and the 100 % (CONGRATULATIONS, with Jicchi, Nick and Kelly if their mod is on).'),
@@ -241,8 +242,13 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     pkg['ops']['news'] = _nw.ops(O)
     import hplive as _hl
     pkg['ops']['hplive'] = _hl.ops(O)
-    import options as _op
-    pkg['ops']['options'] = _op.ops(O)
+    # progress page: its primitive buffers move up to 0x801F4000 / 0x801F6000 (0x801F2000: the switches' block)
+    for op in pkg['ops']['progress']:
+        if op[0] == 'append':
+            b = bytearray.fromhex(op[2]); i = b.find(struct.pack('<I', 0x36D62000)); assert i >= 0 and i % 4 == 0   # ori s6, s6, 0x2000
+            struct.pack_into('<I', b, i, 0x36D64000); op[2] = b.hex()
+    import options as _op      # last: the switches of the other mods are built from their operations
+    pkg['ops']['options'] = _op.ops(O, pkg)
     import radar as _rd      # heads made by crew's operations (face, icons), repeated so that the mod works alone
     pkg['ops']['radar'] = _rd.ops(O, _cw.ALIASV, _cw.BASEV, _cw.MODESV, _cw.FBD, _cw.ICON_X, _cw.ICON_Y, _cw.ICON_CLUT_X, _cw.ICON_CLUT_Y,
                                   [_cw.face_op(), _cw.icons_op()])
@@ -297,6 +303,8 @@ def apply(disc, pkg, feats, log=lambda m: None):
                 b = buf(op[1]); src = orig(op[1]); d = b''.join(src[x[2]:x[2] + x[1]] if x[0] == 0 else bytes.fromhex(x[1]) for x in op[3])
                 b[op[2]:op[2] + len(d)] = d
             elif t == 'append': buf(op[1]).extend(bytes.fromhex(op[2]))
+            elif t == 'padto':     # ['padto', file, size]: zeros up to that size
+                b = buf(op[1]); b.extend(bytes(max(0, op[2] - len(b))))
             elif t == 'px4': px4(buf(op[1]), op)
             elif t == 'rec': recs[op[1]] = (op[2], op[3])
             elif t == 'sec': secs[op[1]] = (bytes.fromhex(op[2]), op[3])

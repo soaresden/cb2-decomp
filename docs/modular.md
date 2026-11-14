@@ -255,8 +255,8 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
 
 - Les interrupteurs sont des bits de 0x80057438 (bit à 1 = coupé) : 1 vue arrière, 2 notes du half-pipe en direct,
   4 annonces de déblocage, 8 figures en l'air (`air`), 16 chocs en Boarder Cross (`ramming`), 32 écran large (à 1 =
-  actif : coupé par défaut), 64 ligne du radar (`radar`), 128 classement (`radar`), 256 UNLOCK EVERYTHING fait (l'octet
-  0x80057439, lui aussi sauvegardé et jamais lu : les options se lisent en demi-mot). Cet octet fait partie
+  actif : coupé par défaut), 64 ligne du radar (`radar`), 128 classement (`radar`), puis les autres mods (section
+  suivante) et UNLOCK EVERYTHING (bit 17) : le mot 0x80057438 entier. Cet octet fait partie
   du bloc 0x80057434..0x8005744D copié dans la sauvegarde mais n'est jamais lu par le jeu (docs/progression.md) : le
   réglage suit la carte mémoire. À 0, tout est actif comme avant.
 - `rear`, `hplive`, `news` lisent leur bit. `air` et `ramming` sont coupés là où leur code vit, dans l'exe (toujours
@@ -284,6 +284,37 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
   Style avec air et ramming coupés ; notes du half-pipe absentes avec le bit 2 ; vue arrière normale avec le bit 1 ;
   annonce non lancée avec le bit 4. Pas encore vérifié : l'octet relu après un vrai enregistrement puis chargement de
   la carte.
+
+## Tous les mods réglables dans le jeu (`options` + `remix/toggles.py`, v28)
+
+- Le panneau REMIX OPTIONS a 18 lignes (10 visibles, la liste défile avec le curseur) ; ligne i = bit i du mot
+  0x80057438 (32 bits : 0x80057438..0x8005743B sont sauvegardés et jamais lus par le jeu). Bits 0..7 : vue arrière,
+  notes du half-pipe, annonces, figures en l'air, chocs, 16:9, ligne du radar, classement ; 8..16 : `special`,
+  `hardmirror`, `riders`, `outfits`, `max`, `bam`, `progress`, `skipq`, `crew` ; 17 : UNLOCK EVERYTHING (fait).
+- Les « sites » de chaque mod (`remix/toggle_sites.py`, 232 mots) : les mots du jeu qu'il change et que le jeu atteint
+  (instructions remplacées, données), pas son code dans des fonctions mortes (que plus rien n'atteint une fois les
+  sites remis). Trouvés une fois depuis le désassemblage (fonction morte = aucun appel, saut ni pointeur dans aucun
+  fichier ; plus les zones que les mods déclarent). Exclus : les débuts de tas de MAIN_SEL / MODE_SEL (0x8001003C,
+  0x800100B8, 0x800100B4 : ces fichiers ont grandi) et l'appel de l'overlay 0x8001228C (déjà pris par `max`, chaîné).
+- La table (groupe par mod et par fichier : bit, sorte, nombre, adresse et mot témoins ; entrées : index du mot,
+  mot d'origine, et pour l'exe le mot modifié) et la routine `tap` sont à la fin de MODE_SEL, qui grandit d'un
+  secteur de plus (`padto` à 83 secteurs d'abord : même adresse avec ou sans la page de progression ; son tas commence
+  ensuite, mot 0x800100B4 écrit tel quel). À chaque image de l'écran des modes, `tins` (code des options) copie le
+  bloc en 0x801F2000 (RAM libre dans toutes les scènes : vérifié avec un motif à travers les menus, le Free Style, le
+  2 joueurs, le half-pipe et la Compétition ; la page de progression dessine donc maintenant en 0x801F4000 / 6000) et
+  remplace, dans l'exe en mémoire seulement, l'appel de l'overlay de la boucle principale (0x8001228C) par `jal tap`,
+  après avoir gardé l'appel qui y était (celui du jeu, ou celui de `max`) en 0x801F3FFC.
+- `tap`, à chaque scène avant l'overlay : groupe d'un overlay, mod coupé, et l'overlay qui vient d'être chargé a
+  encore le mot modifié au premier site (il arrive modifié du disque) → mots d'origine remis ; groupe de l'exe, si le
+  mod est sur le disque (un mot de son propre code est là) → chaque site reçoit son mot modifié ou d'origine selon
+  l'interrupteur ; puis FlushCache et l'appel gardé (ou l'overlay directement si `max` est coupé). Un mod coupé prend
+  donc effet en quittant l'écran des modes.
+- Restent en place même coupés (sans effet sur le jeu) : les fichiers ajoutés (modèles, voix, textures), les
+  couleurs et plaques de nom échangées Boss / Jicchi de `riders` dans ENEMY1 / EFCT_SBC, l'indice de la télé de
+  `hardmirror`, le code des mods dans les fonctions mortes.
+- Vérifié dans l'émulateur : défilement ; MAX coupé (MAIN_SEL : les 33 mots d'origine, plus de « R1 : MAX ») ;
+  SPECIAL, riders et Jicchi/Nick/Kelly coupés (mots de l'exe et de MAIN_SEL d'origine, écran BOARDER du jeu, course
+  du Free Style) ; remis (mots modifiés) ; page de progression.
 
 ## Classement et radar de course (`radar`, v27)
 
