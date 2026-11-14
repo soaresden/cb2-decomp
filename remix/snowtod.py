@@ -35,21 +35,18 @@ G_RIDER = 0x80057408
 OVLS = {
     # Boarder Cross: the race loop's call of the bar function
     'SBC2': dict(riders=0x8009B9A8, hdr=0x8008655C, mot=0x8008CC7C, cave=0x80062DB4, cave_end=0x8006304C,
-                 sites=[0x8005F56C], tail=0x8006D2A4),
+                 sites=[0x8005F56C], tail=0x8006D2A4, todf=0x8008C254),
     # 1st stage (tricks): the two calls of the TOD frame player func_80089AB8 (its stack arguments stay in place):
     # func_80064ACC (the start of a motion) and the playback of every frame
     'SBC1': dict(riders=0x80090DF0, hdr=0x80083DC0, mot=0x8008A4E0, cave=0x80061018, cave_end=0x800612B0,
-                 sites=[0x80064B30, 0x80065150], tail=0x80089AB8),
+                 sites=[0x80064B30, 0x80065150], tail=0x80089AB8, todf=0x80089AB8),
 }
 MAP = [0, 1, 2, 3, 4, 5, 6, 7, 6, 8, 9, 8, 9, 6, 7, 8, 9, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
        26, 27, 28, 29, 30, 31, 3, 3, 1, 2, 3, 4, 5, 32, 33, 32, 8, 9, 8, 9, 32, 33, 8, 9, 3, 4, 43, 44, 45, 13, 14, 15, 16, 17,
        18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 28, 31, 30, 3, 3, 39, 40, 41, 42, 37, 38, 37, 38, 37, 38, 34, 35, 36, 35, 36]
 assert len(MAP) == 100
-# Snowman's hierarchy, as Free Style builds it: objects 5..11, bones 12..18 (id, parent id; 0 = the rider's root)
-HIER = [(5, 15), (6, 16), (7, 14), (8, 13), (9, 12), (10, 17), (11, 18),
-        (12, 0), (13, 9), (14, 8), (15, 7), (16, 5), (17, 8), (18, 8)]
 # his base bone: TOD_SM's setup puts it 119 below the rider's root (y down); Free Style has it 100 lower, on the snow
-# (never animated: the same in every frame of both modes). In the competition he floated 100 units above his shadow.
+# (the game puts that height back every frame). In the competition he floated 100 units above his shadow.
 ROOT_BONE, ROOT_Y = 12, 219
 
 
@@ -70,40 +67,45 @@ def exe_code():
 
 def sbc_code(name):
     o = OVLS[name]
-    RIDERS, HDR_RELOC, MOT_RELOC, CAVE, CAVE_END, TAIL = o['riders'], o['hdr'], o['mot'], o['cave'], o['cave_end'], o['tail']
-    S = ['snw:', 'addiu sp, sp, -0x30', 'sw ra, 0x28(sp)', 'sw s0, 0x18(sp)', 'sw s1, 0x1c(sp)', 'sw a0, 0x10(sp)', 'sw a1, 0x14(sp)',
-         'sw a2, 0x20(sp)', 'sw a3, 0x24(sp)',
+    RIDERS, HDR_RELOC, MOT_RELOC, CAVE, CAVE_END, TAIL, TODF = (o[k] for k in ('riders', 'hdr', 'mot', 'cave', 'cave_end', 'tail', 'todf'))
+    S = ['snw:', 'addiu sp, sp, -0x40', 'sw ra, 0x30(sp)', 'sw s0, 0x18(sp)', 'sw s1, 0x1c(sp)', 'sw a0, 0x20(sp)', 'sw a1, 0x24(sp)',
+         'sw a2, 0x28(sp)', 'sw a3, 0x2c(sp)',
          'lui t0, 0x8005', f'lh t0, {G_RIDER & 0xffff:#x}(t0)', 'addiu t1, zero, 6', 'bne t0, t1, sn9', 'nop',
          f'lui t0, {H(TSM_PTR)}', f'lw s0, {L(TSM_PTR)}(t0)', 'nop', 'beqz s0, sn9', 'nop',
          'lhu t0, 0(s0)', 'addiu t1, zero, 0x4f54', 'bne t0, t1, sn9', 'nop',                 # "TO"
          'lbu t0, 2(s0)', 'nop', 'beqz t0, sn2', 'nop',                                       # not converted yet
          f'jal {HDR_RELOC}', 'move a0, s0', 'lbu s1, 3(s0)', 'nop',
          'sn1:', 'sll t0, s1, 2', 'addu t0, t0, s0', 'lw a0, 0(t0)', f'jal {MOT_RELOC}', 'nop', 'addiu s1, s1, -1', 'bnez s1, sn1', 'nop',
-         # the player's motion table from MAP
-         'sn2:', f'lui t0, {H(RIDERS)}', f'lw t0, {L(RIDERS)}(t0)', 'nop', 'beqz t0, sn9', 'addiu t0, t0, 0x204',
+         # the player's motion table from MAP (its entry 0 = the game's motion 1, played at the start: the setup)
+         'sn2:', f'lui t0, {H(RIDERS)}', f'lw s1, {L(RIDERS)}(t0)', 'nop', 'beqz s1, sn9', 'addiu t0, s1, 0x204',
          'lui t1, MAPH', 'addiu t1, t1, MAPL', 'addiu t2, t1, 100',
          'sn3:', 'lbu t3, 0(t1)', 'addiu t1, t1, 1', 'sll t3, t3, 2', 'addu t3, t3, s0', 'lw t3, 4(t3)', 'nop',
          'lw t4, 4(t3)', 'lw t5, 8(t3)', 'addiu t3, t3, 8', 'lw t5, 4(t5)', 'sw t3, 0(t0)', 'sw t4, 0x198(t0)', 'sw t5, 0x32c(t0)',
          'bne t1, t2, sn3', 'addiu t0, t0, 4',
-         # Snowman's hierarchy (HIER: object/bone id, its parent's id, 0 = the rider's root) in place of the human one
-         f'lui t0, {H(RIDERS)}', f'lw t0, {L(RIDERS)}(t0)', 'nop', 'lw t8, 0x1e4(t0)', 'lw t9, 0x1d4(t0)', 'beqz t8, sn9', 'nop',
-         'lui t6, HIEH', 'addiu t6, t6, HIEL', f'addiu t7, t6, {2 * len(HIER)}',
-         'sh1:', 'jal fnd', 'lbu a0, 0(t6)', 'move a1, v0', 'lbu a0, 1(t6)', 'nop', 'beqz a0, sh2', 'move v0, t9', 'jal fnd', 'nop',
-         'sh2:', 'beqz a1, sh3', 'nop', 'beqz v0, sh3', 'nop', 'sw v0, 0x48(a1)',
-         'sh3:', 'addiu t6, t6, 2', 'bne t6, t7, sh1', 'nop',
-         # his base bone as low as in Free Style (his feet on the snow)
-         'jal fnd', f'addiu a0, zero, {ROOT_BONE}', 'beqz v0, sn9', f'addiu t0, zero, {ROOT_Y}', 'sw t0, 0x1c(v0)', 'j sn9', 'nop',
+         # still the human setup (bone 17 under the human root instead of object 8)? then TOD_SM's setup frame, with the
+         # overlay's TOD frame player and the arguments of the racer init (func_800667CC: object table = rider + 0x1E4)
+         'lw t8, 0x1e4(s1)', 'nop', 'beqz t8, sn9', 'nop',
+         'jal fnd', 'addiu a0, zero, 8', 'move t6, v0', 'jal fnd', 'addiu a0, zero, 17', 'beqz v0, sn9', 'nop',
+         'lw t0, 0x48(v0)', 'nop', 'beq t0, t6, sn5', 'nop',
+         'lw t0, 0x1f0(s1)', 'sw zero, 0x14(sp)', 'sw t0, 0x10(sp)', 'lw t0, 0x204(s1)', 'lw a0, 0x530(s1)', 'lw a1, 0(t0)',
+         'addiu a2, s1, 0x1e4', f'jal {TODF}', 'lw a3, 0x394(s1)',
+         # bone 12 under the rider's root (the setup leaves it without a parent) and as low as in Free Style
+         'sn5:', 'lw t8, 0x1e4(s1)', 'nop', 'jal fnd', f'addiu a0, zero, {ROOT_BONE}', 'beqz v0, sn9', 'nop',
+         'lw t0, 0x1d4(s1)', f'addiu t1, zero, {ROOT_Y}', 'sw t0, 0x48(v0)', 'sw t1, 0x1c(v0)',
+         # and it is the bone whose height the game puts back every frame (rider + 0x6D4: the bone, + 0x6D0: its height;
+         # set once after the setup, by func_80066894: the human pelvis, id 17 = Snowman's right arm)
+         'sw v0, 0x6d4(s1)', 'j sn9', 'sh t1, 0x6d0(s1)',
          # coordinate of the object/bone a0 in the rider's object list (t8), 0 if none
          'fnd:', 'move t1, t8',
          'fn1:', 'lw t2, 0x14(t1)', 'addiu at, zero, -1', 'beq t2, at, fn9', 'move v0, zero', 'bne t2, a0, fn1', 'addiu t1, t1, 0x18',
          'lw v0, -0x14(t1)', 'fn9:', 'jr ra', 'nop',
-         'sn9:', 'lw a0, 0x10(sp)', 'lw a1, 0x14(sp)', 'lw a2, 0x20(sp)', 'lw a3, 0x24(sp)', 'lw s0, 0x18(sp)', 'lw s1, 0x1c(sp)',
-         'lw ra, 0x28(sp)', f'j {TAIL}', 'addiu sp, sp, 0x30']
-    c0, _ = asm([x.replace('MAPH', '0').replace('MAPL', '0').replace('HIEH', '0').replace('HIEL', '0') for x in S], CAVE)
-    mp = c0[-1][0] + 4; hp = mp + len(MAP)
-    S = [x.replace('MAPH', str(H(mp))).replace('MAPL', str(L(mp))).replace('HIEH', str(H(hp))).replace('HIEL', str(L(hp))) for x in S]
+         'sn9:', 'lw a0, 0x20(sp)', 'lw a1, 0x24(sp)', 'lw a2, 0x28(sp)', 'lw a3, 0x2c(sp)', 'lw s0, 0x18(sp)', 'lw s1, 0x1c(sp)',
+         'lw ra, 0x30(sp)', f'j {TAIL}', 'addiu sp, sp, 0x40']
+    c0, _ = asm([x.replace('MAPH', '0').replace('MAPL', '0') for x in S], CAVE)
+    mp = c0[-1][0] + 4
+    S = [x.replace('MAPH', str(H(mp))).replace('MAPL', str(L(mp))) for x in S]
     c, l = asm(S, CAVE)
-    m = bytes(MAP) + bytes(sum(HIER, ()))
+    m = bytes(MAP)
     m += bytes((-len(m)) % 4)
     c += [(mp + i, struct.unpack_from('<I', m, i)[0]) for i in range(0, len(m), 4)]
     assert c[-1][0] < CAVE_END, hex(c[-1][0])
@@ -114,6 +116,8 @@ def ops(disc):
     exe = disc.read_file('/SCES_009.92')
     we = lambda a: struct.unpack_from('<I', exe, a - EXE_BASE)[0]
     assert we(LOAD_SITE) == J(3, QUEUE)
+    tsm = disc.read_file('/DATA/CHR/TOD_SM.DAT'); m0 = struct.unpack_from('<I', tsm, 4)[0] * 4
+    assert tsm[:3] == b'TO2' and struct.unpack_from('<I', tsm, m0 + 4)[0] == 1     # the setup motion: one frame (snw plays one)
     ce, le = exe_code()
     out = [['w', '/SCES_009.92', a - EXE_BASE, we(a), x] for a, x in ce + [(LOAD_SITE, J(3, le['tsm'])), (TSM_PTR, 0)]]
     for name, o in OVLS.items():

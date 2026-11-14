@@ -129,10 +129,16 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
   squelette humain. Liste des nœuds du rider : pointeur en rider + 0x1E4 (entrées de 0x18 octets : attribut,
   coordonnées, PMD, objet, base, numéro), racine en rider + 0x1D4. Hiérarchie de Snowman (Free Style) :
   racine → 12 → 9 → 13 → 8 → {14 → 7 → 15 → 5 → 16 → 6, 17 → 10, 18 → 11}.
-  `snw` remet ces 14 parents à chaque image (les os humains 19..28 restent, inutilisés, sous ceux de Snowman).
-  Hauteur : la mise en place de TOD_SM met l'os 12 à 119 sous la racine ; le Free Style le met à 219 (100 plus bas,
-  jamais animé : même valeur à chaque image dans les deux modes). Sans ça, Snowman flottait 100 unités au-dessus de
-  son ombre en Compétition : `snw` remet aussi 219 (v30).
+  v31 : `snw` ne recopie plus les parents, il fait jouer par le jeu la vraie mise en place de Snowman (le mouvement 0 de
+  TOD_SM, une image, avec le lecteur de TOD de l'overlay et les arguments de l'init des riders `func_800667CC` : table
+  d'objets = rider + 0x1E4), dès que la hiérarchie est encore humaine (l'os 17 n'est pas sous l'objet 8). Elle donne
+  aussi les positions et rotations de départ de chaque os : les animations n'ajoutent que des écarts, et avec les
+  valeurs humaines (os 17 à 340 au lieu de 1475) le bras droit était faux.
+  Le « bassin » : après la mise en place, `func_80066894` prend le nœud sans parent, le met sous la racine, et le
+  garde en rider + 0x6D4 (hauteur en + 0x6D0) ; le jeu remet cette hauteur à chaque image. Humains : os 17 à 340 ;
+  Free Style avec Snowman : os 12 à 219 (119 de la mise en place + 100). En Compétition c'était l'os 17 (le bras
+  droit de Snowman) : `snw` y met l'os 12 et 219 (sinon il flottait 100 unités au-dessus de son ombre).
+  Vérifié dans l'émulateur : les 14 nœuds fixes ont les mêmes parents et valeurs qu'en Free Style (Big Air, Boarder Cross).
   Piège : `lbu a0` suivi tout de suite de `beqz a0` lisait l'ancien a0 (délai de chargement) → l'os 12 restait
   sous un os humain → boucle dans la hiérarchie, récursion sans fin, mémoire écrasée.
 - SBC1 (1re étape, épreuves de figures) a le même problème : riders D_80090DF0, conversions 0x80083DC0 / 0x8008A4E0,
