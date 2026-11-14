@@ -84,24 +84,30 @@ import bossout
 
 EXE_BASE = 0x8000F800; OVL = 0x8005AEA8; G_FILES = 0x800583E8
 # dead functions of the exe (never called, no pointer to them anywhere); 0x8001E630..0x8001E7C4: mod news
-CAVES = [(0x80013940, 0x80013A34), (0x80028F94, 0x80029014), (0x8002F5E0, 0x8002F644),   # v57: unused PsyQ functions
+CAVES = [(0x80013940, 0x80013A34), (0x80028D04, 0x80028D3C), (0x8002A14C, 0x8002A184), (0x8002022C, 0x80020250), (0x800203BC, 0x800203E0),   # v58
+         (0x80028F6C, 0x80029014), (0x80028F1C, 0x80028F58), (0x80044AC4, 0x80044AE8), (0x80040F88, 0x80040FA8), (0x8002F5E0, 0x8002F644),   # v57: unused PsyQ functions
          (0x800169B4, 0x80016AB0), (0x800238E0, 0x80023998),
          (0x80029AE0, 0x80029B7C), (0x80021DA0, 0x80021E38), (0x80022B70, 0x80022C08), (0x80021BB0, 0x80021C38),
          (0x8001FA0C, 0x8001FA98),   # (0x800280B8, 0x8002E7D0: mod rear)
-         (0x800404E4, 0x80040640), (0x8001B69C, 0x8001B718),
+         (0x800404E4, 0x80040640), (0x8001B680, 0x8001B718),
          (0x8002DE10, 0x8002DE88), (0x8002E96C, 0x8002EA10), (0x80027E9C, 0x80027F04), (0x8002C49C, 0x8002C504),
          (0x800290C8, 0x80029128), (0x8003F028, 0x8003F088), (0x800439C4, 0x80043A24),
          (0x80017BF8, 0x80017C9C), (0x8002043C, 0x8002050C), (0x80021A88, 0x80021B28), (0x800312C4, 0x80031374), (0x80028078, 0x800280B8),
          (0x8001829C, 0x80018320), (0x80031180, 0x8003120C),   # v54: given by remix/options.py (unused there)
          # v26 (2 players): small unreferenced functions, checked against every jump, branch and pointer of every file
          # (0x80031180, 0x8003BD98, 0x80040AA4, 0x8001829C, 0x8003EAC4, 0x800123C8: mod options)
-         (0x80013BA0, 0x80013BD0), (0x80020288, 0x800202C4), (0x80020394, 0x800203BC), (0x80028D78, 0x80028DB4), (0x80028E18, 0x80028E40),
+         (0x80013BA0, 0x80013BD0), (0x80020288, 0x800202C4), (0x80020394, 0x800203BC), (0x80028D78, 0x80028DD8), (0x80028E18, 0x80028E40),
          (0x80029194, 0x800291CC), (0x8002A62C, 0x8002A694), (0x8002A798, 0x8002A7C4), (0x8002E6A4, 0x8002E6D0), (0x8002E79C, 0x8002E7D0),
          (0x80031230, 0x80031280), (0x8003C0A4, 0x8003C108), (0x8003C138, 0x8003C168),
          (0x8003EFEC, 0x8003F028), (0x800435B4, 0x80043604)]
 DATA2 = 0x8003EE98; DATA2_END = 0x8003EF00             # menu models: file entries, rectangles, state
-ENT2, IDX2, RCOL, RCLUT = (DATA2 + o for o in (0, 0x20, 0x28, 0x48))   # 4 menu models: Jicchi, Nick, Kelly, Boss in black (v57)
-NMENU = 4
+# 5 menu models: Jicchi, Nick, Kelly, Boss in black (v57), Cindy's unused ending outfit (ED_CHRCG, v58). Rectangles
+# kept short (texture column x, y; palette row y, height), RECT built from them for LoadImage / StoreImage
+ENT2, IDX2, COLXY, CLUTYH, RECT = (DATA2 + o for o in (0, 0x28, 0x34, 0x48, 0x5C))
+NMENU = 5
+# Cindy's ending outfit in races (remix/cgrider.py): its 2 files' entries (model, texture), 8-byte aligned, in a dead
+# copy of func_8001C748's clearing loop
+ENTG = 0x8001C1A0; ENTG_END = 0x8001C1C0
 MENU_SHOWN = 0x4D575253                                 # 'SRWM' + k in MENU_SAVE: alias k's texture is in VRAM
 MODELS = 0x8007C4E8; FN_MDL = 0x80064A08; MUSIC = 0x800171B4; MDL_SITES = [0x800602E8, 0x80061580]
 UPLOAD = 0x8005DB60; WEAR_UPLOADS = [0x80064100, 0x80064124]
@@ -213,17 +219,24 @@ def routines(race_regs):
               f'br_{rr}_{xr}:', f'subu v0, v0, {xr}', 'sll v0, v0, 2', 'jr ra', f'addu v0, v0, {xr}']
     # file loads of the player's rider (P1 model / texture)
     S += ['ld24:', 'j ld', 'addiu t7, s1, 0x24', 'ld20:', 'j ld', 'addiu t7, s1, 0x20',
-          'ld:', 'subu t8, a2, s1', 'addiu at, zero, 0x14', 'beq t8, at, ldq', 'addiu at, zero, 0x28', 'beq t8, at, ldq', 'nop',
+          'ld:', 'subu t8, a2, s1', 'addiu at, zero, 0x14', 'beq t8, at, ldqj', 'addiu at, zero, 0x28', 'beq t8, at, ldqj', 'nop',
           'move t4, ra', 'move t5, a0', 'move t6, a1', 'lui at, 0x8005', 'lh a0, 0x7408(at)', f'lui at, {H(ALIASV)}', f'lw a1, {L(ALIASV)}(at)', 'jal aval', 'nop',
-          'move ra, t4', 'move a0, t5', 'beqz v0, ld9', 'move a1, t6', 'sll t0, v0, 1', f'lui at, {H(IDX)}', 'addu at, at, t0',
+          'move ra, t4', 'move a0, t5', 'bnez v0, lda', 'move a1, t6', 'j ldg', 'nop', 'lda:', 'sll t0, v0, 1', f'lui at, {H(IDX)}', 'addu at, at, t0',
           'addiu t1, s1, 0x10', 'bne a2, t1, ld1', 'nop', 'j ld9', f'lh a0, {L(IDX) - 2}(at)',
+          # Cindy (rider 2) in her ending outfit (hidden outfit flag, jacket 3; v58): its own model / texture files
+
           'ld1:', 'bne a2, t7, ld9', 'nop', f'lh a0, {L(IDX) + 4}(at)',
-          'ld9:', f'j {ENQ}', 'nop',
+          'ld9:', f'j {ENQ}', 'nop', 'ldqj:', 'j ldq', 'nop',
           # player 2 (2 players): slot 0x14 = model (its own copy, IDX3), 0x28 = texture (the same files as player 1)
           'ldq:', 'move t4, ra', 'move t5, a0', 'move t6, a1', 'lui at, 0x8005', 'lh a0, 0x7412(at)', f'lui at, {H(ALIAS2)}', f'lw a1, {L(ALIAS2)}(at)',
-          'jal aval', 'nop', 'move ra, t4', 'move a0, t5', 'beqz v0, ld9', 'move a1, t6', 'sll t0, v0, 1', 'addiu at, zero, 0x14',
+          'jal aval', 'nop', 'move ra, t4', 'move a0, t5', 'beqz v0, lqx', 'move a1, t6', 'sll t0, v0, 1', 'addiu at, zero, 0x14',
           'bne t8, at, ldq1', f'lui at, {H(IDX3)}', 'addu at, at, t0', 'j ld9', f'lh a0, {L(IDX3) - 2}(at)',
-          'ldq1:', f'lui at, {H(IDX)}', 'addu at, at, t0', 'j ld9', f'lh a0, {L(IDX) + 4}(at)']
+          'ldq1:', f'lui at, {H(IDX)}', 'addu at, at, t0', 'j ld9', f'lh a0, {L(IDX) + 4}(at)', 'lqx:', 'j ld9', 'nop']
+    # Cindy (rider 2) in her ending outfit (hidden outfit flag, jacket 3; v58): its own model / texture files
+    S += ['ldg:', 'lui at, 0x8005', 'lh t0, 0x7408(at)', 'lh t1, 0x742A(at)', 'lh t2, 0x740C(at)', 'addiu t0, t0, -2', 'bnez t0, lgx',
+          'addiu t2, t2, -3', 'beqz t1, lgx', 'nop', 'bnez t2, lgx', 'addiu t1, s1, 0x10', 'bne a2, t1, lg1', 'nop',
+          'j ld9', f'addiu a0, zero, {(ENTG - G_FILES) // 8}',
+          'lg1:', 'bne a2, t7, lgx', 'nop', f'addiu a0, zero, {(ENTG + 8 - G_FILES) // 8}', 'lgx:', 'j ld9', 'nop']
     # BOARDER screen opens (sel_riderCursor = g_rider): ACUR = usable ALIAS; validated: ALIAS = ACUR
     S += ['cinit:', 'lhu v0, 0x7408(v0)', 'move t4, ra', 'move t5, a0', 'move t6, a1', 'move t3, v0', 'sll a0, v0, 16', 'sra a0, a0, 16',
           f'lui at, {H(ALIASV)}', 'beqz a1, ci1', f'lw a1, {L(ALIASV)}(at)', 'lui at, 0x8005', 'lh a0, 0x7412(at)', f'lui at, {H(ALIAS2)}',
@@ -257,7 +270,16 @@ def routines(race_regs):
           'rp9:', 'sll v0, t2, 4', 'rpe:', 'lw t0, -4(sp)', 'lw t1, -8(sp)', 'lw t2, -12(sp)', 'jr ra', 'nop']
     # ---- menu models (BOARDER screen): see menu_chunk()
     MM = MENU_BUF + M_MAGIC
-    rect = lambda tbl, kreg: [f'addiu t0, {kreg}, -1', 'sll t0, t0, 3', f'lui a0, {H(tbl)}', f'addiu a0, a0, {L(tbl)}', 'addu a0, a0, t0']
+    def rect(tbl, kreg):     # a0 = RECT of model k (s0 = 1..NMENU): its texture column (64 x 256) or palette rows (256 x h)
+        assert kreg == 's0'
+        return ['jal rcol' if tbl == COLXY else 'jal rclut', 'nop']
+    RCOL, RCLUT = COLXY, CLUTYH
+    # rcol / rclut (s0 = model k): RECT = its texture column / palette rows, from COLXY (x, y) / CLUTYH (y, h); a0 = RECT
+    S += ['rcol:', 'addiu t0, s0, -1', 'sll t0, t0, 2', f'lui a0, {H(COLXY)}', 'addu a0, a0, t0', f'lw t1, {L(COLXY)}(a0)',
+          f'lui a0, {H(RECT)}', f'addiu a0, a0, {L(RECT)}', 'sw t1, 0(a0)', 'lui t1, 0x100', 'ori t1, t1, 0x40', 'jr ra', 'sw t1, 4(a0)',
+          'rclut:', 'addiu t0, s0, -1', 'sll t0, t0, 2', f'lui a0, {H(CLUTYH)}', 'addu a0, a0, t0', f'lw t1, {L(CLUTYH)}(a0)',
+          f'lui a0, {H(RECT)}', f'addiu a0, a0, {L(RECT)}', 'sll t2, t1, 16', 'ori t2, t2, 768', 'sw t2, 0(a0)',
+          'srl t2, t1, 16', 'sll t2, t2, 16', 'ori t2, t2, 256', 'jr ra', 'sw t2, 4(a0)']
     # mreq(a0 = k): load the model of alias k into MENU_BUF (CD queue), unless already asked
     S += ['mreq:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'move s0, a0',
           f'lui at, {H(PENDING)}', f'lw t0, {L(PENDING)}(at)', 'nop', 'beq t0, s0, mr9', 'nop', f'sw s0, {L(PENDING)}(at)',
@@ -269,7 +291,7 @@ def routines(race_regs):
     # munsh(): the base rider's texture back in VRAM if an alias's is there
     S += ['munsh:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', f'lui at, {H(MENU_SAVE)}', f'lw s0, {L(MENU_SAVE)}(at)',
           f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'subu s0, s0, t0', 'addiu t1, s0, -1', f'sltiu t1, t1, {NMENU}', 'beqz t1, mu9', 'nop',
-          f'jal {DRAWSYNC}', 'move a0, zero', *rect(RCOL, 's0'), f'lui a1, {H(MENU_SAVE + 0x204)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 0x204)}',
+          f'jal {DRAWSYNC}', 'move a0, zero', *rect(RCOL, 's0'), f'lui a1, {H(MENU_SAVE + 0x404)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 0x404)}',
           *rect(RCLUT, 's0'), f'lui a1, {H(MENU_SAVE + 4)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 4)}',
           f'jal {DRAWSYNC}', 'move a0, zero', f'lui at, {H(MENU_SAVE)}', f'sw zero, {L(MENU_SAVE)}(at)',
           'mu9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'jr ra', 'addiu sp, sp, 0x20']
@@ -277,7 +299,7 @@ def routines(race_regs):
     S += ['mshow:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'move s0, a0', f'lui at, {H(MENU_SAVE)}', f'lw t1, {L(MENU_SAVE)}(at)',
           f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'addu t0, t0, s0', 'bne t0, t1, msa', 'nop', 'j ms9', 'nop', 'msa:',
           'jal munsh', 'nop', f'jal {DRAWSYNC}', 'move a0, zero',
-          *rect(RCOL, 's0'), f'lui a1, {H(MENU_SAVE + 0x204)}', f'jal {STOREIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 0x204)}',
+          *rect(RCOL, 's0'), f'lui a1, {H(MENU_SAVE + 0x404)}', f'jal {STOREIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 0x404)}',
           *rect(RCLUT, 's0'), f'lui a1, {H(MENU_SAVE + 4)}', f'jal {STOREIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 4)}',
           f'jal {DRAWSYNC}', 'move a0, zero', 'j msb', 'nop', 'msb:',
           *rect(RCOL, 's0'), f'lui a1, {H(MENU_BUF + M_IMG)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_BUF + M_IMG)}',
@@ -394,7 +416,7 @@ def place(S):
 
 
 # block starts for place(); nx and mdq are not fallen into (an unconditional jump comes before them)
-TOP = bossout.TOP | {'aval', 'amode', 'setcur', 'navH2', 'fwH2', 'nwH2', 'rpv', 'rpg', 'msb', 'navH', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'acomp', 'fwx', 'nwx', 'apitch', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
+TOP = bossout.TOP | {'ldg', 'ldq', 'rcol', 'rclut', 'aval', 'amode', 'setcur', 'navH2', 'fwH2', 'nwH2', 'rpv', 'rpg', 'msb', 'navH', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'acomp', 'fwx', 'nwx', 'apitch', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
 
 
 # ---------------------------------------------------------------------------------------------------- disc layout
@@ -432,7 +454,7 @@ def patches(fs_read, placed):
         d = fs_read(f); sll = struct.unpack_from('<I', d, a - 12 - OVL)[0]
         assert sll & 0xffe0ffff == 0x00001100 and struct.unpack_from('<I', d, a - OVL)[0] == 0x00431021, f
         race_regs[f] = 'zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7'.split()[(sll >> 16) & 31]
-    words, lb = place(routines(race_regs.values()) + bossout.routines(MENU_BUF + M_MAGIC, MENU_MAGIC + 4))
+    words, lb = place(routines(race_regs.values()) + bossout.routines(MENU_BUF + M_MAGIC, MENU_MAGIC, MENU_SAVE, MENU_SHOWN))
     global LABELS; LABELS = lb
     P = [('/SCES_009.92', a, w) for a, w in words]
     # data
@@ -455,12 +477,14 @@ def patches(fs_read, placed):
     data += bytes((-len(data)) % 4)
     P += [('/SCES_009.92', DATA + i, struct.unpack_from('<I', data, i)[0]) for i in range(0, len(data), 4)]
     # menu models: their files, VRAM rectangles of the base riders (texture column, palette row), state
-    d2 = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[6:9] + placed[12:13])
-    d2 += struct.pack('<4h', *[(ENT2 + 8 * k - G_FILES) // 8 for k in range(NMENU)])
-    d2 += b''.join(struct.pack('<4h', *MENU_RECT[k], 64, 256) for k in range(NMENU))
-    d2 += b''.join(struct.pack('<4h', 768, MENU_CLUT_Y[k], 256, 1) for k in range(NMENU))
-    assert DATA2 + len(d2) == DATA2_END and (ENT2 - G_FILES) % 8 == 0 and len(d2) == RCLUT + 8 * NMENU - DATA2
+    d2 = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[6:9] + placed[12:14])
+    d2 += struct.pack('<5h', *[(ENT2 + 8 * k - G_FILES) // 8 for k in range(NMENU)]) + bytes(2)
+    d2 += b''.join(struct.pack('<2h', *MENU_RECT[k]) for k in range(NMENU))
+    d2 += b''.join(struct.pack('<2h', MENU_CLUT_Y[k], MENU_CLUT_H[k]) for k in range(NMENU)) + bytes(8)
+    assert len(d2) == RECT + 8 - DATA2 and DATA2 + len(d2) <= DATA2_END and (ENT2 - G_FILES) % 8 == 0
     P += [('/SCES_009.92', DATA2 + i, struct.unpack_from('<I', d2, i)[0]) for i in range(0, len(d2), 4)]
+    dg = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[14:16]); assert ENTG + len(dg) <= ENTG_END and (ENTG - G_FILES) % 8 == 0
+    P += [('/SCES_009.92', ENTG + i, struct.unpack_from('<I', dg, i)[0]) for i in range(0, len(dg), 4)]
     # hooks
     ms = fs_read('/MAIN_SEL.BIN'); ex = fs_read('/SCES_009.92')
     w_ms = lambda a: struct.unpack_from('<I', ms, a - OVL)[0]; w_ex = lambda a: struct.unpack_from('<I', ex, a - EXE_BASE)[0]
@@ -525,7 +549,7 @@ def ops(disc):
     """the operations of the mod, relative to the player's original disc"""
     rd = disc.read_file
     import vs2p
-    fl = files(rd); blobs = fl + [bytes(M_SIZE)] * 3 + [vs2p.to_p2(fl[2 * k]) for k in range(3)] + [bytes(M_SIZE)]; first, placed = layout(blobs)
+    fl = files(rd); blobs = fl + [bytes(M_SIZE)] * 3 + [vs2p.to_p2(fl[2 * k]) for k in range(3)] + [bytes(M_SIZE)] * 2 + cg_files(rd); first, placed = layout(blobs)
     out = []
     for f, a, new in patches(rd, placed):
         o = (a - EXE_BASE) if f == '/SCES_009.92' else (a - OVL)
@@ -541,8 +565,10 @@ def ops(disc):
     import bundle, cpurider
     p0 = rd(SOURCES[0]); p0a = srcs[0][0]
     for j, (lba, b) in enumerate(placed):
-        if 6 <= j < 9 or j == 12:     # menu model: built by the patcher from the ending model and ENDING.FBD (12: Boss in black)
-            k = 3 if j == 12 else j - 6
+        if j == 14: out.append(['cgpmd', lba, cgrider.FS_CG, cgrider.FS_CINDY_RACE, cg_params(rd)]); continue   # Cindy's ending outfit: race model
+        if j == 15: out.append(['cgfbd', lba, cgrider.FS_CG, cgrider.FS_FBD, CG_HEADER, cg_params(rd)]); continue   # and texture
+        if 6 <= j < 9 or 12 <= j < 14:     # menu model: built by the patcher from the ending model and ENDING.FBD (12: Boss in black, 13: Cindy's)
+            k = j - 9 if j >= 12 else j - 6
             out.append(['crewmenu', lba, ENDING_MODELS[k], ENDING_FBD, menu_params(k)]); continue
         if j % 2 == 0 or 9 <= j < 12:     # model (player 1, or player 2's copy): from the CPU model in PLAYER0.DAT, recomputed bytes only
             src = bundle.parse(p0)[cpurider.CPU[NAMES[j // 2 if j < 9 else j - 9]][0]]; o = p0.find(src); assert o >= 0 and len(src) == len(b)
@@ -566,14 +592,16 @@ def ops(disc):
 # the menu with the hands apart and the board; texture in ENDING/ENDING.FBD). menu_chunk() turns one into a menu
 # model (hands joined to the forearms, board left out, 3040 lower, texture moved to the base rider's column),
 # already "mapped" (absolute pointers) for MENU_BUF where the game code loads it when the rider is selected.
-ENDING_MODELS = ['/ENDING/S_CHR/ED_CHR41.DAT', '/ENDING/S_CHR/ED_CHR51.DAT', '/ENDING/S_CHR/ED_CHR61.DAT', '/ENDING/S_CHR/ED_CHR71.DAT']
+ENDING_MODELS = ['/ENDING/S_CHR/ED_CHR41.DAT', '/ENDING/S_CHR/ED_CHR51.DAT', '/ENDING/S_CHR/ED_CHR61.DAT', '/ENDING/S_CHR/ED_CHR71.DAT', '/ENDING/S_CHR/ED_CHRCG.DAT']
 ENDING_FBD = '/ENDING/ENDING.FBD'
 MENU_BUF = 0x801C2000; MENU_SAVE = 0x801D2000          # free RAM in the menu (left-over copy of MAIN_SEL.FBD)
-M_CLUT = 0x7800; M_IMG = 0x7A00; M_MAGIC = 0xFA00; M_SIZE = 0xFA04
+M_CLUT = 0x7600; M_IMG = 0x7A00   # palette row(s) 0x7600 (and 0x7800: 2 rows)
+M_MAGIC = 0xFA00; M_SIZE = 0xFA04
 # VRAM column of the base rider (Yaggi, Jin, Cindy; Boss: x 640, y 256, texture page 26 = 1664 >> 6 for crew_menu_chunk)
-MENU_COL = [512, 576, 640, 1664]
-MENU_RECT = [(512, 0), (576, 0), (640, 0), (640, 256)]
-MENU_CLUT_Y = [476, 478, 480, 484]
+MENU_COL = [512, 576, 640, 1664, 640]
+MENU_RECT = [(512, 0), (576, 0), (640, 0), (640, 256), (640, 0)]
+MENU_CLUT_Y = [476, 478, 480, 484, 480]
+MENU_CLUT_H = [1, 1, 1, 1, 2]
 Y_SHIFT = 3040
 # words of a TMD primitive holding indices: mode -> [(word, half, 'v' vertex | 'n' normal)]
 TMD_IDX = {0x34: [(4, 0, 'n'), (4, 1, 'v'), (5, 0, 'n'), (5, 1, 'v'), (6, 0, 'n'), (6, 1, 'v')],
@@ -588,11 +616,33 @@ TMD_IDX = {0x34: [(4, 0, 'n'), (4, 1, 'v'), (5, 0, 'n'), (5, 1, 'v'), (6, 0, 'n'
 MENU_PARTS = [[0], [1], [2], [3], [4, 5], [6], [7, 8], [9], [10], [11], [12], [13], [14]]   # ending parts (board out)
 
 
+import cgrider
+CG_HEADER = '/DATA/CHR/FR/FBD2/FRFM1_00.FBD'      # Cindy's race texture (jacket 0, pants 0): the layout
+
+
+def cg_params(rd):
+    global _CGP
+    if _CGP is None: _CGP = (cgrider.params(rd(cgrider.FS_CINDY_END), rd(cgrider.FS_CINDY_RACE)), cgrider.decimation(rd(cgrider.FS_CG)))
+    return {'xf': _CGP[0], 'dec': _CGP[1], 'obj': CG_OBJ, 'board': 3,
+            'pal2': sorted(cgrider.PAL2), 'src': [384, 0, 768, 480], 'copy': CINDY_MENU['copy']}
+
+
+CG_OBJ = [0, 4, 5, 8, 9, 9, 6, 7, 7, 1, 2, 3, 10, 11, 3]
+_CGP = None
+
+
+def cg_files(rd):
+    """room for the race model and texture of Cindy's ending outfit (built by the patcher: sizes only)"""
+    import modular
+    p = cg_params(rd)
+    return [bytes(len(modular.cg_pmd(rd(cgrider.FS_CG), rd(cgrider.FS_CINDY_RACE), p))), bytes(17428)]
+
+
 def menu_params(k, dest=MENU_BUF):
     (px, py), (cx, cy) = END_TEX[k]
     return {'dest': dest, 'col': MENU_COL[k], 'cly': MENU_CLUT_Y[k], 'src': [px, py, cx, cy], 'yshift': Y_SHIFT,
             'parts': MENU_PARTS, 'idx': {str(m): v for m, v in TMD_IDX.items()}, 'clut_off': M_CLUT, 'img_off': M_IMG,
-            'magic_off': M_MAGIC, 'size': M_SIZE, 'magic': MENU_MAGIC + k + 1, **(BOSS_MENU if k == 3 else {})}
+            'magic_off': M_MAGIC, 'size': M_SIZE, 'magic': MENU_MAGIC + k + 1, **(BOSS_MENU if k == 3 else CINDY_MENU if k == 4 else {})}
 
 
 def menu_chunk(archive, fbd, k, dest=MENU_BUF):
@@ -602,9 +652,12 @@ def menu_chunk(archive, fbd, k, dest=MENU_BUF):
 
 # Boss's ending head faces the other way, and has hair (60 primitives textured in a square, u 96..127, v 0..31, that
 # is white in ENDING.FBD: the player's Boss is bald): left out
+# Cindy's unused ending outfit (ED_CHRCG: no board, 15 parts, Cindy's texture at x 384 in ENDING.FBD, both her palette
+# rows: hips and legs on the second one, as her ending model ED_CHR21), shown in Cindy's menu column and rows 480 / 481
+CINDY_MENU = {'pal2': [2, 9, 10, 11, 12, 13, 14], 'copy': [32, 80, 96, 0, 32, 32]}   # + her fringe: the white square (u 96, v 0) gets hair (u 32, v 80)
 BOSS_MENU = {'flip': [0], 'drop': [[0, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 204, 205, 206, 207, 208, 209, 210, 211]]]}
 MENU_MAGIC = 0x4D575243   # 'CRWM' (+ 1..3)
-END_TEX = [((512, 256), (768, 485)), ((576, 256), (768, 486)), ((640, 256), (768, 487)), ((704, 256), (768, 484))]   # Jicchi, Nick, Kelly, Boss in ENDING.FBD
+END_TEX = [((512, 256), (768, 485)), ((576, 256), (768, 486)), ((640, 256), (768, 487)), ((704, 256), (768, 484)), ((384, 0), (768, 480))]   # Jicchi, Nick, Kelly, Boss, Cindy in ENDING.FBD
 
 
 

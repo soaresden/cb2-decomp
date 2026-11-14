@@ -56,8 +56,8 @@ FEATURES = [   # id, French name, English name, description FR, description EN
      'Sur l’écran « 1st STAGE » : START = jouer les qualifications, SELECT = les passer et partir 4e sur 8, au milieu du départ en handicap du Boarder Cross.',
      'On the “1st STAGE” screen: START = play the qualifying, SELECT = skip it and start 4th of 8, in the middle of the Boarder Cross handicap start.'),
     ('crew', 'Jicchi, Nick et Kelly jouables', 'Jicchi, Nick and Kelly playable',
-     'Les trois riders de l’ordinateur rejoignent l’écran BOARDER après Irin, avec leur portrait (tiré de la vidéo de la Compétition), leur modèle 3D (celui de la fin du jeu dans le menu, celui des courses en piste) et leurs stats de course ; leur voix est celle du rider de base, plus grave (Nick, Jicchi) ou plus aiguë (Kelly). Free Style, Big Air, Halfpipe et Board Park (Free Style à 2 joueurs compris, pas en Compétition). Ils sont la récompense des 100 % (écran CONGRATULATIONS) ; avec « Tout débloqué », ils sont là d’office. Fin du film d’intro raccourcie d’environ une seconde.',
-     'The three CPU riders join the BOARDER screen after Irin, with their portrait (from the Competition movie), their 3D model (the ending’s in the menu, the race one on the slopes) and their race stats; their voice is the base rider’s, deeper (Nick, Jicchi) or higher (Kelly). Free Style, Big Air, Halfpipe and Board Park (2-player Free Style included, not in Competition). They are the 100 % reward (CONGRATULATIONS screen); with “Everything unlocked” they are there from the start. End of the intro movie about one second shorter.'),
+     'Les trois riders de l’ordinateur rejoignent l’écran BOARDER après Irin, avec leur portrait (tiré de la vidéo de la Compétition), leur modèle 3D (celui de la fin du jeu dans le menu, celui des courses en piste) et leurs stats de course ; leur voix est celle du rider de base, plus grave (Nick, Jicchi) ou plus aiguë (Kelly). Free Style, Big Air, Halfpipe et Board Park (Free Style à 2 joueurs compris, pas en Compétition). Ils sont la récompense des 100 % (écran CONGRATULATIONS) ; avec « Tout débloqué », ils sont là d’office. Nouvelles tenues sur l’écran WEAR : Boss en noir (sa tenue de la Compétition) et, pour Cindy, sa tenue inédite de la fin du jeu (modèle jamais utilisé par le jeu, à talons et queue de cheval ; Free Style, Big Air, Halfpipe, Board Park). Fin du film d’intro raccourcie d’environ deux secondes.',
+     'The three CPU riders join the BOARDER screen after Irin, with their portrait (from the Competition movie), their 3D model (the ending’s in the menu, the race one on the slopes) and their race stats; their voice is the base rider’s, deeper (Nick, Jicchi) or higher (Kelly). Free Style, Big Air, Halfpipe and Board Park (2-player Free Style included, not in Competition). They are the 100 % reward (CONGRATULATIONS screen); with “Everything unlocked” they are there from the start. New outfits on the WEAR screen: Boss in black (his Competition outfit) and, for Cindy, her unseen ending outfit (a model the game never used, in heels with a ponytail; Free Style, Big Air, Halfpipe, Board Park). End of the intro movie about two seconds shorter.'),
     ('rear', 'Vue arrière (Rond)', 'Rear view (Circle)',
      'En course, Rond maintenu : la caméra passe devant ton rider et regarde derrière lui (pour voir qui te suit).',
      'In a race, hold Circle: the camera moves in front of your rider and looks back (to see who is following).'),
@@ -328,8 +328,11 @@ def apply(disc, pkg, feats, log=lambda m: None):
             elif t == 'fcopy':     # ['fcopy', src, dst, [[src off, dst off, len]...]]: bytes of a file as patched so far
                 sb, db = buf(op[1]), buf(op[2])
                 for so, do, n in op[3]: db[do:do + n] = sb[so:so + n]
-            elif t == 'crewmenu':
-                ch = crew_menu_chunk(orig(op[2]), orig(op[3]), op[4]); nch = -(-len(ch) // 2048); ch += bytes(nch * 2048 - len(ch))
+            elif t in ('crewmenu', 'cgpmd', 'cgfbd'):
+                if t == 'crewmenu': ch = crew_menu_chunk(orig(op[2]), orig(op[3]), op[4])
+                elif t == 'cgpmd': ch = cg_pmd(orig(op[2]), orig(op[3]), op[4])
+                else: ch = cg_fbd(orig(op[2]), orig(op[3]), orig(op[4]), op[5])
+                nch = -(-len(ch) // 2048); ch += bytes(nch * 2048 - len(ch))
                 for k in range(nch):
                     secs[op[1] + k] = (bytes([0, 0, 0x89 if k == nch - 1 else 0x08, 0]) * 2, [[1, ch[k * 2048:(k + 1) * 2048].hex()]])
     mods = {}
@@ -625,7 +628,7 @@ def crew_menu_chunk(archive, fbd, p):
                     sh = 16 * half; val = ((w[wi] >> sh) & 0xffff) + (vo if kind == 'v' else no)
                     w[wi] = (w[wi] & ~(0xffff << sh) & 0xffffffff) | (val << sh)
                 if mode & 4:
-                    w[1] = (w[1] & 0xffff) | (ncba << 16)
+                    w[1] = (w[1] & 0xffff) | ((ncba + (64 if gi in p.get('pal2', ()) else 0)) << 16)   # pal2: next palette row (v58)
                     w[2] = (w[2] & 0xffff) | (((((w[2] >> 16) & 0xffff) & ~0x1f) | (col >> 6)) << 16)
                 P.append(w)
         out.append((V, N, P))
@@ -640,7 +643,11 @@ def crew_menu_chunk(archive, fbd, p):
     px, py, cx, cy = p['src']; vo_ = lambda x, y: 20 + (y * 704 + x - 320) * 2
     chunk = bytearray(p['size']); chunk[:len(tmd)] = tmd
     chunk[p['clut_off']:p['clut_off'] + 512] = fbd[vo_(cx, cy):vo_(cx, cy) + 512]
+    if 'pal2' in p: chunk[p['clut_off'] + 512:p['clut_off'] + 1024] = fbd[vo_(cx, cy + 1):vo_(cx, cy + 1) + 512]
     chunk[p['img_off']:p['img_off'] + 32768] = b''.join(fbd[vo_(px, py + y):vo_(px, py + y) + 128] for y in range(256))
+    if 'copy' in p:      # [su, sv, du, dv, w, h]: a texture square copied over another (texels, v58)
+        su, sv, du, dv, cw, chh = p['copy']; io = p['img_off']
+        for y in range(chh): chunk[io + 128 * (dv + y) + du:io + 128 * (dv + y) + du + cw] = chunk[io + 128 * (sv + y) + su:io + 128 * (sv + y) + su + cw]
 
     struct.pack_into('<I', chunk, p['magic_off'], p['magic'])
     return bytes(chunk)
@@ -752,7 +759,203 @@ def decode_config(code):
     s = int.from_bytes(b[4:12], 'little')
     return {'mods': [f for i, f in enumerate(IDS) if m >> i & 1], 'us_music': bool(b[3] & 1), 'skins': [i for i in range(64) if s >> i & 1]}
 
+# ------------------------------------------------------------------------------------------------ Cindy's ending outfit
+# (mod crew, v58; see remix/cgrider.py). Integer only: disc.js does the same, byte for byte.
+def cg_parts(archive, dec=None):
+    """[(verts [[x, y, z]], textured triangles [(v0, v1, v2, uv0, uv1, uv2)])] of ED_CHRCG (mode 0x34 only); dec: per
+    part, edge collapses [u, v] (u becomes v; triangles left flat are dropped)"""
+    n0 = struct.unpack_from('<I', archive, 4)[0]; t = archive[n0 * 4:4 * struct.unpack_from('<I', archive, 8)[0]]
+    n = struct.unpack_from('<I', t, 8)[0]; out = []
+    for i in range(n):
+        vt, nv, nt, nn, pt, np_, sc = struct.unpack_from('<7I', t, 12 + 28 * i)
+        V = [list(struct.unpack_from('<3h', t, 12 + vt + 8 * j)) for j in range(nv)]
+        T = []; o = 12 + pt
+        for _ in range(np_):
+            ilen = t[o + 1]; w = struct.unpack_from('<%dI' % (ilen + 1), t, o)
+            if w[0] >> 24 == 0x34: T.append((w[4] >> 16, w[5] >> 16, w[6] >> 16, w[1] & 0xffff, w[2] & 0xffff, w[3] & 0xffff))
+            o += 4 + 4 * ilen
+        if dec:
+            rp = list(range(len(V)))
+            for u, v in dec[i]: rp[u] = v
+            def f(x):
+                while rp[x] != x: x = rp[x]
+                return x
+            T = [(f(a), f(b), f(c), u0, u1, u2) for a, b, c, u0, u1, u2 in T]
+            T = [t for t in T if t[0] != t[1] and t[1] != t[2] and t[0] != t[2]]
+        out.append((V, T))
+    return out
+
+
+def cg_texels(uv0, uv1, uv2):
+    """texels (x, y) whose centre is in the UV triangle (edges included; doubled coordinates)"""
+    P = [((u & 0xff) * 2, (u >> 8) * 2) for u in (uv0, uv1, uv2)]
+    xs = [p[0] for p in P]; ys = [p[1] for p in P]; out = []
+    (ax, ay), (bx, by), (cx, cy) = P
+    area = (bx - ax) * (cy - ay) - (by - ay) * (cx - ax)
+    if area == 0: return out
+    for y in range(min(ys) // 2, (max(ys) + 1) // 2 + 1):
+        for x in range(min(xs) // 2, (max(xs) + 1) // 2 + 1):
+            px, py = 2 * x + 1, 2 * y + 1
+            e0 = (bx - ax) * (py - ay) - (by - ay) * (px - ax)
+            e1 = (cx - bx) * (py - by) - (cy - by) * (px - bx)
+            e2 = (ax - cx) * (py - cy) - (ay - cy) * (px - cx)
+            if (e0 >= 0 and e1 >= 0 and e2 >= 0) or (e0 <= 0 and e1 <= 0 and e2 <= 0):
+                if 0 <= x < 128 and 0 <= y < 256: out.append((x, y))
+    return out
+
+
+def cg_layout(parts):
+    """-> owner[y][x] (first part covering the texel, -1 none), group of each part (parts sharing texels together)"""
+    owner = [[-1] * 128 for _ in range(256)]; up = list(range(len(parts)))
+    def find(a):
+        while up[a] != a: a = up[a]
+        return a
+    for i, (V, T) in enumerate(parts):
+        for tr in T:
+            for x, y in cg_texels(*tr[3:]):
+                o = owner[y][x]
+                if o < 0: owner[y][x] = i
+                else:
+                    a, b = find(o), find(i)
+                    if a != b: up[max(a, b)] = min(a, b)
+    roots = []; group = []
+    for i in range(len(parts)):
+        r = find(i)
+        if r not in roots: roots.append(r)
+        group.append(roots.index(r))
+    return owner, group
+
+
+def cg_median_cut(hist, n):
+    """hist {(r, g, b): count} (5-bit) -> n colours (r, g, b), deterministic"""
+    boxes = [sorted(hist.items())]
+    while len(boxes) < n:
+        best = -1; bi = -1; bc = 0
+        for k, b in enumerate(boxes):
+            if len(b) < 2: continue
+            for c in range(3):
+                rg = max(e[0][c] for e in b) - min(e[0][c] for e in b)
+                if rg > best: best, bi, bc = rg, k, c
+        if bi < 0: break
+        b = sorted(boxes[bi], key=lambda e: (e[0][bc], e[0]))
+        tot = sum(e[1] for e in b); acc = 0; cut = 1
+        for k, e in enumerate(b):
+            acc += e[1]
+            if 2 * acc >= tot: cut = min(max(k + 1, 1), len(b) - 1); break
+        boxes[bi:bi + 1] = [b[:cut], b[cut:]]
+    pal = []
+    for b in boxes:
+        tot = sum(e[1] for e in b)
+        pal.append(tuple(sum(e[0][c] * e[1] for e in b) // tot for c in range(3)))
+    while len(pal) < n: pal.append((0, 0, 0))
+    return pal
+
+
+def cg_fbd(archive, fbd, header, p):
+    """['cgfbd', lba, archive, fbd, header fbd, p]: her race texture (FRFM1_00.FBD layout: 20 bytes, 2 palette rows of
+    256 at x 768, rows 493 / 494, 128 x 256 4-bit image); p['src'] = [x, y, palette x, palette y] in ENDING.FBD,
+    p['pal2'] = parts reading the next palette row"""
+    parts = cg_parts(archive, p.get('dec')); owner, group = cg_layout(parts)
+    vo = lambda x, y: 20 + (y * 704 + x - 320) * 2
+    sx, sy, cx, cy = p['src']; pal2 = p['pal2']; cp = p.get('copy')
+    def col(x, y):
+        i = owner[y][x]
+        if cp and cp[2] <= x < cp[2] + cp[4] and cp[3] <= y < cp[3] + cp[5]: x, y = x - cp[2] + cp[0], y - cp[3] + cp[1]
+        k = fbd[vo(sx, sy + y) + x]
+        c = struct.unpack_from('<H', fbd, vo(cx + k, cy + (1 if i in pal2 else 0)))[0]
+        return (c & 31, (c >> 5) & 31, (c >> 10) & 31)
+    ng = max(group) + 1; hists = [dict() for _ in range(ng)]
+    for y in range(256):
+        for x in range(128):
+            i = owner[y][x]
+            if i >= 0: h = hists[group[i]]; c = col(x, y); h[c] = h.get(c, 0) + 1
+    pals = [cg_median_cut(h, 16) if h else [(0, 0, 0)] * 16 for h in hists]
+    out = bytearray(header[:20]) + bytearray(1024) + bytearray(128 * 256 // 2)
+    for g, pl in enumerate(pals):
+        for k, (r, gg, b) in enumerate(pl):
+            v = r | (gg << 5) | (b << 10)
+            struct.pack_into('<H', out, 20 + 512 * (g // 16) + 2 * (16 * (g % 16) + k), v if v else 0x8000)
+    for y in range(256):
+        for x in range(128):
+            i = owner[y][x]
+            if i < 0: continue
+            c = col(x, y); pl = pals[group[i]]; best = 0; bd = 1 << 30
+            for k, q in enumerate(pl):
+                dd = (c[0] - q[0]) ** 2 + (c[1] - q[1]) ** 2 + (c[2] - q[2]) ** 2
+                if dd < bd: bd, best = dd, k
+            o = 20 + 1024 + y * 64 + x // 2
+            out[o] |= best << (4 * (x & 1))
+    return bytes(out)
+
+
+def cg_quads(T):
+    """triangles [(v0, v1, v2, uv0, uv1, uv2)] -> polygons [(v, uv) x 3 or 4]: two triangles sharing an edge (same
+    vertices and UVs) become one quad (a, b, c, d): the GPU draws it as (a, b, c) and (b, c, d), the same triangles"""
+    edge = {}
+    for k, t in enumerate(T):
+        vs = [(t[0], t[3]), (t[1], t[4]), (t[2], t[5])]
+        for e in range(3): edge.setdefault((min(vs[e], vs[(e + 1) % 3]), max(vs[e], vs[(e + 1) % 3])), []).append(k)
+    used = [False] * len(T); out = []
+    for k, t in enumerate(T):
+        if used[k]: continue
+        used[k] = True; vs = [(t[0], t[3]), (t[1], t[4]), (t[2], t[5])]; done = False
+        for e in range(3):
+            x, y = vs[e], vs[(e + 1) % 3]; key = (min(x, y), max(x, y))
+            for j in edge[key]:
+                if used[j]: continue
+                u = T[j]; ws = [(u[0], u[3]), (u[1], u[4]), (u[2], u[5])]
+                d = [w for w in ws if w != x and w != y]
+                if len(d) != 1: continue
+                a = vs[(e + 2) % 3]; used[j] = True; done = True
+                out.append((a, x, y, d[0])); break
+            if done: break
+        if not done: out.append(tuple(vs))
+    return out
+
+
+def cg_pmd(archive, race, p):
+    """['cgpmd', lba, archive, race pmd, p]: her race model: 12 objects as Cindy's FR/1P/FRFM1.PMD; p['xf'] = per part
+    [3x3 (x 4096), t], p['obj'] = race object of each part, p['board'] = the object whose own blocks are kept except
+    its type-0x12 ones (the board, without Cindy's boots); triangles: PMD type 0x12 (POLY_GT3, both buffers, then the
+    3 vertices), palette of the part's texel group (cg_fbd), texture page 9"""
+    parts = cg_parts(archive, p.get('dec')); owner, group = cg_layout(parts)
+    pp, vp, nobj = struct.unpack_from('<3I', race, 4); o = 16; objs = []
+    for i in range(nobj):
+        n = struct.unpack_from('<I', race, o)[0]; objs.append(list(struct.unpack_from('<%dI' % n, race, o + 4))); o += 4 + 4 * n
+    def raw_block(q):
+        n, t = struct.unpack_from('<HH', race, q); pk, nv = {0x12: (0x50, 3), 0x13: (0x68, 4), 0x11: (0x50, 3)}[t]
+        return race[q:q + 4 + n * (pk + 8 * nv)]
+    blocks = []
+    for ob in range(nobj):
+        bl = [raw_block(q) for q in objs[ob] if ob == p['board'] and struct.unpack_from('<HH', race, q)[1] != 0x12]
+        tris = bytearray(); nt = 0; quads = bytearray(); nq = 0
+        for i, (V, T) in enumerate(parts):
+            if p['obj'][i] != ob: continue
+            m = p['xf'][i]
+            W = [[((m[3 * r] * v[0] + m[3 * r + 1] * v[1] + m[3 * r + 2] * v[2]) >> 12) + m[9 + r] for r in range(3)] for v in V]
+            g = group[i]; cba = ((493 + g // 16) << 6) | ((768 + 16 * (g % 16)) >> 4)
+            vx = lambda k: struct.pack('<4h', *W[k], 0)
+            for q in cg_quads(T):
+                if len(q) == 3:
+                    (a, u0), (b, u1), (c, u2) = q
+                    pk = struct.pack('<10I', 0x09000000, 0x35808080, 0, (cba << 16) | u0, 0x808080, 0, (9 << 16) | u1, 0x808080, 0, u2)
+                    tris += pk + pk + vx(a) + vx(b) + vx(c); nt += 1
+                else:
+                    (a, u0), (b, u1), (c, u2), (d, u3) = q
+                    pk = struct.pack('<13I', 0x0C000000, 0x3D808080, 0, (cba << 16) | u0, 0x808080, 0, (9 << 16) | u1, 0x808080, 0, u2, 0x808080, 0, u3)
+                    quads += pk + pk + vx(a) + vx(b) + vx(c) + vx(d); nq += 1
+        if nt: bl.append(struct.pack('<HH', nt, 0x12) + tris)
+        if nq: bl.append(struct.pack('<HH', nq, 0x13) + quads)
+        blocks.append(bl)
+    head = 16 + sum(4 + 4 * len(b) for b in blocks); tab = bytearray(); body = bytearray()
+    for bl in blocks:
+        tab += struct.pack('<I', len(bl))
+        for b in bl: tab += struct.pack('<I', head + len(body)); body += b
+    return struct.pack('<4I', 0x42, head, 0, nobj) + bytes(tab) + bytes(body)
+
+
 if __name__ == '__main__':
     # usage: modular.py PAL.chd REFERENCE.chd PAL_fs remix/cb2remix.delta.gz out.json.gz
     pkg = generate(*sys.argv[1:5]); save(pkg, sys.argv[5])
     print({k: len(v) for k, v in pkg['ops'].items()}, os.path.getsize(sys.argv[5]), 'octets')
+

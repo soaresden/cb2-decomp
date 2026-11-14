@@ -538,3 +538,34 @@ joueur 2 quand les deux joueurs choisissent Boss en VS (texture = 0xD8 + joueur)
 - Couleur du boost : gris acier pour la tenue noire.
 - Vérifié dans l'émulateur : WEAR (bascule, aperçu, validation), Free Style (BOSS0 / BOSS1 selon la tenue), Compétition
   (Big Air en noir), Jicchi en Free Style inchangé.
+
+v58 : **tenue inédite de Cindy** (`remix/cgrider.py`, mod `crew`). `ENDING/S_CHR/ED_CHRCG.DAT` est un modèle de la fin
+que le jeu ne charge jamais (aucun chemin dans la table des fichiers) : c'est Cindy (elle lit l'emplacement de texture
+de Cindy dans la fin, x 384 de ENDING.FBD, palettes 480 / 481 : visage, cheveux, veste rouge, pantalon beige, chaussures
+rouges tombent juste), plus fine, à talons, queue de cheval, sans planche (15 pièces).
+- Menu : 7e tenue de Cindy sur l'écran WEAR (rangée des vestes, 0..6 ; 3..5 : ses tenues cachées du mod `outfits`), dans
+  les modes où la course la charge (Free Style, Big Air, Halfpipe, Board Park ; pas en Compétition ni en VS). Modèle de
+  menu 5 de crew : `crewmenu` gagne `pal2` (pièces sur la 2e ligne de palette : hanches, jambes, comme le modèle de fin
+  de Cindy) et `copy` (le carré u 96..127, v 0..31, blanc dans ENDING.FBD — la fin le remplit — reçoit des cheveux :
+  sa frange). Les chunks de menu ont leurs palettes en 0x7600 (2 lignes) ; la sauvegarde de la colonne du rider de base
+  passe à MENU_SAVE + 0x404 ; rectangles VRAM courts (COLXY, CLUTYH) et construits par `rcol` / `rclut`.
+  `bossk` rend 5 pour Cindy quand BOUT = 6 ; `ensr` fait défiler sa rangée de vestes ; `ensp` montre ce modèle pour la
+  tenue 6 et remet celui de Cindy pour les autres. Validée, la tenue devient veste 3 + tenue cachée (mod `outfits`).
+- Course : `ldg` (crochet `ld` de crew) charge ses deux fichiers à la place de ceux de Cindy (rider 2, tenue cachée,
+  veste 3) ; entrées de fichiers en 0x8001C1A0 (copie morte de la boucle de func_8001C748).
+  - Modèle (`cg_pmd`, fait par le patcheur) : les 12 objets de FR/1P/FRFM1.PMD. Ses 15 pièces sont mises dans la pose de
+    course de Cindy : pour chaque pièce, la transformation qui envoie la pièce de fin de Cindy (ED_CHR21) sur son objet
+    de course (−90° autour de y, échelle 0,59, puis centre / axe principal / longueur) — 15 petites matrices entières
+    calculées à la génération (`cgrider.params`). Ses pieds vont avec la planche (objet 3, bottes de Cindy retirées),
+    ses semelles noires (18 triangles plats) sont laissées de côté.
+  - Taille : le jeu garde le modèle du joueur dans un tampon à la taille du plus gros (Irin, 41 664 octets) ; le modèle
+    de fin donnait 80 Ko (blocage à l'écran de chargement : vérifié à 61 et 57 Ko, passe à 40 Ko). Simplification par
+    fusions d'arêtes (erreur quadrique, sommets existants, bords des pièces gardés, pas de triangle retourné ; liste de
+    paires de sommets dans le paquet, `cgrider.decimation`), puis triangles réunis en quads (type 0x13, deux triangles
+    qui partagent une arête et ses UV : le GPU dessine les mêmes) : 35 600 octets.
+  - Texture (`cg_fbd`) : ses UV lisent la texture 8 bits de la fin (128 × 256) ; la course veut 4 bits : pièces qui
+    partagent des texels regroupées, 16 couleurs par groupe (médiane, entiers seulement), une palette par groupe
+    (lignes 493 / 494).
+  - Le tout en entiers : disc.js fait les mêmes octets (vérifié).
+- Vérifié dans l'émulateur : WEAR (7 tenues en Free Style, 6 en Compétition), Free Style et Halfpipe avec elle, Jicchi
+  et Boss en noir inchangés. Non testé : VS, Big Air, Board Park.
