@@ -255,7 +255,8 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
 
 - Les interrupteurs sont des bits de 0x80057438 (bit à 1 = coupé) : 1 vue arrière, 2 notes du half-pipe en direct,
   4 annonces de déblocage, 8 figures en l'air (`air`), 16 chocs en Boarder Cross (`ramming`), 32 écran large (à 1 =
-  actif : coupé par défaut), 64 radar avec les têtes (`radar`), 128 UNLOCK EVERYTHING fait. Cet octet fait partie
+  actif : coupé par défaut), 64 ligne du radar (`radar`), 128 classement (`radar`), 256 UNLOCK EVERYTHING fait (l'octet
+  0x80057439, lui aussi sauvegardé et jamais lu : les options se lisent en demi-mot). Cet octet fait partie
   du bloc 0x80057434..0x8005744D copié dans la sauvegarde mais n'est jamais lu par le jeu (docs/progression.md) : le
   réglage suit la carte mémoire. À 0, tout est actif comme avant.
 - `rear`, `hplive`, `news` lisent leur bit. `air` et `ramming` sont coupés là où leur code vit, dans l'exe (toujours
@@ -267,10 +268,10 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
   seulement lue par les fonctions de vue) passe de 0x1000 à 0xC00 : le jeu calcule lui-même un champ 16:9, à afficher
   étiré en 16:9 (sans le « widescreen hack » de l'émulateur). Valeur reprise du code DuckStation de PeterDelta pour ce
   disque (SCES-00992 : A7059288 10000C00, github.com/PeterDelta/PCSX2). Vérifié : course de Free Style en 16:9.
-- UNLOCK EVERYTHING (dernière ligne, bit 128 = fait, affiché ON) : une action, pas un interrupteur. Premier R2 : mot
+- UNLOCK EVERYTHING (dernière ligne, bit 256 = fait, affiché ON) : une action, pas un interrupteur. Premier R2 : mot
   `conf` à 1, trois lignes d'avertissement sous le panneau (`owr`) ; second R2 (`ounl`, dans l'exe) : le bloc de
   progression reçoit les valeurs d'une partie à 100 % (0x743C/0x743E = 10, 0x7440 |= 0x7F, 0x7442 |= 7,
-  0x7444/0x7446 = 1, 0x7448/0x744A/0x744C = 0x3FF), bit 128 mis, `conf` remis à 0. Bouger le curseur annule
+  0x7444/0x7446 = 1, 0x7448/0x744A/0x744C = 0x3FF), bit 256 mis, `conf` remis à 0. Bouger le curseur annule
   l'avertissement. La sauvegarde garde le tout (pas de retour arrière). Sert à essayer tous les modes et toutes les
   options d'un coup ; débloque aussi Jicchi, Nick et Kelly (porte 100 % de `crew`).
 - Tampon de primitives du panneau : 0x801F8000 + 0x2000 par image (0x801F0000..0x801FF000 n'est pas touché sur cet
@@ -284,7 +285,7 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
   annonce non lancée avec le bit 4. Pas encore vérifié : l'octet relu après un vrai enregistrement puis chargement de
   la carte.
 
-## Radar de course avec les têtes (`radar`, v27)
+## Classement et radar de course (`radar`, v27)
 
 Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D614`, données dans `func_8007BEB8`).
 
@@ -309,6 +310,16 @@ Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D
   mode, même test que la voix) posé sur la ligne en y 107, le joueur entouré d'un contour jaune qui clignote comme le carré d'origine, et un DR_TPAGE
   de la page des têtes en tête de chaque entrée (le texte du HUD, S et F compris, change la page dans les mêmes
   entrées). Retour en 0x8006D540 avec s2 (primitives) et s6 (entrée suivante) comme la boucle les laisse.
+- Classement (bit 128 coupé), dessiné par `rank` avant la ligne, dans l'entrée 3 de l'ordering table comme le texte
+  du HUD : trois rangées (la place devant le joueur, la sienne, celle derrière ; 1er à 3e quand il mène, 6e à 8e quand
+  il est dernier ; place = coureur + 0x58) en x 76, y -24, 18 pixels d'écart : la place (« 1ST »…, texte de SBC2
+  `func_8008AFC8` avec la police D_8009BBC0, couleur par `func_8008B354` : or, argent, bronze, blanc, qui scintille avec
+  VSync(-1)), la tête (contour jaune pour le joueur) et le pourcentage de la piste fait (progression × 100 / 255), sur
+  un cadre sombre translucide (TILE 0x62 précédé d'une page en mode moitié-moitié). Le texte prend ses primitives à
+  D_80058E0C, que la fonction de la barre garde dans s2 et réécrit à la fin : `rtext` les synchronise autour de
+  l'appel (sans ça, les deux se recouvraient et le jeu se figeait). Mots libres du cadre de pile pendant `rad` : 0x24,
+  0x2C, 0x5C, 0x64, 0x6C, 0x74 (0x7C : gris de la ligne). Ligne coupée (bit 64) : retour à la boucle d'origine avec
+  ses registres (s1 = primitive + 0xA, a2 = 0xFF000000, s7 = 0xFFFFFF) ; les deux coupés : rien n'est changé.
 - Première version en haut à gauche (barre plus haute, deux rangées) : têtes trop serrées sur 112 pixels ; la ligne du
   bas en fait 272.
 - Vérifié dans l'émulateur : têtes et contour en course, option coupée (barre et carrés d'origine en haut), alias

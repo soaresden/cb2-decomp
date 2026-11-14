@@ -2,8 +2,9 @@
 # is held, L1 moves the cursor and R2 switches the line on or off: rear view (mod rear), live half-pipe marks
 # (hplive), unlock announcements (news), air control (air), Boarder Cross ramming (ramming).
 #
-# The switches are bits of 0x80057438 (bit set = off), a byte of the progress block that the game saves on the
-# memory card but never reads (see docs/progression.md): they follow the save.
+# The switches are bits of the halfword 0x80057438 (bit set = off; bits 8.. in 0x80057439), in the progress block that
+# the game saves on the memory card but never reads (see docs/progression.md; INIT zeroes it): they follow the save.
+#   - radar tests bit 64 (the line) and bit 128 (the ranking panel);
 #   - rear, hplive, news test their bit themselves;
 #   - air and ramming are switched where their code lives in the exe (always in memory): every frame of the mode
 #     select screen, the words of PATCH get their "on" or "off" value (air: three branches of the exe routines md / ax /
@@ -28,11 +29,11 @@ CAVES = [(0x800654A8, 0x8006562C), (0x8006F680, 0x8006F71C), (0x8006F7C4, 0x8006
          (0x80031180, 0x8003120C), (0x8003BD98, 0x8003BE10), (0x80040AA4, 0x80040B0C),     # exe: dead functions kept for this mod
          (0x8001829C, 0x80018320), (0x8003EAC4, 0x8003EB80), (0x800123C8, 0x80012448)]     # (see crew.CAVES)
 DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data
-X0, X1, Y0, DY = -150, 70, -48, 13
+X0, X1, Y0, DY = -150, 70, -56, 13
 LINES = [('REAR VIEW (CIRCLE)', 1), ('LIVE HALF-PIPE MARKS', 2), ('UNLOCK NEWS', 4), ('AIR CONTROL', 8), ('BOARDER CROSS RAMMING', 16),
-         ('WIDESCREEN 16:9', 32), ('RACE RADAR HEADS', 64), ('UNLOCK EVERYTHING', 128)]
-INV = 32 | 128                         # lines whose bit set means ON (off by default)
-UNLOCK_LINE = 7                        # an action, not a switch: R2 shows the warning, R2 again unlocks (bit 128 = done)
+         ('WIDESCREEN 16:9', 32), ('RACE RADAR LINE', 64), ('RACE RANKING', 128), ('UNLOCK EVERYTHING', 256)]
+INV = 32 | 256                         # lines whose bit set means ON (off by default)
+UNLOCK_LINE = 8                        # an action, not a switch: R2 shows the warning, R2 again unlocks (bit 256 = done)
 WARN = ['R2 AGAIN UNLOCKS ALL RIDERS,', 'COURSES, BOARDS, MIRROR, HARD,', 'TROPHIES. SAVED. NO UNDO!']     # <= 30 letters (box)
 # the progress block as a 100 % game (remix/progress.py): courses, riders (Boss, Gray, Snowman), SPECIAL boards,
 # Mirror, Hard, the 30 Free Style trophies; the save keeps it
@@ -76,9 +77,9 @@ def routines(D):
          f'andi t0, t1, {R1}', 'bnez t0, op1', 'nop', 'j out', 'nop',
          'op1:', 'nor t4, t3, zero', 'and t4, t4, t1', f'lw t5, {L(D["cur"])}(t2)', f'andi t0, t4, {L1}', 'beqz t0, op2', 'addiu t5, t5, 1',
          f'slti t0, t5, {n}', 'bnez t0, op3', 'nop', 'move t5, zero', 'op3:', f'sw t5, {L(D["cur"])}(t2)', f'sw zero, {L(D["conf"])}(t2)',
-         'op2:', f'lw t5, {L(D["cur"])}(t2)', f'lui t0, {H(FLAGS)}', f'lbu t6, {L(FLAGS)}(t0)', f'andi t7, t4, {R2}', 'beqz t7, op4', 'addiu t7, zero, 1',
+         'op2:', f'lw t5, {L(D["cur"])}(t2)', f'lui t0, {H(FLAGS)}', f'lhu t6, {L(FLAGS)}(t0)', f'andi t7, t4, {R2}', 'beqz t7, op4', 'addiu t7, zero, 1',
          f'addiu t8, zero, {UNLOCK_LINE}', 'bne t5, t8, op5', 'nop', 'j ounl', 'nop', 'op5:',
-         'sllv t7, t7, t5', 'xor t6, t6, t7', f'sb t6, {L(FLAGS)}(t0)',
+         'sllv t7, t7, t5', 'xor t6, t6, t7', f'sh t6, {L(FLAGS)}(t0)',
          'op4:', 'sw t6, 0x38(sp)', 'sw t5, 0x24(sp)', 'j odr', 'nop']
     # odr: the panel
     S += ['odr:', 'sll v1, s1, 2', 'addu v1, v1, s1', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw s5, 4(v1)', 'sll v0, s1, 13',
@@ -102,7 +103,7 @@ def routines(D):
           'oun1:', f'sw zero, {L(D["conf"])}(t2)', 'lui t8, 0x8005']
     for o, v, k in UNLOCK:
         S += ([f'lhu t9, {o}(t8)', 'nop', f'ori t9, t9, {v}'] if k == 'o' else [f'addiu t9, zero, {v}']) + [f'sh t9, {o}(t8)']
-    S += ['ori t6, t6, 128', f'sb t6, {L(FLAGS)}(t0)', 'j op4', 'nop']
+    S += ['ori t6, t6, 256', f'sh t6, {L(FLAGS)}(t0)', 'j op4', 'nop']
     yb = Y0 + DY * (n + 1 + len(WARN))
     S += ['drw:', 'sw ra, 0x2c(sp)', 'sw t4, 0x10(sp)', 'sw t5, 0x14(sp)', 'sw t6, 0x18(sp)', 'sw t7, 0x1c(sp)', 'sw zero, 0x20(sp)',
           'move a0, s5', 'move a1, s6', f'lui a2, {H(FONT)}', f'addiu a2, a2, {L(FONT)}', f'jal {TEXT}', f'addiu a3, zero, {CLUT}',
@@ -124,7 +125,7 @@ def routines(D):
 TOP = {'opt', 'odr', 'ost', 'drw', 'box', 'out', 'oap', 'owr', 'ow2', 'ounl'}
 
 
-def place(S, tables):
+def place(S, tables, extra=()):
     """blocks (split at TOP labels) placed best fit, then the tables (bytes) in what is left -> words, labels"""
     blocks = []; cur = []
     for l in S:
@@ -133,13 +134,14 @@ def place(S, tables):
     blocks.append(cur)
     size = lambda b: 4 * sum(1 for l in b if not l.endswith(':'))
     caves = [[lo, lo, hi, []] for lo, hi in CAVES]
+    tcaves = [[lo, lo, hi, []] for lo, hi in extra]          # for the tables only
     for b in sorted(blocks, key=lambda b: -size(b)):
         fit = [c for c in caves if c[1] + size(b) <= c[2]]
         assert fit, 'plus de place pour ' + b[0]
         c = min(fit, key=lambda c: c[2] - c[1]); c[3].append(b); c[1] += size(b)
     tab_at = {}
     for name, t in tables:
-        fit = [c for c in caves if c[1] + len(t) <= c[2]]
+        fit = [c for c in caves + tcaves if c[1] + len(t) <= c[2]]
         assert fit, 'plus de place pour ' + name
         c = min(fit, key=lambda c: c[2] - c[1]); tab_at[name] = c[1]; c[1] += len(t)
     cave_of = {}
@@ -171,9 +173,10 @@ def build():
     blobs = lambda tabaddr: [('tab', b''.join(struct.pack('<I', tabaddr['l%d' % i]) for i in range(len(LINES)))), ('ptab', ptab)] + \
         [(k, t.encode() + bytes(4 - len(t) % 4)) for k, t in strs]
     D2 = dict(D); D2.update({k: 0 for k in ['tab', 'ptab'] + [k for k, _ in strs]})      # first pass: where the tables land
-    _, lab = place(routines(D2), blobs(D2))
+    extra = [(DATA[0] + (len(d) + 3) // 4 * 4, DATA[1])]       # what the data block leaves
+    _, lab = place(routines(D2), blobs(D2), extra)
     D2.update({k: lab[k] for k in ['tab', 'ptab'] + [k for k, _ in strs]})
-    words, lab = place(routines(D2), blobs(D2))
+    words, lab = place(routines(D2), blobs(D2), extra)
     assert all(lab[k] == D2[k] for k in ['tab', 'ptab'] + [k for k, _ in strs])
     return words, lab, d
 

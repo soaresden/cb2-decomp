@@ -17,6 +17,9 @@
 # crew alias), the player with a yellow outline that blinks like the original square, and a DR_TPAGE for the heads'
 # page (the HUD text in the same entries changes it); then back to 0x8006D540 with s2 (primitives) and s6 (next entry)
 # as the loop leaves them. Code and data in two dead functions of SBC2 (no call, jump or pointer to them).
+# Ranking panel (bit 128 of the options off): before that, `rank` draws on the right three rows (the place ahead of the
+# player, the player's, the one behind), each with the place in SBC2's HUD font (gold, silver, bronze shimmering for
+# the first three), the head and the percentage of the course done (see docs/modular.md).
 import struct
 from asm import asm
 
@@ -24,14 +27,19 @@ OVL = 0x8005AEA8
 FILE = '/SBC2.BIN'
 HOOK, BACK_LOOP, BACK_END = 0x8006D410, 0x8006D418, 0x8006D540
 PROGRESS = 0x8007E4B0                       # (course, position) -> 0..255
-LOADIMAGE = 0x80029B7C
+LOADIMAGE, PRIMS = 0x80029B7C, 0x80058E0C
 CODE, CODE_END = 0x8007D614, 0x8007DF54     # dead function func_8007D614 (0x940 bytes)
 DATA, DATA_END = 0x8007BEB8, 0x8007C81C     # dead function func_8007BEB8 (0x964 bytes)
-OPT_FLAGS, OPT_BIT = 0x80057438, 64         # in-game options (mod options): bit set = radar off
+OPT_FLAGS, LINE_BIT, RANK_BIT = 0x80057438, 64, 128    # in-game options (mod options): bit set = line / panel off
+VSYNC, TEXT, TEXT_RGB, FONT = 0x8003BE30, 0x8008AFC8, 0x8008B354, 0x8009BBC0   # VSync(-1); SBC2's HUD text (the S and F)
 G_RIDER, MODE = 0x80057408, 0x80057420
 HEADS_VRAM, CLUT_VRAM = (768, 472), (768, 490)   # empty in the race (bottom of the HUD texture page)
 N = 10                                      # heads, in the order of crew.STRIP_ORDER
-PIX, CLUTS, RECT1, RECT2 = 0, 1280, 1600, 1608
+PIX, CLUTS, RECT1, RECT2, POSS, PCT, COLS = 0, 1280, 1600, 1608, 1616, 1652, 1660   # data block (end 1684)
+PX, PY, ROW = 76, -24, 18                   # ranking panel: places, heads, percentages (right side, mid height)
+# text colours (the font is white, 0x80 = as is): gold, silver, bronze, others; value = base + step * t, t = 0..15..0
+COLORS = [(128, 84, 0, 0, 2, 1), (88, 88, 96, 2, 2, 2), (104, 56, 20, 2, 2, 1), (128, 128, 128, 0, 0, 0)]
+BOX_RGB = 0x00181818
 BAR_X, BAR_W, BAR_Y, BAR_H, HEAD_Y = -0x8C, 0x110, 112, 6, 107    # a long thin line at the bottom, the heads on it
 LINE_RGB = 0x30                             # grey level of the line (translucent: a white one disappears on the snow)
 COLOR_SITE = 0x8006D58C                     # "lhu t1, 0x22(sp) / addiu v0, zero, 0xFF" (bar colour) -> "lw v0, 0x7c(sp) / lhu t1, ..."
@@ -45,17 +53,20 @@ def L(a): return a - (H(a) << 16)
 
 
 def data_words():
-    return struct.pack('<4h', HEADS_VRAM[0], HEADS_VRAM[1], 4 * N, 16) + struct.pack('<4h', CLUT_VRAM[0], CLUT_VRAM[1], 16 * N, 1)
+    d = struct.pack('<4h', HEADS_VRAM[0], HEADS_VRAM[1], 4 * N, 16) + struct.pack('<4h', CLUT_VRAM[0], CLUT_VRAM[1], 16 * N, 1)
+    d += b''.join(('%d%s' % (k, 'ST' if k == 1 else 'ND' if k == 2 else 'RD' if k == 3 else 'TH')).encode() + b'\0' for k in range(1, 10))[:36]
+    d += bytes(8) + b''.join(bytes(c) for c in COLORS)
+    assert len(d) == COLS + 24 - RECT1 and len(d) % 4 == 0
+    return d
 
 
 def code(aliasv, basev, modesv):
     la = lambda r, a: [f'lui {r}, {H(a)}', f'addiu {r}, {r}, {L(a)}']
-    S = ['rad:', 'addiu t1, zero, 0xff', 'sw t1, 0x7c(sp)', 'lui t0, 0x8005', f'lbu t0, {OPT_FLAGS & 0xffff:#x}(t0)', 'nop', f'andi t0, t0, {OPT_BIT}', 'beqz t0, ra0', 'nop',
+    S = ['rad:', 'addiu t1, zero, 0xff', 'sw t1, 0x7c(sp)', 'lui t0, 0x8005', f'lhu t0, {OPT_FLAGS & 0xffff:#x}(t0)', 'nop',
+         f'andi t0, t0, {LINE_BIT | RANK_BIT}', f'addiu t1, zero, {LINE_BIT | RANK_BIT}', 'bne t0, t1, ra0', 'nop',
          f'j {BACK_LOOP}', 'move s3, zero',
-         'ra0:', f'addiu t1, zero, {LINE_RGB}', 'sw t1, 0x7c(sp)', f'addiu t0, zero, {BAR_X}', 'sh t0, 0x18(sp)', f'addiu t0, zero, {BAR_Y}', 'sh t0, 0x1a(sp)',
-         f'addiu t0, zero, {BAR_W}', 'sh t0, 0x20(sp)', f'addiu t0, zero, {BAR_H}', 'sh t0, 0x22(sp)',
          # heads and palettes to VRAM
-         *la('a0', DATA + RECT1), *la('a1', DATA + PIX), f'jal {LOADIMAGE}', 'nop',
+         'ra0:', *la('a0', DATA + RECT1), *la('a1', DATA + PIX), f'jal {LOADIMAGE}', 'nop',
          *la('a0', DATA + RECT2), *la('a1', DATA + CLUTS), f'jal {LOADIMAGE}', 'nop',
          # player's head (s7): crew alias of g_rider if chosen for this mode, else g_rider (Boss, Gray, Snowman = 7..9)
          'lui t0, 0x8005', f'lh s4, {G_RIDER & 0xffff:#x}(t0)', 'nop', 'move s7, s4', 'slti at, s4, 4', 'bnez at, rp1', 'nop', 'addiu s7, s4, 3',
@@ -63,7 +74,14 @@ def code(aliasv, basev, modesv):
          f'lui at, {H(basev)}', 'addu at, at, t1', f'lbu t2, {L(basev)}(at)', 'nop', 'bne t2, s4, rp2', 'nop',
          'lui at, 0x8005', f'lw t3, {MODE & 0xffff:#x}(at)', f'lui at, {H(modesv)}', f'lw at, {L(modesv)}(at)', 'nop', 'srlv at, at, t3',
          'andi at, at, 1', 'beqz at, rp2', 'nop', 'addiu s7, t1, 3',
-         'rp2:', 'move s3, zero', 'move s1, s5']
+         'rp2:', 'lui t0, 0x8005', f'lhu t0, {OPT_FLAGS & 0xffff:#x}(t0)', 'nop', f'andi t0, t0, {RANK_BIT}', 'bnez t0, rp3', 'nop',
+         'jal rank', 'nop',
+         'rp3:', 'lui t0, 0x8005', f'lhu t0, {OPT_FLAGS & 0xffff:#x}(t0)', 'nop', f'andi t0, t0, {LINE_BIT}', 'beqz t0, rp4', 'nop',
+         # line off: the original loop, with its registers (s1 = primitive + 0xA, a2 = 0xFF000000, s7 = 0xFFFFFF)
+         'addiu s1, s2, 0xa', 'lui a2, 0xff00', 'lui s7, 0xff', 'ori s7, s7, 0xffff', f'j {BACK_LOOP}', 'move s3, zero',
+         'rp4:', f'addiu t1, zero, {LINE_RGB}', 'sw t1, 0x7c(sp)', f'addiu t0, zero, {BAR_X}', 'sh t0, 0x18(sp)', f'addiu t0, zero, {BAR_Y}', 'sh t0, 0x1a(sp)',
+         f'addiu t0, zero, {BAR_W}', 'sh t0, 0x20(sp)', f'addiu t0, zero, {BAR_H}', 'sh t0, 0x22(sp)',
+         'move s3, zero', 'move s1, s5']
     # per racer (s3 = index, s1 = racer, s4 = g_rider, s7 = player's head, s5 = y): x = BAR_X + (BAR_W - 16) * progress / 255
     S += ['rl:', 'lw a0, 0x60(sp)', 'jal {}'.format(PROGRESS), 'lh a1, 0(s1)', f'addiu t0, zero, {BAR_W - 16}', 'mult v0, t0', 'mflo t0',
           'addiu t1, zero, 255', 'divu t0, t1', 'mflo t0', 'lh t1, 0x18(sp)', 'nop', 'addu s0, t1, t0',
@@ -87,6 +105,70 @@ def code(aliasv, basev, modesv):
           'move a0, s2', 'jal radd', 'addiu s2, s2, 8',
           'addiu s6, s6, 1', 'addiu s3, s3, 1', 'slti at, s3, 8', 'bnez at, rl', 'addiu s1, s1, 0x1288',
           f'j {BACK_END}', 'nop']
+    # rank: the panel (rows: the place ahead of the player, the player's, the one behind; 1st..3rd when leading,
+    # 6th..8th when last), in ordering-table entry 3 like the HUD text; s0, s1, s3 used, s6 kept; free words of the
+    # frame: 0x24 (place of the row), 0x2C (rtext's return), 0x5C (s6), 0x64 (shimmer), 0x6C (first row), 0x74 (return)
+    S += ['rank:', 'sw ra, 0x74(sp)', 'sw s6, 0x5c(sp)', 'addiu s6, zero, 3',
+          # the player's place p (racer whose slot is g_rider) -> first row w = clamp(p - 1, 1, 6) at 0x6c(sp)
+          'move t0, s5', 'addiu t1, zero, 8', 'addiu t3, zero, 1',
+          'rk0:', 'lbu t2, 3(t0)', 'nop', 'bne t2, s4, rk1', 'nop', 'lh t3, 0x58(t0)',
+          'rk1:', 'addiu t1, t1, -1', 'bnez t1, rk0', 'addiu t0, t0, 0x1288',
+          'addiu t3, t3, -1', 'slti at, t3, 1', 'beqz at, rk2', 'nop', 'addiu t3, zero, 1', 'rk2:', 'slti at, t3, 7', 'bnez at, rk3', 'nop',
+          'addiu t3, zero, 6', 'rk3:', 'sw t3, 0x6c(sp)',
+          # shimmer t = 0..15..0 (VSync count / 2) at 0x64(sp)
+          f'jal {VSYNC}', 'addiu a0, zero, -1', 'srl v0, v0, 1', 'andi v0, v0, 31', 'slti at, v0, 16', 'bnez at, rk4', 'nop',
+          'addiu t0, zero, 31', 'subu v0, t0, v0', 'rk4:', 'sw v0, 0x64(sp)',
+          'move s3, zero',
+          'rr0:', 'lw t3, 0x6c(sp)', 'nop', 'addu t3, t3, s3', 'move s1, s5', 'addiu t1, zero, 8',
+          'rr1:', 'lh t2, 0x58(s1)', 'nop', 'beq t2, t3, rr2', 'nop', 'addiu t1, t1, -1', 'bnez t1, rr1', 'addiu s1, s1, 0x1288',
+          'j rr9', 'nop',
+          # s1 = racer of the row, t3 = its place; s0 = y
+          'rr2:', 'sw t3, 0x24(sp)', f'addiu t0, zero, {ROW}', 'mult s3, t0', 'mflo s0', f'addiu s0, s0, {PY}',
+          # colour of the place (1st gold, 2nd silver, 3rd bronze, others white), shimmering
+          'addiu t0, t3, -1', 'slti at, t0, 3', 'bnez at, rr3', 'nop', 'addiu t0, zero, 3',
+          'rr3:', 'sll t1, t0, 1', 'addu t0, t1, t0', 'sll t0, t0, 1', *la('t1', DATA + COLS), 'addu t0, t0, t1', 'lw t9, 0x64(sp)',
+          'lbu a1, 0(t0)', 'lbu t1, 3(t0)', 'nop', 'mult t1, t9', 'mflo t1', 'addu a1, a1, t1',
+          'lbu a2, 1(t0)', 'lbu t1, 4(t0)', 'nop', 'mult t1, t9', 'mflo t1', 'addu a2, a2, t1',
+          'lbu a3, 2(t0)', 'lbu t1, 5(t0)', 'nop', 'mult t1, t9', 'mflo t1', 'addu a3, a3, t1',
+          f'lui a0, {H(FONT)}', f'jal {TEXT_RGB}', f'lw a0, {L(FONT)}(a0)',
+          'lw t3, 0x24(sp)', 'nop', 'addiu t3, t3, -1', 'sll t3, t3, 2', *la('a2', DATA + POSS), 'addu a2, a2, t3',
+          f'addiu a3, zero, {PX}', 'jal rtext', 'addiu t0, s0, 4',
+          # head (the player's with the yellow outline), then its texture page
+          'lbu t2, 3(s1)', 'nop', 'move t3, t2', 'bne t2, s4, rr4', 'nop', 'move t3, s7',
+          'rr4:', 'move a1, s0', 'jal rhead', f'addiu a0, zero, {PX + 26}',
+          'lbu t2, 3(s1)', 'nop', 'bne t2, s4, rr5', 'nop', f'addiu a0, zero, {PX + 26}', 'jal rbox', 'move a1, s0',
+          'rr5:', 'jal rtp', 'nop',
+          # percentage of the course: progress * 100 / 255, written as "N%", "NN%" or "100%"
+          'lw a0, 0x60(sp)', f'jal {PROGRESS}', 'lh a1, 0(s1)', 'addiu t0, zero, 100', 'mult v0, t0', 'mflo t0', 'addiu t1, zero, 255',
+          'divu t0, t1', 'mflo t0', *la('a2', DATA + PCT), 'move t2, a2', 'addiu t4, zero, 10', 'slti at, t0, 100', 'bnez at, rp5', 'nop',
+          'addiu t5, zero, 0x31', 'sb t5, 0(t2)', 'addiu t2, t2, 1', 'addiu t0, t0, -100', 'addiu t5, zero, 0x30', 'sb t5, 0(t2)', 'j rp6', 'addiu t2, t2, 1',
+          'rp5:', 'slti at, t0, 10', 'bnez at, rp6', 'nop', 'divu t0, t4', 'mflo t5', 'mfhi t0', 'addiu t5, t5, 0x30', 'sb t5, 0(t2)', 'addiu t2, t2, 1',
+          'rp6:', 'addiu t0, t0, 0x30', 'sb t0, 0(t2)', 'addiu t5, zero, 0x25', 'sb t5, 1(t2)', 'sb zero, 2(t2)',
+          f'lui a0, {H(FONT)}', f'lw a0, {L(FONT)}(a0)', 'addiu a1, zero, 0x80', 'addiu a2, zero, 0x80', f'jal {TEXT_RGB}', 'addiu a3, zero, 0x80',
+          *la('a2', DATA + PCT), f'addiu a3, zero, {PX + 45}', 'jal rtext', 'addiu t0, s0, 4',
+          'rr9:', 'addiu s3, s3, 1', 'slti at, s3, 3', 'bnez at, rr0', 'nop',
+          # dark translucent box behind the panel (linked last: drawn first), after a page with the half-and-half blending
+          'lui t4, 0x300', 'sw t4, 0(s2)', f'lui t4, {0x6200 | (BOX_RGB >> 16)}', f'ori t4, t4, {BOX_RGB & 0xffff}', 'sw t4, 4(s2)',
+          f'lui t4, {(PY - 3) & 0xffff:#x}', f'ori t4, t4, {(PX - 4) & 0xffff:#x}', 'sw t4, 8(s2)', f'lui t4, {3 * ROW + 4}', 'ori t4, t4, 84', 'sw t4, 12(s2)',
+          'move a0, s2', 'jal radd', 'addiu s2, s2, 16', 'jal rtp', 'nop',
+          'lw s6, 0x5c(sp)', 'lw ra, 0x74(sp)', 'nop', 'jr ra', 'nop']
+    # rtext: string a2 at x a3, y t0, font FONT, into entry s6
+    # (the text takes its primitives at D_80058E0C, which the bar function keeps in s2 and writes back at its end)
+    S += ['rtext:', 'sw ra, 0x2c(sp)', 'sw t0, 0x10(sp)', 'sw zero, 0x14(sp)', 'lw a0, 4(fp)', 'sll t1, s6, 2', 'addu a0, a0, t1',
+          f'lui at, {H(PRIMS)}', f'sw s2, {L(PRIMS)}(at)',
+          f'lui a1, {H(FONT)}', f'jal {TEXT}', f'lw a1, {L(FONT)}(a1)', f'lui at, {H(PRIMS)}', f'lw s2, {L(PRIMS)}(at)',
+          'lw ra, 0x2c(sp)', 'nop', 'jr ra', 'nop']
+    # rhead: SPRT 16x16 of head t3 at (a0, a1); rtp: DR_TPAGE of the heads; rbox: yellow outline around (a0, a1)
+    S += ['rhead:', 'move t9, ra', 'lui t4, 0x300', 'sw t4, 0(s2)', 'lui t4, 0x7c80', 'ori t4, t4, 0x8080', 'sw t4, 4(s2)',
+          'sll t5, a1, 16', 'andi t6, a0, 0xffff', 'or t5, t5, t6', 'sw t5, 8(s2)',
+          f'addiu t6, t3, {(CLUT_VRAM[1] << 6) | (CLUT_VRAM[0] >> 4)}', 'sll t6, t6, 16', f'ori t6, t6, {(HEADS_VRAM[1] - 256) << 8}',
+          'sll t7, t3, 4', 'or t6, t6, t7', 'sw t6, 12(s2)', 'move a0, s2', 'jal radd', 'addiu s2, s2, 16', 'jr t9', 'nop']
+    S += ['rtp:', 'move t9, ra', 'lui t4, 0x100', 'sw t4, 0(s2)', f'lui t4, {TPAGE >> 16:#x}', f'ori t4, t4, {TPAGE & 0xffff:#x}', 'sw t4, 4(s2)',
+          'move a0, s2', 'jal radd', 'addiu s2, s2, 8', 'jr t9', 'nop']
+    S += ['rbox:', 'move t9, ra', 'addiu t5, a1, -1', 'sll t5, t5, 16', 'addiu t6, a0, -1', 'andi t6, t6, 0xffff', 'or a1, t5, t6',
+          'lui a2, 1', 'jal rtile', 'ori a2, a2, 18', 'lui t0, 17', 'addu a1, a1, t0', 'lui a2, 1', 'jal rtile', 'ori a2, a2, 18',
+          'lui t0, 0xfff0', 'addu a1, a1, t0',                                                # back to y (- 16)
+          'lui a2, 16', 'jal rtile', 'ori a2, a2, 1', 'addiu a1, a1, 17', 'lui a2, 16', 'jal rtile', 'ori a2, a2, 1', 'jr t9', 'nop']
     # rtile: a yellow TILE at a1 (y << 16 | x), size a2 (h << 16 | w), linked into entry s6
     S += ['rtile:', 'move t8, ra', 'lui t4, 0x300', 'sw t4, 0(s2)', f'lui t4, {0x6000 | (FRAME_RGB >> 16)}', f'ori t4, t4, {FRAME_RGB & 0xffff}',
           'sw t4, 4(s2)', 'sw a1, 8(s2)', 'sw a2, 12(s2)', 'move a0, s2', 'jal radd', 'addiu s2, s2, 16', 'jr t8', 'nop']
