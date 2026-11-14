@@ -64,7 +64,7 @@ _C = dict(pink=(255, 105, 180), gold=(255, 200, 30), sky=(120, 195, 245), orange
           silver=(205, 210, 225), ice=(130, 175, 240))
 JACKETS = [['pink', 'gold', 'sky'], ['orange', 'yellow', 'camo'], ['red', 'peri', 'green', 'steel', 'cyan', 'brown'],
            ['teal', 'pink', 'gold', 'navy', 'blue', 'pink'],
-           ['gold'], ['silver'], ['red'],                              # g_rider 4..6: Boss, Gray, Snowman (one outfit)
+           ['gold', 'steel'], ['silver'], ['red'],                     # g_rider 4..6: Boss (v57: black outfit 1), Gray, Snowman
            ['gold'], ['silver'], ['red'],                              # 7..9 (not used)
            ['yellow'], ['blue'], ['ice', 'peri', 'green', 'steel', 'steel', 'steel']]   # Jicchi, Nick, Kelly
 JNAMES = sorted(_C)

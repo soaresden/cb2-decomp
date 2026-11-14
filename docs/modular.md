@@ -509,3 +509,32 @@ v56 : **Big Air Master réservé à Yaggi** : ce mode n'a pas d'écran de choix 
 était dans `MODES` de `crew` : si Jicchi, Nick ou Kelly restait choisi d'un autre mode, le chargement du Big Air Master
 prenait les fichiers de l'alias et ne finissait jamais (Kelly). Le bit 6 est retiré ; vérifié dans l'émulateur (ALIAS
 forcé à Kelly, la session démarre avec Yaggi).
+
+v57 : **Boss en tenue noire** (`remix/bossout.py`, mod `crew`). La tenue « squelette » noire du Boss de l'ordinateur
+est déjà sur le disque en texture de joueur : FR/FBD3/BOSS1.FBD (fichier 0xD9), que le jeu ne prenait que pour le
+joueur 2 quand les deux joueurs choisissent Boss en VS (texture = 0xD8 + joueur).
+- Écran WEAR : MAIN_SEL ne l'ouvrait que pour les riders 0..3 (`slti v0, v0, 4` en 0x80060508, 0x800616F4, 0x80062310 :
+  5 maintenant). Pour Boss, une seule rangée comme les ensembles du jeu : `ensd` (0x80061DE8) prend le chemin du
+  libellé d'ensemble, `ensu` (0x80062198) ignore haut / bas, `ensr` (0x80061FFC, 0x800620CC) bascule la tenue 0 / 1
+  dans les curseurs veste et pantalon ; validée comme g_jacket.
+- Aperçu : func_800640AC (envoi des textures du WEAR, tables des riders 0..3 seulement) est sauté pour Boss (`ensp`) ;
+  la tenue va dans BOUT (0x8001FCA8) et le modèle est reconstruit par `mdl` de crew, qui appelle désormais `bossk` au
+  lieu de `aval` : modèle de menu 4 quand Boss porte la tenue noire. Ce modèle est fait par le patcheur comme ceux des
+  alias, depuis le modèle de fin de Boss (ENDING/S_CHR/ED_CHR71.DAT, texture ENDING.FBD x 704, y 256, palette 484),
+  mis dans la colonne VRAM du Boss du menu (x 640, y 256, palette 484). Sa tête est tournée d'un demi-tour (option
+  `flip` de crewmenu) et ses cheveux retirés (option `drop` : 60 primitives texturées dans un carré blanc, u 96..127,
+  v 0..31, que la fin du jeu remplit elle-même ; le Boss du joueur est chauve). `bossk` demande aussi le modèle à
+  l'avance quand Boss est sous le curseur (le menu montre l'autre en attendant). Tables de crew à 4 modèles (DATA2) ;
+  PENDING / DUMMY passés dans DATA (0x8001FCA0).
+- Courses : les chargements de texture du rider du joueur (crochets ld24 / ld20 de crew en 0x8001D55C, 0x8001D644,
+  0x8001D938) passent par `bt…` : le fichier 0xD8 / 0xD9 de Boss est xoré avec la tenue du joueur (le joueur 2 en VS
+  garde l'autre si les deux prennent Boss). Compétition (mod `riders`, `tex`) : les riders 4..6 prennent
+  0xD0 + 2 × rider + (3 veste + pantalon) / 4 & 1 ; avant, une veste / un pantalon laissés par un autre rider leur
+  donnaient un autre fichier (Boss après Yaggi veste 2 / pantalon 2 prenait SNOW0).
+- Place : code avec les routines de crew (`place`), plus deux fonctions PsyQ jamais appelées (0x80028F94..0x80029014,
+  0x8002F5E0..0x8002F644 : aucune référence à aucune adresse de leur corps). Écarté : 0x80025820 (gestionnaire
+  d'exceptions, recopié au démarrage) et 0x8001FA98 (entrée au milieu, 0x8001FAAC, 9 appels). La fin de l'exe à partir de
+  0x800505B8 est effacée au démarrage (BSS) : rien à y mettre.
+- Couleur du boost : gris acier pour la tenue noire.
+- Vérifié dans l'émulateur : WEAR (bascule, aperçu, validation), Free Style (BOSS0 / BOSS1 selon la tenue), Compétition
+  (Big Air en noir), Jicchi en Free Style inchangé.

@@ -248,6 +248,8 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     pkg['ops']['riders'] = _vo.merge(O, pkg['ops']['riders'])
     import crew as _cw
     pkg['ops']['crew'] = _cw.ops(O)
+    import bossout as _bo
+    pkg['ops']['riders'] = _bo.tex_merge(O, pkg['ops']['riders'])   # Boss's outfit in Competition (v57)
     import rear as _rv
     pkg['ops']['rear'] = _rv.ops(O)
     import news as _nw
@@ -609,8 +611,15 @@ def crew_menu_chunk(archive, fbd, p):
         V = []; N = bytearray(); P = []
         for gi in group:
             verts, norms, prims = parts[gi]; vo, no = len(V), len(N) // 8
+            if gi in p.get('flip', ()):      # part turned half a turn around y (Boss's ending head, v57)
+                verts = [[-x, y, -z, q] for x, y, z, q in verts]; nb = bytearray(norms)
+                for j in range(0, len(nb), 8):
+                    for q in (0, 4): struct.pack_into('<h', nb, j + q, -struct.unpack_from('<h', nb, j + q)[0])
+                norms = bytes(nb)
             V += [[x, y + p['yshift'], z, q] for x, y, z, q in verts]; N += norms
-            for w in prims:
+            drop = set(dict(p.get('drop', [])).get(gi, ()))     # primitives left out (Boss's ending hair, v57)
+            for k, w in enumerate(prims):
+                if k in drop: continue
                 w = list(w); mode = (w[0] >> 24) & 0xff
                 for wi, half, kind in idx[mode]:
                     sh = 16 * half; val = ((w[wi] >> sh) & 0xffff) + (vo if kind == 'v' else no)
@@ -632,6 +641,7 @@ def crew_menu_chunk(archive, fbd, p):
     chunk = bytearray(p['size']); chunk[:len(tmd)] = tmd
     chunk[p['clut_off']:p['clut_off'] + 512] = fbd[vo_(cx, cy):vo_(cx, cy) + 512]
     chunk[p['img_off']:p['img_off'] + 32768] = b''.join(fbd[vo_(px, py + y):vo_(px, py + y) + 128] for y in range(256))
+
     struct.pack_into('<I', chunk, p['magic_off'], p['magic'])
     return bytes(chunk)
 
