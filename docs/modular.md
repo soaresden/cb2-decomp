@@ -678,3 +678,11 @@ par image (avant 1/32) jusqu'au plafond 340 (avant 310) : 103 → 169 km/h en un
 sous les points de TOTAL TRICK (elle était cachée derrière l'étiquette). **Lettres du Board Park** : M à la
 séparation des pistes devant le premier sapin de l'îlot, I sur le toit du camion, X juste avant le saut final
 (section 222) sur la droite.
+
+v71 : **boost absent du replay** : bmain sort quand le mot d'état de la boucle de course vaut 6 (replay ; 2 en course) —
+FREE 0x8009E230, SBC2 0x8009144C (même code dans les deux : `sw` juste avant `jal func_80015D18(0x5CE, …)`). Les
+directions des traits de vitesse quittent l'image à BASE (pleine) pour l'overlay (SBC2 après JPAL, FREE après les
+tables de vestes). **Chutes en chiffres en Free Style** (`radar.free_fall_ops`) : même `rfall` sur l'appel des billes
+de FREE (0x8006D2C8), routines de texte du HUD de FREE trouvées par leur code (0x800942E4 / 0x80094670, police
+D_800A3FB8), code coupé en quatre petites fonctions mortes ; la ligne FALLS AS A NUMBER (bit 17) est aussi dans
+l'onglet FREE. Vérifié : une bille + « x3 » ; replay sans barre.

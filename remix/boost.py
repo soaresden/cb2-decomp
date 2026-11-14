@@ -72,7 +72,8 @@ JNAMES = sorted(_C)
 JPAL_WORDS = [(_C[n][2] << 16) | (_C[n][1] << 8) | _C[n][0] for n in JNAMES]
 JTAB_BYTES = bytes(JNAMES.index(j[min(k, len(j) - 1)]) for j in JACKETS for k in range(6))
 JTAB, JPAL = 0x8007C760, 0x8007C7B0          # SBC2, after btr / rtr (radar's data function, to 0x8007C81C)
-assert len(JTAB_BYTES) <= JPAL - JTAB and JPAL + 4 * len(JPAL_WORDS) <= 0x8007C81C
+SBC2_DIRS = JPAL + 4 * len(JPAL_WORDS)       # v70: the speed lines' directions here (the image at BASE was full)
+assert len(JTAB_BYTES) <= JPAL - JTAB and SBC2_DIRS + 4 * 10 <= 0x8007C81C
 WTAB = [max(8, 48 - 14 * i) for i in range(NH + 1)]   # half width of the ribbon at history point i (world units)
 import math
 DIRS = [(round(128 * math.cos(math.radians(a))), round(-128 * math.sin(math.radians(a)))) for a in (-15, 10, 35, 60, 82, 98, 120, 145, 170, 195)]
@@ -96,7 +97,7 @@ def xy(x, y): return ((y & 0xffff) << 16) | (x & 0xffff)
 # v66: the boost in the Free Style too (FREE.BIN: the same race loop, the racer's fields from about 0x4800 on 8 bytes
 # lower). Per race overlay: where the player's racer pointer is, the velocity, the function the hook replaced, the
 # jacket tables, the switch (REMIX screen: COMP bit 19, FREE bit 21)
-SBC2_P = dict(riders=RIDERS, vel=VEL, tail=SBC2_TAIL, jtab=JTAB, jpal=JPAL, bit=BOOST_BIT)
+SBC2_P = dict(riders=RIDERS, vel=VEL, tail=SBC2_TAIL, jtab=JTAB, jpal=JPAL, bit=BOOST_BIT, phase=0x8009144C, dirs=SBC2_DIRS)   # v71: the race loop's state (6: replay)
 FREE_SITE, FREE_TAIL = 0x8005EFAC, 0x8006D274    # jal func_8006D274 in FREE's race loop (func_8005EEB0, s0 = the racer)
 FREE_ENTRY, FREE_ENTRY_TAIL = 0x8005AED0, 0x8001BFD4   # free_entry's call of func_8001BFD4
 FREE_SLOT = 0x801F3FF8                     # the racer pointer, stored by the FREE hook (`bft`) (v70: was 0x801F3FFC = toggles.NEXTA:
@@ -107,8 +108,9 @@ FREE_CAVES = [(0x80070A40, 0x80070E4C), (0x8008F534, 0x8008F878), (0x8007F378, 0
 FREE_BFT = (0x80093A44, 0x80093B50)        # `bft` and the jacket tables
 FREE_BIT = 21
 FREE_JPAL = FREE_BFT[0] + 0x40; FREE_JTAB = FREE_JPAL + 4 * len(JPAL_WORDS)     # after bft (in FREE: no room left at BASE)
-assert FREE_JTAB + len(JTAB_BYTES) <= FREE_BFT[1]
-FREE_P = dict(riders=FREE_SLOT, vel=VEL - 8, tail=FREE_TAIL, jtab=FREE_JTAB, jpal=FREE_JPAL, bit=FREE_BIT, bx=-140, by=-28)   # v70: bar under TOTAL TRICK's points
+FREE_DIRS = (FREE_JTAB + len(JTAB_BYTES) + 3) & ~3
+assert FREE_DIRS + 40 <= FREE_BFT[1]
+FREE_P = dict(riders=FREE_SLOT, vel=VEL - 8, tail=FREE_TAIL, jtab=FREE_JTAB, jpal=FREE_JPAL, bit=FREE_BIT, bx=-140, by=-28, phase=0x8009E230, dirs=FREE_DIRS)   # v70: bar under TOTAL TRICK's points
 
 
 def main_code(tables, P=None):
@@ -137,6 +139,8 @@ def main_code(tables, P=None):
          'sw s0, 0x24(sp)', 'sw s1, 0x28(sp)', 'sw s2, 0x2c(sp)', 'sw s3, 0x30(sp)', 'sw s4, 0x34(sp)', 'sw s5, 0x38(sp)',
          'sw s6, 0x3c(sp)', 'sw s7, 0x40(sp)',
          f'lui t0, {H(OPT_FLAGS)}', f'lw t0, {L(OPT_FLAGS)}(t0)', f'lui t1, {(1 << BOOST_BIT) >> 16:#x}', 'and t0, t0, t1', 'bnez t0, bout', 'nop',
+         # v71: nothing in the replay (the race loop's state word P['phase'] is 6; 2 in the race)
+         f'lui t0, {H(P["phase"])}', f'lw t0, {L(P["phase"])}(t0)', 'addiu t1, zero, 6', 'beq t0, t1, bout', 'nop',
          f'lui t0, {H(RIDERS)}', f'lw s0, {L(RIDERS)}(t0)', 'nop', 'beqz s0, bout', 'nop', *la('s1', VARS),
          # this frame's move
          'lw t0, 0x2c(s0)', 'lw t1, 0x30(s0)', 'lw t2, 0x34(s0)', 'lw t3, 0(s1)', 'lw t4, 4(s1)', 'lw t5, 8(s1)',
@@ -302,10 +306,10 @@ def image(P=None):
     c, l = build({'wtab': 0, 'dirs': 0, 'jtab': 0, 'jpal': 0})
     t0 = c[-1][0] + 4
     tb = JTAB_BYTES + bytes(-len(JTAB_BYTES) % 4)
-    tables = {'wtab': t0, 'dirs': t0 + 4 * len(WTAB)}
-    tables['jpal'] = tables['dirs'] + 4 * len(DIRS); tables['jtab'] = tables['jpal'] + 4 * len(JPAL_WORDS)
+    P_ = P or SBC2_P
+    tables = {'wtab': t0, 'dirs': P_['dirs'], 'jpal': 0, 'jtab': 0}
     c, l = build(tables)
-    words = [MAGIC] + [w for _, w in c] + WTAB + [(dx & 0xffff) | ((dy & 0xffff) << 16) for dx, dy in DIRS]
+    words = [MAGIC] + [w for _, w in c] + WTAB
     if P is not None and P['jtab'] is None:
         words += JPAL_WORDS + list(struct.unpack('<%dI' % (len(tb) // 4), tb))
     assert BASE + 4 * len(words) <= BASE_END and VARS + VARS_LEN <= 0x801F3FF0
@@ -365,6 +369,7 @@ def ops(disc):
     assert c2[-1][0] < JTAB
     tb = JTAB_BYTES + bytes(-len(JTAB_BYTES) % 4)
     c2 += [(JTAB + i, struct.unpack_from('<I', tb, i)[0]) for i in range(0, len(tb), 4)] + [(JPAL + 4 * i, w) for i, w in enumerate(JPAL_WORDS)]
+    c2 += [(SBC2_DIRS + 4 * i, (dx & 0xffff) | ((dy & 0xffff) << 16)) for i, (dx, dy) in enumerate(DIRS)]
     out = [['w', '/SBC1.BIN', a - OVL, w1(a), x] for a, x in c1 + [(SBC1_SITE, J(3, l1['bins']))]]
     assert w2(SAVE_SITE) == 0x10620004 and w2(SAVE_SITE + 0x14) == 0x24040001
     c2 = c2 + [(SAVE_SITE, 0x10000004)]
@@ -385,6 +390,7 @@ def free_ops(disc):
     c2, l2 = asm(S, FREE_BFT[0]); assert c2[-1][0] < FREE_JPAL
     tb = JTAB_BYTES + bytes(-len(JTAB_BYTES) % 4)
     c2 += [(FREE_JPAL + 4 * i, w) for i, w in enumerate(JPAL_WORDS)] + [(FREE_JTAB + i, struct.unpack_from('<I', tb, i)[0]) for i in range(0, len(tb), 4)]
+    c2 += [(FREE_DIRS + 4 * i, (dx & 0xffff) | ((dy & 0xffff) << 16)) for i, (dx, dy) in enumerate(DIRS)]
     return [['w', '/FREE.BIN', a - OVL, wf(a), x] for a, x in c1 + c2 + [(FREE_ENTRY, J(3, l1['bins'])), (FREE_SITE, J(3, l2['bft']))]]
 
 

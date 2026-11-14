@@ -259,4 +259,51 @@ def ops(disc, aliasv, basev, modesv, fbd, icon_x, icon_y, clut_x, clut_y, pre):
     segs += [[vo(clut_x + 16 * (i % 6), clut_y + i // 6), DATA - OVL + CLUTS + 32 * i, 32] for i in range(N)]
     out.append(['fcopy', fbd, FILE, segs])
     import boost                                                 # trick boost (v43): SBC1 installer, SBC2 hook
-    return out + boost.ops(disc)
+    return out + boost.ops(disc) + free_fall_ops(disc)               # v71: falls as a number in the Free Style
+
+
+# v71: FALLS AS A NUMBER in the Free Style too (FREE.BIN: the same falls function, func_8006D274, its call of the
+# balls at 0x8006D2C8; its HUD text routines 0x800942E4 / 0x80094670 and font pointer D_800A3FB8, found by their
+# code; no radar line there: the balls stay at y 0x68). The code is cut in four small dead functions of FREE (jumps).
+FREE_FALL_SITE = 0x8006D2C8
+FREE_TEXT, FREE_TEXT_RGB, FREE_FONT = 0x800942E4, 0x80094670, 0x800A3FB8
+FREE_FALL_STR = 0x80093964                  # 16 bytes
+FREE_FALL_BLOCKS = [0x800944C4, 0x8007F134, 0x80075BAC, 0x8005BDBC]   # 116, 84, 80, 72 bytes (dead functions of FREE)
+FREE_FALL_ENDS = [0x80094538, 0x8007F188, 0x80075BFC, 0x8005BE04]
+
+
+def free_fall_code():
+    H_ = lambda a: (a + 0x8000) >> 16
+    L_ = lambda a: a - (H_(a) << 16)
+    A = ['ffa:', 'addiu sp, sp, -0x40', 'sw ra, 0x38(sp)', 'sw t0, 0x34(sp)', 'mfhi t1', 'sw t1, 0x30(sp)', 'mflo t1', 'sw t1, 0x2c(sp)',
+         f'lui t9, {H_(OPT_FLAGS)}', f'lw t9, {L_(OPT_FLAGS)}(t9)', 'addiu a1, zero, -0x98', 'addiu a2, zero, 0x68',
+         f'srl t8, t9, {FALL_NUM_BIT}', 'andi t8, t8, 1', 'bnez t8, ff9', 'nop', 'blez a3, ff9', 'nop',
+         'sw a2, 0x28(sp)', 'j ffb', 'nop',
+         'ff9:', 'lw t1, 0x30(sp)', 'lw t2, 0x2c(sp)', 'lw t0, 0x34(sp)', 'mthi t1', 'mtlo t2', 'lw ra, 0x38(sp)', 'nop', 'jr ra', 'addiu sp, sp, 0x40']
+    B = ['ffb:', f'lui t1, {H_(FREE_FALL_STR + 8)}', f'addiu t1, t1, {L_(FREE_FALL_STR + 8)}', 'sb zero, 0(t1)', 'move t2, a3', 'addiu t3, zero, 10',
+         'fd1:', 'divu t2, t3', 'mfhi t4', 'mflo t2', 'addiu t4, t4, 0x30', 'addiu t1, t1, -1', 'bnez t2, fd1', 'sb t4, 0(t1)',
+         'addiu t1, t1, -1', 'addiu t4, zero, 0x78', 'sb t4, 0(t1)', 'j ffc', 'sw t1, 0x24(sp)']
+    C = ['ffc:', f'lui a0, {H_(FREE_FONT)}', f'lw a0, {L_(FREE_FONT)}(a0)', 'addiu a1, zero, 0x80', 'addiu a2, zero, 0x80', f'jal {FREE_TEXT_RGB:#x}',
+         'addiu a3, zero, 0x80', 'j ffd', 'nop']
+    D = ['ffd:', 'lw t0, 0x34(sp)', 'lw a2, 0x24(sp)', 'lw a0, 4(t0)', f'lui a1, {H_(FREE_FONT)}', f'lw a1, {L_(FREE_FONT)}(a1)', 'addiu a0, a0, 0xc',
+         'lw t1, 0x28(sp)', 'addiu a3, zero, -0x86', 'addiu t1, t1, 8', 'sw t1, 0x10(sp)', f'jal {FREE_TEXT:#x}', 'sw zero, 0x14(sp)',
+         'lw a2, 0x28(sp)', 'addiu a1, zero, -0x98', 'j ff9', 'addiu a3, zero, 1']
+    labels = {}
+    for blk, at in zip((A, B, C, D), FREE_FALL_BLOCKS):
+        pc = at
+        for l in blk:
+            if l.endswith(':'): labels[l[:-1]] = pc
+            else: pc += 4
+    out = []
+    for blk, at, end in zip((A, B, C, D), FREE_FALL_BLOCKS, FREE_FALL_ENDS):
+        c, _ = asm(blk, at, labels); assert c[-1][0] < end, (hex(at), hex(c[-1][0])); out += c
+    return out, labels
+
+
+def free_fall_ops(disc):
+    d = disc.read_file('/FREE.BIN'); w = lambda a: struct.unpack_from('<I', d, a - OVL)[0]
+    J = lambda op, t: (op << 26) | ((t >> 2) & 0x3ffffff)
+    assert w(FREE_FALL_SITE) == 0x2405FF68 and w(FREE_FALL_SITE + 4) == 0x24060068
+    c, l = free_fall_code()
+    P = c + [(FREE_FALL_SITE, J(3, l['ffa'])), (FREE_FALL_SITE + 4, 0)]
+    return [['w', '/FREE.BIN', a - OVL, w(a), x] for a, x in P]

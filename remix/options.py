@@ -86,7 +86,7 @@ def L(a): return a - (H(a) << 16)
 
 # the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
 TABS = [('COMP', [22, 19, 3, 7, 6, 17, 4, 20, 15, 9, 10]),        # v67: the race first, then the cup        # v63: one tab per game mode, then the game-wide ones
-        ('FREE', [23, 21, 27]),                                        # (v64: REAR VIEW / AIR CONTROL with their own bit
+        ('FREE', [23, 21, 17, 27]),                                        # (v64: REAR VIEW / AIR CONTROL with their own bit
         ('AIR', [13, 24, 28]),                                     # in each mode)
         ('PIPE', [1, 25, 29]),
         ('PARK', [16, 26, 30]),
