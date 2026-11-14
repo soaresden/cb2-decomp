@@ -659,3 +659,11 @@ BP) ; `bft` (0x80093A44) range s0 dans FREE_SLOT (0x801F3FFC) et saute à bmain 
 Interrupteur propre : bit 21 (SSX STYLE BOOST, onglet FREE ; le bit des PARK ICONS jusqu'à la v64). Vérifié : jauge
 pleine, 120 images avec R2 → 30 % de distance en plus (140 km/h contre 103), jauge 480 → 377, traînée affichée ;
 Boarder Cross identique mot pour mot.
+
+v67 : **PROGRESS en logo vert** (même police et même style que le logo REMIX, `title.word(colors=, outline=)`,
+`options.logo('PROGRESS', 10, …)`, VRAM libre du menu x 384, y 0, palette 384, 64 ; dim, ou pulsant quand choisi) ;
+**SELECT n'ouvre plus la page** : `pw` retire le bit SELECT des mots de manette du jeu à chaque image, l'entrée PROGRESS
+le remet tant que la page est ouverte (ligne 14 : PROGRESS PAGE (MENU)). **Onglets** : noms espacés régulièrement
+entre le bord gauche des lignes et la colonne ON / OFF (table `tabx`) ; COMP réordonné (la course : vue arrière, boost,
+figures en l'air, classement, radar, chutes, chocs « KNOCK RIDERS DOWN » ; puis la coupe : RETRY, qualifications,
+Hard + Mirror, Boss / Gray / Snowman).

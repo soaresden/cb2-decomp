@@ -40,12 +40,12 @@ DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data (code since v37)
 import toggles
 SCR_DATA = toggles.SCREEN[0]           # the screen's data: start of MODE_SEL's 84th sector
 X0, X1, Y0, DY = -150, 70, -64, 13
-LINES = ['REAR VIEW (O)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', 'AIR CONTROL', 'MAKE RIDERS FALL AGAINST THEM', 'WIDESCREEN 16:9',
+LINES = ['REAR VIEW (O)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', 'AIR CONTROL', 'KNOCK RIDERS DOWN', 'WIDESCREEN 16:9',
          'RACE RADAR LINE', 'RACE RANKING',
          # the other mods (remix/toggles.py: bits 8..16, in the order of toggles.BITS)
          'SPECIAL BOARDS ALWAYS', 'NEW HARD+MIRROR CUP', 'BOSS GRAY SNOWMAN IN COMP', 'HIDDEN OUTFITS FOR GIRLS', 'CAN MAX RIDERS AND BOARD',
          'BIG AIR MASTER KEYS SHOWN',
-         'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY PARK ICONS',   # v65: + the letters
+         'PROGRESS PAGE (MENU)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY PARK ICONS',   # v65: + the letters
          'FALLS AS A NUMBER',                   # bit 17 (radar.py: one ball and x13 instead of the row of balls)
          'UNLOCK EVERYTHING',                   # line i = bit i of the flags word (bit set = off)
          'SSX STYLE BOOST',                    # bit 19 (remix/boost.py, with the mod radar)
@@ -85,7 +85,7 @@ def L(a): return a - (H(a) << 16)
 
 
 # the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
-TABS = [('COMP', [22, 19, 20, 15, 6, 7, 17, 3, 4, 9, 10]),        # v63: one tab per game mode, then the game-wide ones
+TABS = [('COMP', [22, 19, 3, 7, 6, 17, 4, 20, 15, 9, 10]),        # v67: the race first, then the cup        # v63: one tab per game mode, then the game-wide ones
         ('FREE', [23, 21, 27]),                                        # (v64: REAR VIEW / AIR CONTROL with their own bit
         ('AIR', [13, 24, 28]),                                     # in each mode)
         ('PIPE', [1, 25, 29]),
@@ -93,7 +93,12 @@ TABS = [('COMP', [22, 19, 20, 15, 6, 7, 17, 3, 4, 9, 10]),        # v63: one tab
         ('GAME', [11, 12, 8, 14, 2, 5, 18])]
 # mode select cursor (0 COMP, 1 BIG AIR, 2 HALFPIPE, 3 FREE STYLE, 4 BOARD PARK, else as FREE) -> (REAR VIEW, AIR CONTROL) bits
 PMT = [(22, 3), (24, 28), (25, 29), (23, 27), (26, 30), (23, 27), (23, 27), (23, 27)]
-TAB_X0, TAB_DX = -148, 52                # the tabs' names (menu font)
+TAB_X0, TAB_X1 = -132, 136               # the tabs' names (menu font, 8 pixels a letter): v67 from the lines' left edge to
+                                        # the ON / OFF column's right edge, the same gap between names
+def tab_xs():
+    w = [8 * len(n) for n, _ in TABS]; gap = (TAB_X1 - TAB_X0 - sum(w)) / (len(w) - 1); x = TAB_X0; out = []
+    for k in w: out.append(round(x)); x += k + gap
+    return out
 UP, RIGHT, DOWN, LEFT, TRI, CIRC, CROSS = 0x1000, 0x2000, 0x4000, 0x8000, 0x10, 0x20, 0x40
 PADV = 0x800832BA                      # MODE_SEL's pad words (held, ...: 0x800832BA..0x800832C5), set by func_8005CCE4
 PAD_CALL, PAD_FN = 0x8005CB94, 0x8005CCE4
@@ -103,20 +108,23 @@ LABEL_XY = (78, 92)                    # "REMIX" under the OPTIONS sign (menu fo
 # outline, tilted), made small at build time, 16 colours, sent to free VRAM of the mode select (x 448.., y 0; palette
 # y 64) every frame and drawn as a SPRT (+ DR_TPAGE); the label is dim, and pulses when the cursor is on it
 LOGO_SIZE, LOGO_VRAM, LOGO_CLUT = 16, (448, 0), (448, 64)
-LOGO_XY, LOGO_TITLE_XY = (76, 80), (-152, -116)
-PG_XY = (74, 106)                      # v65: PROGRESS (menu font) under the logo: Down from REMIX, X shows the progress page
+LOGO_XY, LOGO_TITLE_XY = (76, 76), (-152, -116)
+PG_XY = (72, 99)                       # v65: PROGRESS under the logo: Down from REMIX, X shows the progress page (v67: a green
+PG_SIZE, PG_VRAM, PG_CLUT = 10, (384, 0), (384, 64)   # logo in the REMIX logo's style, free VRAM x 384.., y 0; SELECT no more)
+PG_COLORS = ([215, 255, 200], [90, 225, 95], [30, 150, 55], [10, 80, 30])
+PG_OUTLINE = (10, 45, 20)
 PG_HOOK, PG_OLD, PG_BIT = 0x800643B4, 0x0C00B88A, 14     # mod progress: its hook (jal func_8002E228 when absent), its switch
 LOADIMAGE = 0x80029B7C
 
 
-def logo():
+def logo(text='REMIX', size=None, **kw):
     """-> (width, height, 4-bit pixels (rows of width / 2 bytes), 16 colours (15-bit, 0 = transparent))"""
     import title, numpy as np
     from PIL import Image
-    a = title.word('REMIX', LOGO_SIZE, 8); al = a[..., 3] > 0; ys, xs = np.where(al)
+    a = title.word(text, size or LOGO_SIZE, 8, **kw); al = a[..., 3] > 0; ys, xs = np.where(al)
     a = a[ys.min():ys.max() + 1, xs.min():xs.max() + 1]; al = a[..., 3] > 0
     h, w = al.shape; W = (w + 3) // 4 * 4
-    assert W <= 64 and h <= 60, (w, h)
+    assert W <= 128 and h <= 60, (w, h)
     q = Image.fromarray(a[..., :3].copy()).quantize(15, method=Image.MEDIANCUT, dither=Image.NONE)
     idx = np.array(q) + 1; idx[~al] = 0
     pal = np.array(q.getpalette()[:45]).reshape(15, 3)
@@ -162,7 +170,10 @@ def data():
     assert all(lab['l%d' % i] >> 16 == 0x8008 for i in range(len(LINES)))
     put('ltab', b''.join(struct.pack('<H', lab['l%d' % i] & 0xffff) for i in range(len(LINES))))   # v63: halfwords (0x8008....)
     put('ttab', b''.join(struct.pack('<I', lab['t%d' % i]) for i in range(len(TABS))))
-    put('prg', b'PROGRESS\0'); put('pg', bytes(4))
+    put('pg', bytes(4)); put('tabx', struct.pack('<%dh' % len(TABS), *tab_xs()))
+    PW, PH, ppix, pcl = logo('PROGRESS', PG_SIZE, colors=PG_COLORS, outline=PG_OUTLINE)
+    put('prect', struct.pack('<4h', PG_VRAM[0], PG_VRAM[1], PW // 4, PH)); put('pcrect', struct.pack('<4h', PG_CLUT[0], PG_CLUT[1], 16, 1))
+    put('pclut', struct.pack('<16H', *pcl)); put('ppix', ppix)
     put('pmt', bytes(b for p in PMT for b in p)); put('fx', bytes(4))
     put('ptab', b''.join(struct.pack('<4I', a, on, off, bit) for a, on, off, bit in PATCH))
     data.side = bytes(d2)
@@ -177,6 +188,8 @@ def routines(D):
     # pw: in place of the mode select's pad routine: the game's pad words, then (only while the mode select screen is
     # drawn: alive) the REMIX entry and screen; while they have the input, the game's pad words are cleared
     S = ['pw:', 'addiu sp, sp, -0x20', 'sw ra, 0x18(sp)', f'jal {PAD_FN}', 'nop',
+         # v67: SELECT no more opens the progress page by itself (only the PROGRESS entry, which puts it back below)
+         f'lui t1, {H(PADV)}', *[x for k in range(0, 12, 2) for x in (f'lhu t0, {L(PADV) + k}(t1)', 'nop', 'andi t0, t0, 0xfeff', f'sh t0, {L(PADV) + k}(t1)')],
          *lw('t0', 'alive'), 'blez t0, pw9', 'addiu t0, t0, -1', *sw('t0', 'alive'),
          f'lui t1, {H(PADV)}', f'lhu t1, {L(PADV)}(t1)', *lw('t2', 'prev'), *sw('t1', 'prev'), 'nor t2, t2, zero', 'and t2, t2, t1',
          # v65: PROGRESS under REMIX (sel 2): X shows the in-game progress page (mod progress: SELECT held) until
@@ -234,9 +247,22 @@ def routines(D):
           'beq v1, at, pga0', f'lui v1, {H(FLAGS)}', f'lw v1, {L(FLAGS)}(v1)', 'nop', f'andi v1, v1, {1 << PG_BIT:#x}', 'bnez v1, pga0', 'nop',
           'jr ra', 'addiu v0, zero, 1', 'pga0:', 'jr ra', 'move v0, zero']
     # dpg: the PROGRESS label under the REMIX logo (bright when chosen; hidden while the page is shown)
+    PW, PH, _, _ = logo('PROGRESS', PG_SIZE, colors=PG_COLORS, outline=PG_OUTLINE)
+    PTP = 0xE1000400 | (PG_VRAM[0] >> 6) | ((PG_VRAM[1] >> 8) << 4)
+    PCW = (PG_CLUT[1] << 6) | (PG_CLUT[0] >> 4)
     S += ['dpg:', 'sw ra, 0x38(sp)', 'jal pga', 'nop', 'beqz v0, dp9', 'nop', *lw('t0', 'pg'), 'bnez t0, dp9', 'nop',
-          *la('t7', D['rgbh']), *lw('t0', 'sel'), 'addiu t1, zero, 2', 'bne t0, t1, dp1', 'nop', *la('t7', D['rgbs']),
-          'dp1:', *la('t6', D['prg']), f'addiu t4, zero, {PG_XY[0]}', f'addiu t5, zero, {PG_XY[1]}', 'jal drw', 'nop',
+          # dim, or pulsing when chosen (as the REMIX label)
+          *lw('t1', 'blink'), 'lui t7, 0x60', 'ori t7, t7, 0x6060', *lw('t0', 'sel'), 'addiu t2, zero, 2', 'bne t0, t2, dp1', 'andi t1, t1, 16',
+          'lui t7, 0x80', 'beqz t1, dp1', 'ori t7, t7, 0x8080', 'lui t7, 0xb0', 'ori t7, t7, 0xb0b0',
+          'dp1:', 'sw t7, 0x3c(sp)',
+          *la('a0', D['prect']), *la('a1', D['ppix']), f'jal {LOADIMAGE}', 'nop',
+          *la('a0', D['pcrect']), *la('a1', D['pclut']), f'jal {LOADIMAGE}', 'nop',
+          'lui t0, 0x400', 'sw t0, 0(s6)', 'lw t7, 0x3c(sp)', 'lui t1, 0x6400', 'or t7, t7, t1', 'sw t7, 4(s6)',
+          f'lui t4, {PG_XY[1] & 0xffff:#x}', f'ori t4, t4, {PG_XY[0] & 0xffff:#x}', 'sw t4, 8(s6)',
+          f'lui t0, {PCW}', f'ori t0, t0, {(PG_VRAM[1] & 255) << 8}', 'sw t0, 12(s6)', f'lui t0, {PH}', f'ori t0, t0, {PW}', 'sw t0, 16(s6)',
+          'move a0, s6', 'jal dlnk', 'addiu s6, s6, 20',
+          'lui t0, 0x100', 'sw t0, 0(s6)', f'lui t0, {PTP >> 16:#x}', f'ori t0, t0, {PTP & 0xffff:#x}', 'sw t0, 4(s6)',
+          'move a0, s6', 'jal dlnk', 'addiu s6, s6, 8',
           'dp9:', 'lw ra, 0x38(sp)', 'nop', 'jr ra', 'nop']
     # dlogo: the logo at (t4, t5), modulation t7 (0x808080 = as is): sent to VRAM, SPRT + DR_TPAGE linked into s5
     W, Hh, _, _ = logo()
@@ -257,7 +283,7 @@ def routines(D):
     S += ['drs:', f'addiu t4, zero, {LOGO_TITLE_XY[0]}', f'addiu t5, zero, {LOGO_TITLE_XY[1]}', 'lui t7, 0x80', 'ori t7, t7, 0x8080', 'jal dlogo', 'nop',
           'move s7, zero',
           'dt1:', 'sw s7, 0x30(sp)', 'sll t0, s7, 2', *la('t1', D['ttab']), 'addu t1, t1, t0', 'lw t6, 0(t1)',
-          f'addiu t0, zero, {TAB_DX}', 'mult s7, t0', 'mflo t4', f'addiu t4, t4, {TAB_X0}', 'addiu t5, zero, -80',
+          'sll t0, s7, 1', *la('t4', D['tabx']), 'addu t4, t4, t0', 'lh t4, 0(t4)', 'addiu t5, zero, -80',
           *la('t7', D['rgbh']), *lw('t0', 'tab'), 'bne t0, s7, dt2', 'nop', *la('t7', D['rgbt']),
           'dt2:', 'jal drw', 'nop', 'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', f'slti t0, s7, {NT}', 'bnez t0, dt1', 'nop',
           'move s7, zero', 'j di1', 'nop']
