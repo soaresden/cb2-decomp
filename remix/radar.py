@@ -1,5 +1,5 @@
-# Race radar with heads (mod `radar`, v27): in the Boarder Cross of the competition (SBC2.BIN), the progress bar at the
-# top left (S ... F) shows each rider's 16x16 head instead of a 4x4 coloured square.
+# Race radar with heads (mod `radar`, v27): in the Boarder Cross of the competition (SBC2.BIN), the progress bar (S ... F,
+# at the top left) becomes a long line at the bottom of the screen with each rider's 16x16 head instead of a 4x4 square.
 #
 # SBC2: func_8006D2A4 (called by the race loop with the racer array D_8009146C, 8 x 0x1288 bytes) draws the bar: a
 # translucent TILE (x -0x90, y -0x78, 0x70 x 0xD, rect at sp + 0x18), then per racer (loop 0x8006D418..0x8006D53C,
@@ -8,13 +8,15 @@
 # IRIN JICCHI NICK KELLY BOSS; the player has the place g_rider), each tile in its own ordering-table entry (s6 = 3..10,
 # the lower entries drawn last), the player's tile blinking (flag sp + 0x70); then the bar (entry s6) and the letters.
 # Hook: 0x8006D410 ("addu s3, zero, zero") -> j rad (delay slot kept). rad: with the option off, back to the loop as
-# before. Otherwise the bar is made 0x16 high from y -0x7E (top of the screen, TIME is under it), the heads (BOARDER strip of the menu: YAGGI JIN CINDY IRIN
-# JICCHI NICK KELLY BOSS GRAY SNOWMAN, made by the mod crew's 'icons' operation in TITLE/MAIN_SEL.FBD, copied here by
-# 'fcopy') are sent to free VRAM of the race (x 768.., y 472, palettes y 490) every frame, and each racer gets a SPRT
-# 16x16 (CPU: head of its place; player: head of g_rider, or of the crew alias), odd places of the race (racer + 0x58)
-# on the upper row and even ones 4 pixels lower (a pack stays readable), the player with a yellow outline that
-# blinks like the original square, and a DR_TPAGE for the heads' page (the HUD text in the same entries changes it); then back to 0x8006D540 with s2 (primitives) and s6 (next entry) as the loop leaves
-# them. Code and data in two dead functions of SBC2 (no call, jump or pointer to them).
+# before. Otherwise the bar becomes a long thin dark line at the bottom of the screen (x -0x8C, y 112, 0x110 x 6: the
+# position and the speed end at y 108, the screen at 123; the letters S and F follow it at its ends; its grey comes
+# from sp + 0x7C, an unused word of the frame, 0xFF with the option off), the heads (BOARDER
+# strip of the menu: YAGGI JIN CINDY IRIN JICCHI NICK KELLY BOSS GRAY SNOWMAN, made by the mod crew's 'icons' operation
+# in TITLE/MAIN_SEL.FBD, copied here by 'fcopy') are sent to free VRAM of the race (x 768.., y 472, palettes y 490)
+# every frame, and each racer gets a SPRT 16x16 on the line (CPU: head of its place; player: head of g_rider, or of the
+# crew alias), the player with a yellow outline that blinks like the original square, and a DR_TPAGE for the heads'
+# page (the HUD text in the same entries changes it); then back to 0x8006D540 with s2 (primitives) and s6 (next entry)
+# as the loop leaves them. Code and data in two dead functions of SBC2 (no call, jump or pointer to them).
 import struct
 from asm import asm
 
@@ -30,7 +32,10 @@ G_RIDER, MODE = 0x80057408, 0x80057420
 HEADS_VRAM, CLUT_VRAM = (768, 472), (768, 490)   # empty in the race (bottom of the HUD texture page)
 N = 10                                      # heads, in the order of crew.STRIP_ORDER
 PIX, CLUTS, RECT1, RECT2 = 0, 1280, 1600, 1608
-BAR_Y, BAR_H, HEAD_Y, ROW_DY = -0x7E, 0x16, -0x7D, 4    # two rows of heads: odd places at HEAD_Y, even ones ROW_DY lower
+BAR_X, BAR_W, BAR_Y, BAR_H, HEAD_Y = -0x8C, 0x110, 112, 6, 107    # a long thin line at the bottom, the heads on it
+LINE_RGB = 0x30                             # grey level of the line (translucent: a white one disappears on the snow)
+COLOR_SITE = 0x8006D58C                     # "lhu t1, 0x22(sp) / addiu v0, zero, 0xFF" (bar colour) -> "lw v0, 0x7c(sp) / lhu t1, ..."
+
 TPAGE = 0xE1000400 | (1 << 4) | (HEADS_VRAM[0] >> 6)    # 4 bits, VRAM (768, 256)
 FRAME_RGB = 0x0000FFFF                       # yellow (r, g, b = ff, ff, 00)
 
@@ -45,9 +50,10 @@ def data_words():
 
 def code(aliasv, basev, modesv):
     la = lambda r, a: [f'lui {r}, {H(a)}', f'addiu {r}, {r}, {L(a)}']
-    S = ['rad:', 'lui t0, 0x8005', f'lbu t0, {OPT_FLAGS & 0xffff:#x}(t0)', 'nop', f'andi t0, t0, {OPT_BIT}', 'beqz t0, ra0', 'nop',
+    S = ['rad:', 'addiu t1, zero, 0xff', 'sw t1, 0x7c(sp)', 'lui t0, 0x8005', f'lbu t0, {OPT_FLAGS & 0xffff:#x}(t0)', 'nop', f'andi t0, t0, {OPT_BIT}', 'beqz t0, ra0', 'nop',
          f'j {BACK_LOOP}', 'move s3, zero',
-         'ra0:', f'addiu t0, zero, {BAR_Y}', 'sh t0, 0x1a(sp)', f'addiu t0, zero, {BAR_H}', 'sh t0, 0x22(sp)',
+         'ra0:', f'addiu t1, zero, {LINE_RGB}', 'sw t1, 0x7c(sp)', f'addiu t0, zero, {BAR_X}', 'sh t0, 0x18(sp)', f'addiu t0, zero, {BAR_Y}', 'sh t0, 0x1a(sp)',
+         f'addiu t0, zero, {BAR_W}', 'sh t0, 0x20(sp)', f'addiu t0, zero, {BAR_H}', 'sh t0, 0x22(sp)',
          # heads and palettes to VRAM
          *la('a0', DATA + RECT1), *la('a1', DATA + PIX), f'jal {LOADIMAGE}', 'nop',
          *la('a0', DATA + RECT2), *la('a1', DATA + CLUTS), f'jal {LOADIMAGE}', 'nop',
@@ -58,11 +64,10 @@ def code(aliasv, basev, modesv):
          'lui at, 0x8005', f'lw t3, {MODE & 0xffff:#x}(at)', f'lui at, {H(modesv)}', f'lw at, {L(modesv)}(at)', 'nop', 'srlv at, at, t3',
          'andi at, at, 1', 'beqz at, rp2', 'nop', 'addiu s7, t1, 3',
          'rp2:', 'move s3, zero', 'move s1, s5']
-    # per racer (s3 = index, s1 = racer, s4 = g_rider, s7 = player's head): x = -0x90 + (0x70 - 16) * progress / 255
-    S += ['rl:', 'lw a0, 0x60(sp)', 'jal {}'.format(PROGRESS), 'lh a1, 0(s1)', 'addiu t0, zero, 0x60', 'mult v0, t0', 'mflo t0',
+    # per racer (s3 = index, s1 = racer, s4 = g_rider, s7 = player's head, s5 = y): x = BAR_X + (BAR_W - 16) * progress / 255
+    S += ['rl:', 'lw a0, 0x60(sp)', 'jal {}'.format(PROGRESS), 'lh a1, 0(s1)', f'addiu t0, zero, {BAR_W - 16}', 'mult v0, t0', 'mflo t0',
           'addiu t1, zero, 255', 'divu t0, t1', 'mflo t0', 'lh t1, 0x18(sp)', 'nop', 'addu s0, t1, t0',
-          'lh t2, 0x58(s1)', f'addiu s5, zero, {HEAD_Y}', 'andi t2, t2, 1', 'bnez t2, rl0', 'nop', f'addiu s5, s5, {ROW_DY}',
-          'rl0:', 'lbu t2, 3(s1)', 'nop', 'move t3, t2', 'bne t2, s4, rl1', 'nop', 'move t3, s7',
+          f'addiu s5, zero, {HEAD_Y}', 'lbu t2, 3(s1)', 'nop', 'move t3, t2', 'bne t2, s4, rl1', 'nop', 'move t3, s7',
           # SPRT 16x16: tag (len 3), 0x7C808080, y << 16 | x, clut << 16 | v << 8 | u
           'rl1:', 'lui t4, 0x300', 'sw t4, 0(s2)', 'lui t4, 0x7c80', 'ori t4, t4, 0x8080', 'sw t4, 4(s2)',
           'sll t5, s5, 16', 'andi t6, s0, 0xffff', 'or t5, t5, t6', 'sw t5, 8(s2)',
@@ -101,7 +106,8 @@ def ops(disc, aliasv, basev, modesv, fbd, icon_x, icon_y, clut_x, clut_y, pre):
     assert w(HOOK) == 0x00009821 and w(HOOK + 4) == 0xAFA20070                 # addu s3, zero, zero / sw v0, 0x70(sp)
     assert w(BACK_LOOP) == 0x16600005 and w(BACK_END) == 0x3C0800FF             # bnez s3 / lui t0, 0xff
     c, l = code(aliasv, basev, modesv)
-    P = [(a, x) for a, x in c] + [(HOOK, J(2, l['rad']))]
+    assert w(COLOR_SITE) == 0x97A90022 and w(COLOR_SITE + 4) == 0x240200FF
+    P = [(a, x) for a, x in c] + [(HOOK, J(2, l['rad'])), (COLOR_SITE, 0x8FA2007C), (COLOR_SITE + 4, 0x97A90022)]
     dw = data_words(); P += [(DATA + RECT1 + i, struct.unpack_from('<I', dw, i)[0]) for i in range(0, len(dw), 4)]
     out = list(pre) + [['w', FILE, a - OVL, w(a), x] for a, x in P]
     vo = lambda x, y: 20 + (y * 704 + x - 320) * 2               # TITLE/MAIN_SEL.FBD (x 320.., 704 wide)

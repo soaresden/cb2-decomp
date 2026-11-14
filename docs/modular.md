@@ -298,16 +298,19 @@ Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D
 - Places de l'effectif de la Compétition : YAGGI JIN CINDY IRIN JICCHI NICK KELLY BOSS ; le joueur a la place
   `g_rider` (Boss, Gray ou Snowman joueur remplacent Jicchi, Nick ou Kelly).
 - Crochet : 0x8006D410 (« addu s3, zero, zero », début de la boucle) → `rad`. Option coupée (bit 64 de 0x80057438) :
-  retour à la boucle d'origine. Sinon : bande de 0x16 de haut à partir de y -0x7E (TIME est juste dessous), les dix
+  retour à la boucle d'origine. Sinon : la bande devient une longue ligne sombre en bas de l'écran (x -0x8C, y 112,
+  0x110 × 6 ; la place et la vitesse finissent en y 108, l'écran en 123 ; S et F suivent ses bouts ; son gris vient de
+  sp + 0x7C, mot libre du cadre de pile, lu en 0x8006D58C à la place du 0xFF d'origine, 0xFF option coupée), les dix
   têtes de la rangée du menu BOARDER (YAGGI JIN CINDY IRIN JICCHI NICK KELLY BOSS GRAY SNOWMAN, faites par les
   opérations `face` et `icons` du mod crew dans TITLE/MAIN_SEL.FBD, recopiées ici par `fcopy` ; le mod les répète
   pour marcher seul) envoyées à chaque image par LoadImage en VRAM (768, 472) (4 bits) et leurs palettes en
   (768.., 490) : zone vide pendant la course, vérifiée sur les 8 pistes de la Compétition. Par coureur : SPRT 16×16
   (ordinateur : tête de sa place ; joueur : tête de `g_rider`, ou de l'alias du mod crew s'il est choisi pour ce
-  mode, même test que la voix), les places impaires sur la rangée du haut et les paires 4 pixels plus bas (un
-  peloton reste lisible), le joueur entouré d'un contour jaune qui clignote comme le carré d'origine, et un DR_TPAGE
+  mode, même test que la voix) posé sur la ligne en y 107, le joueur entouré d'un contour jaune qui clignote comme le carré d'origine, et un DR_TPAGE
   de la page des têtes en tête de chaque entrée (le texte du HUD, S et F compris, change la page dans les mêmes
   entrées). Retour en 0x8006D540 avec s2 (primitives) et s6 (entrée suivante) comme la boucle les laisse.
-- Vérifié dans l'émulateur : têtes et contour en course, option coupée (carrés d'origine), alias (tête de Jicchi
-  pour le joueur), zone de VRAM vide sur les 8 pistes. COMB.BIN a une barre du même genre à 2 coureurs
+- Première version en haut à gauche (barre plus haute, deux rangées) : têtes trop serrées sur 112 pixels ; la ligne du
+  bas en fait 272.
+- Vérifié dans l'émulateur : têtes et contour en course, option coupée (barre et carrés d'origine en haut), alias
+  (tête de Jicchi pour le joueur), zone de VRAM vide sur les 8 pistes. COMB.BIN a une barre du même genre à 2 coureurs
   (`func_8006C884`), pas modifiée.
