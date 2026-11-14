@@ -19,7 +19,7 @@
 # as the loop leaves them. Code and data in two dead functions of SBC2 (no call, jump or pointer to them).
 # Ranking panel (bit 128 of the options off): before that, `rank` draws on the right three rows (the place ahead of the
 # player, the player's, the one behind), each with the place in SBC2's HUD font (gold, silver, bronze shimmering for
-# the first three), the head and the percentage of the course done (see docs/modular.md).
+# the first three), the head and the gap to the player in seconds, timed at the course's segments (see docs/modular.md).
 import struct
 from asm import asm
 
@@ -36,7 +36,9 @@ G_RIDER, MODE = 0x80057408, 0x80057420
 HEADS_VRAM, CLUT_VRAM = (768, 472), (768, 490)   # empty in the race (bottom of the HUD texture page)
 N = 10                                      # heads, in the order of crew.STRIP_ORDER
 PIX, CLUTS, RECT1, RECT2, POSS, PCT, COLS = 0, 1280, 1600, 1608, 1616, 1652, 1660   # data block (end 1684)
-PX, PY, ROW = 76, -24, 18                   # ranking panel: places, heads, percentages (right side, mid height)
+LAST, PIDX, PPL, PRAC, RIDX = 1684, 1688, 1692, 1696, 1700     # work words (LAST = 0 in the file, the others not)
+RINGS = (0x8006C488, 0x80074F48)            # dead functions of SBC2 used as RAM: gates of racers 0..3 and 4..7
+PX, PY, ROW = 66, -24, 18                   # ranking panel: places, heads, gaps (right side, mid height)
 # text colours (the font is white, 0x80 = as is): gold, silver, bronze, others; value = base + step * t, t = 0..15..0
 COLORS = [(128, 84, 0, 0, 2, 1), (88, 88, 96, 2, 2, 2), (104, 56, 20, 2, 2, 1), (128, 128, 128, 0, 0, 0)]
 BOX_RGB = 0x00181818
@@ -55,8 +57,8 @@ def L(a): return a - (H(a) << 16)
 def data_words():
     d = struct.pack('<4h', HEADS_VRAM[0], HEADS_VRAM[1], 4 * N, 16) + struct.pack('<4h', CLUT_VRAM[0], CLUT_VRAM[1], 16 * N, 1)
     d += b''.join(('%d%s' % (k, 'ST' if k == 1 else 'ND' if k == 2 else 'RD' if k == 3 else 'TH')).encode() + b'\0' for k in range(1, 10))[:36]
-    d += bytes(8) + b''.join(bytes(c) for c in COLORS)
-    assert len(d) == COLS + 24 - RECT1 and len(d) % 4 == 0
+    d += bytes(8) + b''.join(bytes(c) for c in COLORS) + bytes(4)        # + LAST
+    assert len(d) == LAST + 4 - RECT1 and len(d) % 4 == 0
     return d
 
 
@@ -110,20 +112,21 @@ def code(aliasv, basev, modesv):
     # frame: 0x24 (place of the row), 0x2C (rtext's return), 0x5C (s6), 0x64 (shimmer), 0x6C (first row), 0x74 (return)
     S += ['rank:', 'sw ra, 0x74(sp)', 'sw s6, 0x5c(sp)', 'addiu s6, zero, 3',
           # the player's place p (racer whose slot is g_rider) -> first row w = clamp(p - 1, 1, 6) at 0x6c(sp)
-          'move t0, s5', 'addiu t1, zero, 8', 'addiu t3, zero, 1',
-          'rk0:', 'lbu t2, 3(t0)', 'nop', 'bne t2, s4, rk1', 'nop', 'lh t3, 0x58(t0)',
+          'move t0, s5', 'addiu t1, zero, 8', 'addiu t3, zero, 1', *la('t6', DATA),
+          'rk0:', 'lbu t2, 3(t0)', 'nop', 'bne t2, s4, rk1', 'nop', 'lh t3, 0x58(t0)', 'addiu t2, zero, 8', 'subu t2, t2, t1',
+          f'sw t2, {PIDX}(t6)', f'sw t3, {PPL}(t6)', f'sw t0, {PRAC}(t6)',
           'rk1:', 'addiu t1, t1, -1', 'bnez t1, rk0', 'addiu t0, t0, 0x1288',
           'addiu t3, t3, -1', 'slti at, t3, 1', 'beqz at, rk2', 'nop', 'addiu t3, zero, 1', 'rk2:', 'slti at, t3, 7', 'bnez at, rk3', 'nop',
           'addiu t3, zero, 6', 'rk3:', 'sw t3, 0x6c(sp)',
           # shimmer t = 0..15..0 (VSync count / 2) at 0x64(sp)
-          f'jal {VSYNC}', 'addiu a0, zero, -1', 'srl v0, v0, 1', 'andi v0, v0, 31', 'slti at, v0, 16', 'bnez at, rk4', 'nop',
+          f'jal {VSYNC}', 'addiu a0, zero, -1', 'jal rgate', 'nop', 'srl v0, v0, 1', 'andi v0, v0, 31', 'slti at, v0, 16', 'bnez at, rk4', 'nop',
           'addiu t0, zero, 31', 'subu v0, t0, v0', 'rk4:', 'sw v0, 0x64(sp)',
           'move s3, zero',
           'rr0:', 'lw t3, 0x6c(sp)', 'nop', 'addu t3, t3, s3', 'move s1, s5', 'addiu t1, zero, 8',
-          'rr1:', 'lh t2, 0x58(s1)', 'nop', 'beq t2, t3, rr2', 'nop', 'addiu t1, t1, -1', 'bnez t1, rr1', 'addiu s1, s1, 0x1288',
+          'rr1:', 'lh t2, 0x58(s1)', 'addiu t4, zero, 8', 'subu t4, t4, t1', 'beq t2, t3, rr2', 'nop', 'addiu t1, t1, -1', 'bnez t1, rr1', 'addiu s1, s1, 0x1288',
           'j rr9', 'nop',
           # s1 = racer of the row, t3 = its place; s0 = y
-          'rr2:', 'sw t3, 0x24(sp)', f'addiu t0, zero, {ROW}', 'mult s3, t0', 'mflo s0', f'addiu s0, s0, {PY}',
+          'rr2:', f'lui at, {H(DATA + RIDX)}', f'sw t4, {L(DATA + RIDX)}(at)', 'sw t3, 0x24(sp)', f'addiu t0, zero, {ROW}', 'mult s3, t0', 'mflo s0', f'addiu s0, s0, {PY}',
           # colour of the place (1st gold, 2nd silver, 3rd bronze, others white), shimmering
           'addiu t0, t3, -1', 'slti at, t0, 3', 'bnez at, rr3', 'nop', 'addiu t0, zero, 3',
           'rr3:', 'sll t1, t0, 1', 'addu t0, t1, t0', 'sll t0, t0, 1', *la('t1', DATA + COLS), 'addu t0, t0, t1', 'lw t9, 0x64(sp)',
@@ -138,20 +141,44 @@ def code(aliasv, basev, modesv):
           'rr4:', 'move a1, s0', 'jal rhead', f'addiu a0, zero, {PX + 26}',
           'lbu t2, 3(s1)', 'nop', 'bne t2, s4, rr5', 'nop', f'addiu a0, zero, {PX + 26}', 'jal rbox', 'move a1, s0',
           'rr5:', 'jal rtp', 'nop',
-          # percentage of the course: progress * 100 / 255, written on two digits ("03%"), or "100%"
-          'lw a0, 0x60(sp)', f'jal {PROGRESS}', 'lh a1, 0(s1)', 'addiu t0, zero, 100', 'mult v0, t0', 'mflo t0', 'addiu t1, zero, 255',
-          'divu t0, t1', 'mflo t0', *la('a2', DATA + PCT), 'move t2, a2', 'addiu t4, zero, 10', 'slti at, t0, 100', 'bnez at, rp5', 'nop',
-          'addiu t5, zero, 0x31', 'sb t5, 0(t2)', 'addiu t2, t2, 1', 'addiu t0, t0, -100', 'addiu t5, zero, 0x30', 'sb t5, 0(t2)', 'j rp6', 'addiu t2, t2, 1',
-          'rp5:', 'divu t0, t4', 'mflo t5', 'mfhi t0', 'addiu t5, t5, 0x30', 'sb t5, 0(t2)', 'addiu t2, t2, 1',
-          'rp6:', 'addiu t0, t0, 0x30', 'sb t0, 0(t2)', 'addiu t5, zero, 0x25', 'sb t5, 1(t2)', 'sb zero, 2(t2)',
-          f'lui a0, {H(FONT)}', f'lw a0, {L(FONT)}(a0)', 'addiu a1, zero, 0x80', 'addiu a2, zero, 0x80', f'jal {TEXT_RGB}', 'addiu a3, zero, 0x80',
+          # gap to the player in seconds (gates: see rgate): ahead "-1.2", behind "+0.8", nothing on the player's row
+          'lbu t2, 3(s1)', 'nop', 'beq t2, s4, rr9', 'nop', *la('t6', DATA), 'lw t3, 0x24(sp)', f'lw t4, {PPL}(t6)', 'nop',
+          'slt at, t3, t4', 'beqz at, rg1', 'nop',
+          f'lw t0, {PRAC}(t6)', 'nop', 'lh a1, 0(t0)', f'lw a0, {PIDX}(t6)', 'jal rent', 'nop', 'move t8, v0',
+          f'lw a0, {RIDX}(t6)', 'jal rent', 'nop', 'move t9, v0', 'j rg2', 'addiu t7, zero, 0x2d',          # '-'
+          'rg1:', 'lh a1, 0(s1)', f'lw a0, {RIDX}(t6)', 'jal rent', 'nop', 'move t8, v0',
+          f'lw a0, {PIDX}(t6)', 'jal rent', 'nop', 'move t9, v0', 'addiu t7, zero, 0x2b',                  # '+'
+          'rg2:', *la('a2', DATA + PCT), 'move t2, a2', 'bltz t8, rg9', 'nop', 'bltz t9, rg9', 'nop',
+          'subu t0, t8, t9', 'andi t0, t0, 0xffff', 'slti at, t0, 5000', 'beqz at, rg9', 'nop',
+          'addiu t1, zero, 5', 'divu t0, t1', 'mflo t0', 'addiu t1, zero, 10', 'divu t0, t1', 'mflo t0', 'mfhi t5',   # t0 s, t5 tenths
+          'sb t7, 0(t2)', 'addiu t2, t2, 1', 'slti at, t0, 10', 'bnez at, rg3', 'nop', 'divu t0, t1', 'mflo t4', 'mfhi t0',
+          'addiu t4, t4, 0x30', 'sb t4, 0(t2)', 'addiu t2, t2, 1',
+          'rg3:', 'addiu t0, t0, 0x30', 'sb t0, 0(t2)', 'addiu t0, zero, 0x2e', 'sb t0, 1(t2)', 'addiu t5, t5, 0x30', 'sb t5, 2(t2)',
+          'j rg8', 'sb zero, 3(t2)',
+          'rg9:', 'addiu t0, zero, 0x2d', 'sb t0, 0(t2)', 'sb t0, 1(t2)', 'sb zero, 2(t2)',                     # "--"
+          'rg8:', f'lui a0, {H(FONT)}', f'lw a0, {L(FONT)}(a0)', 'addiu a1, zero, 0x80', 'addiu a2, zero, 0x80', f'jal {TEXT_RGB}', 'addiu a3, zero, 0x80',
           *la('a2', DATA + PCT), f'addiu a3, zero, {PX + 45}', 'jal rtext', 'addiu t0, s0, 4',
           'rr9:', 'addiu s3, s3, 1', 'slti at, s3, 3', 'bnez at, rr0', 'nop',
           # dark translucent box behind the panel (linked last: drawn first), after a page with the half-and-half blending
           'lui t4, 0x300', 'sw t4, 0(s2)', f'lui t4, {0x6200 | (BOX_RGB >> 16)}', f'ori t4, t4, {BOX_RGB & 0xffff}', 'sw t4, 4(s2)',
-          f'lui t4, {(PY - 3) & 0xffff:#x}', f'ori t4, t4, {(PX - 4) & 0xffff:#x}', 'sw t4, 8(s2)', f'lui t4, {3 * ROW + 4}', 'ori t4, t4, 84', 'sw t4, 12(s2)',
+          f'lui t4, {(PY - 3) & 0xffff:#x}', f'ori t4, t4, {(PX - 4) & 0xffff:#x}', 'sw t4, 8(s2)', f'lui t4, {3 * ROW + 4}', 'ori t4, t4, 92', 'sw t4, 12(s2)',
           'move a0, s2', 'jal radd', 'addiu s2, s2, 16', 'jal rtp', 'nop',
           'lw s6, 0x5c(sp)', 'lw ra, 0x74(sp)', 'nop', 'jr ra', 'nop']
+    # rgate (v0 = VSync count, kept): for each racer, the VSync count (16 bits) at which it entered its current segment
+    # (racer + 0), in a ring of 32 words (segment + 1) << 16 | count; the rings are cleared when the panel has not been
+    # drawn for 30 frames (a new race, a retry). rent: a0 = racer index, a1 = segment -> v0 = count, or -1 if not there
+    S += ['rgate:', *la('t6', DATA), 'andi t7, v0, 0xffff', f'lw t0, {LAST}(t6)', f'sw t7, {LAST}(t6)', 'subu t0, t7, t0', 'andi t0, t0, 0xffff',
+          'slti at, t0, 30', 'bnez at, rg5', 'nop',
+          *la('t0', RINGS[0]), 'addiu t1, t0, 512', 'rg4:', 'sw zero, 0(t0)', 'addiu t0, t0, 4', 'bne t0, t1, rg4', 'nop',
+          *la('t0', RINGS[1]), 'addiu t1, t0, 512', 'rg6:', 'sw zero, 0(t0)', 'addiu t0, t0, 4', 'bne t0, t1, rg6', 'nop',
+          'rg5:', 'move t5, s5', 'move t4, zero',
+          'rg7:', 'lh t1, 0(t5)', 'nop', 'addiu t2, t1, 1', 'andi t1, t1, 31', 'sll t1, t1, 2', *la('t0', RINGS[0]), 'slti at, t4, 4', 'bnez at, rgA', 'sll t3, t4, 7',
+          *la('t0', RINGS[1] - 512), 'rgA:', 'addu t0, t0, t3', 'addu t0, t0, t1', 'lw t3, 0(t0)', 'nop', 'srl t3, t3, 16', 'beq t3, t2, rgB', 'sll t3, t2, 16',
+          'or t3, t3, t7', 'sw t3, 0(t0)',
+          'rgB:', 'addiu t4, t4, 1', 'slti at, t4, 8', 'bnez at, rg7', 'addiu t5, t5, 0x1288', 'jr ra', 'nop']
+    S += ['rent:', 'addiu t2, a1, 1', 'andi t1, a1, 31', 'sll t1, t1, 2', *la('t0', RINGS[0]), 'slti at, a0, 4', 'bnez at, reA', 'sll t3, a0, 7',
+          *la('t0', RINGS[1] - 512), 'reA:', 'addu t0, t0, t3', 'addu t0, t0, t1', 'lw v0, 0(t0)', 'nop', 'srl t3, v0, 16', 'bne t3, t2, reB', 'nop',
+          'jr ra', 'andi v0, v0, 0xffff', 'reB:', 'jr ra', 'addiu v0, zero, -1']
     # rtext: string a2 at x a3, y t0, font FONT, into entry s6
     # (the text takes its primitives at D_80058E0C, which the bar function keeps in s2 and writes back at its end)
     S += ['rtext:', 'sw ra, 0x2c(sp)', 'sw t0, 0x10(sp)', 'sw zero, 0x14(sp)', 'lw a0, 4(fp)', 'sll t1, s6, 2', 'addu a0, a0, t1',

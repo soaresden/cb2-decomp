@@ -314,13 +314,20 @@ Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D
   du HUD : trois rangées (la place devant le joueur, la sienne, celle derrière ; 1er à 3e quand il mène, 6e à 8e quand
   il est dernier ; place = coureur + 0x58) en x 76, y -24, 18 pixels d'écart : la place (« 1ST »…, texte de SBC2
   `func_8008AFC8` avec la police D_8009BBC0, couleur par `func_8008B354` : or, argent, bronze, blanc, qui scintille avec
-  VSync(-1)), la tête (contour jaune pour le joueur) et le pourcentage de la piste fait (progression × 100 / 255, sur deux
-  chiffres : « 03% »), sur
+  VSync(-1)), la tête (contour jaune pour le joueur) et l'écart avec le joueur en secondes (« -1.2 » devant, « +0.8 » derrière,
+  rien sur sa rangée, « -- » sans mesure), sur
   un cadre sombre translucide (TILE 0x62 précédé d'une page en mode moitié-moitié). Le texte prend ses primitives à
   D_80058E0C, que la fonction de la barre garde dans s2 et réécrit à la fin : `rtext` les synchronise autour de
   l'appel (sans ça, les deux se recouvraient et le jeu se figeait). Mots libres du cadre de pile pendant `rad` : 0x24,
   0x2C, 0x5C, 0x64, 0x6C, 0x74 (0x7C : gris de la ligne). Ligne coupée (bit 64) : retour à la boucle d'origine avec
   ses registres (s1 = primitive + 0xA, a2 = 0xFF000000, s7 = 0xFFFFFF) ; les deux coupés : rien n'est changé.
+- Écarts, chronométrés par portes : coureur + 0 est le segment de la piste (un peu moins d'une seconde chacun) ;
+  `rgate` note pour chaque coureur le compteur de VSync (16 bits) à son entrée dans chaque segment, dans un anneau de
+  32 mots ((segment + 1) << 16 | compte) par coureur, dans deux fonctions mortes de SBC2 utilisées comme RAM
+  (0x8006C488 : coureurs 0 à 3, 0x80074F48 : 4 à 7), vidées quand le panneau n'a pas été dessiné depuis 30 images
+  (nouvelle course, recommencer). Devant : (entrée du joueur dans son segment) - (entrée de l'autre dans ce segment) ;
+  derrière : (entrée de l'autre dans son segment) - (entrée du joueur dans ce segment) ; en 1/50 s, affiché en
+  dixièmes. Précis à l'image, mis à jour à chaque porte, comme les temps intermédiaires d'une vraie course.
 - Première version en haut à gauche (barre plus haute, deux rangées) : têtes trop serrées sur 112 pixels ; la ligne du
   bas en fait 272.
 - Vérifié dans l'émulateur : têtes et contour en course, option coupée (barre et carrés d'origine en haut), alias
