@@ -711,3 +711,12 @@ finit quand il atteint 0. Jusqu'à la v74, STOP mettait l'écoulé à 60 s : apr
 la limite restait au-dessus, le jeu continuait comme après Continue et le compteur affichait 999. Maintenant STOP met
 la limite à 0 : la session finit tout de suite, avec le vrai temps (TIME n'est plus forcé à 1'00"). Vérifié : limite
 900000 ms (compteur 894), STOP → compteur 0, « YOUR GRADE IS… », TIME 0'07"640.
+
+v76 : **boost à 2 joueurs** (Free Style 2P, VS.BIN ; `boost.vs_ops`). La fonction du HUD de chaque joueur
+(func_8005F354, s0 = son rider, appelée pour chacun à chaque image) appelle func_8006C150 en 0x8005F464 : l'appel
+passe par `bvt`, qui reconnaît le joueur (rider == D_800A3668[1] : joueur 2) et remplit VS_CUR (0x801F3E80 : rider,
+mots de travail VARS / VARS2, mot de manette 0x800A2810 / 0x800A2812 (relevés dans l'émulateur), rider / veste
+0x80057408 / 0x80057412, alias crew.ALIASV / ALIAS2), puis bmain (image `image(VS_P)` copiée à l'entrée de VS depuis
+quatre fonctions mortes de VS). Barre sous les points de chaque moitié d'écran ; mot d'état de la course de VS
+0x8009DABC (replay) ; même interrupteur que le Free Style (bit 21). Vérifié : jauges pleines, R2 du joueur 1 seul →
++41 % de distance pour lui seul, jauge 480 → 377 ; idem pour le joueur 2.

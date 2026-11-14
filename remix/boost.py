@@ -141,7 +141,8 @@ def main_code(tables, P=None):
          f'lui t0, {H(OPT_FLAGS)}', f'lw t0, {L(OPT_FLAGS)}(t0)', f'lui t1, {(1 << BOOST_BIT) >> 16:#x}', 'and t0, t0, t1', 'bnez t0, bout', 'nop',
          # v71: nothing in the replay (the race loop's state word P['phase'] is 6; 2 in the race)
          f'lui t0, {H(P["phase"])}', f'lw t0, {L(P["phase"])}(t0)', 'addiu t1, zero, 6', 'beq t0, t1, bout', 'nop',
-         f'lui t0, {H(RIDERS)}', f'lw s0, {L(RIDERS)}(t0)', 'nop', 'beqz s0, bout', 'nop', *la('s1', VARS),
+         f'lui t0, {H(RIDERS)}', f'lw s0, {L(RIDERS)}(t0)', 'nop', 'beqz s0, bout', 'nop',
+         *(la('s1', VARS) if not P.get('vs') else [f'lui t0, {H(VS_CUR)}', f'lw s1, {L(VS_CUR) + 4}(t0)']),
          # this frame's move
          'lw t0, 0x2c(s0)', 'lw t1, 0x30(s0)', 'lw t2, 0x34(s0)', 'lw t3, 0(s1)', 'lw t4, 4(s1)', 'lw t5, 8(s1)',
          'subu s5, t0, t3', 'subu s6, t1, t4', 'subu s7, t2, t5', 'sw t0, 0(s1)', 'sw t1, 4(s1)', 'sw t2, 8(s1)']
@@ -149,7 +150,9 @@ def main_code(tables, P=None):
         S += [f'sra t7, {r}, 31', f'xor t6, {r}, t7', 'subu t6, t6, t7', 'slti at, t6, 4000', 'beqz at, breset', 'nop']
     S += ['or t6, s5, s6', 'or t6, t6, s7', 'beqz t6, bdraw', 'nop',
           f'lw t9, {V(FRM)}', 'nop', 'addiu t9, t9, 1', f'sw t9, {V(FRM)}',
-          'lbu t0, 0x3e(s0)', 'lh t1, 0x740(s0)', f'lui t2, {H(PAD)}', f'lhu t2, {L(PAD)}(t2)', 'nop',
+          'lbu t0, 0x3e(s0)', 'lh t1, 0x740(s0)',
+          *([f'lui t2, {H(PAD)}', f'lhu t2, {L(PAD)}(t2)', 'nop'] if not P.get('vs') else
+            [f'lui t2, {H(VS_CUR)}', f'lw t2, {L(VS_CUR) + 8}(t2)', 'nop', 'lhu t2, 0(t2)', 'nop']),
           'beqz t0, bground', 'nop',
           # in the air
           f'lw t3, {V(PEND)}', 'lh t4, 0x6c4(s0)', 'addiu t3, t3, 1', 'addiu t5, zero, 47', 'beq t4, t5, ba1', 'nop', 'addiu t3, t3, 2',
@@ -291,7 +294,10 @@ def main_code(tables, P=None):
           'jal btp', 'nop', 'lw ra, 0x44(sp)', 'nop', 'jr ra', 'nop']
     # bcol -> v0: the colour of the jacket worn (g_rider, g_jacket 0..5), tables in SBC2 (the boost is in the competition
     # only, where Jicchi / Nick / Kelly are not playable: their rows are for later)
-    S += ['bcol:', 'lui t1, 0x8005', 'lh v0, 0x7408(t1)', 'lh t2, 0x740c(t1)', f'lui t3, {H(ALIAS)}', f'lw t3, {L(ALIAS)}(t3)', 'nop',
+    S += (['bcol:', 'lui t1, 0x8005', 'lh v0, 0x7408(t1)', 'lh t2, 0x740c(t1)', f'lui t3, {H(ALIAS)}', f'lw t3, {L(ALIAS)}(t3)', 'nop'] if not P.get('vs') else
+          # VS: the player's rider / jacket (0x80057408 / 0x80057412 + 0, + 4) and alias (crew ALIASV / ALIAS2) from VS_CUR
+          ['bcol:', f'lui t3, {H(VS_CUR)}', f'lw t1, {L(VS_CUR) + 12}(t3)', f'lw t3, {L(VS_CUR) + 16}(t3)', 'lh v0, 0(t1)', 'lh t2, 4(t1)', 'lw t3, 0(t3)', 'nop'])
+    S += [
           'beqz t3, bco1', 'nop', 'addiu v0, t3, 9', 'bco1:',
           'sll t1, v0, 1', 'addu t1, t1, v0', 'sll t1, t1, 1', 'addu t1, t1, t2', *la('t2', JTAB), 'addu t1, t1, t2',
           'lbu t1, 0(t1)', *la('t2', JPAL), 'sll t1, t1, 2', 'addu t1, t1, t2', 'lw v0, 0(t1)', 'jr ra', 'nop']
@@ -316,7 +322,7 @@ def image(P=None):
     return words, l
 
 
-def sbc1_code(img, CAVES=CAVES, SBC1_TAIL=SBC1_TAIL, snap=True):
+def sbc1_code(img, CAVES=CAVES, SBC1_TAIL=SBC1_TAIL, snap=True, clear2=False):
     """`bins`: copies the image to BASE (in pieces: CAVES), clears VARS, FlushCache, then the call it replaces"""
     def S(chunks):
         out = ['bins:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw a0, 0x14(sp)', 'sw a1, 0x18(sp)', 'sw a2, 0x1c(sp)', *la('t1', BASE)]
@@ -326,7 +332,7 @@ def sbc1_code(img, CAVES=CAVES, SBC1_TAIL=SBC1_TAIL, snap=True):
         if snap: out += [f'lui t1, {H(SNAPR)}', f'lw t5, {L(SNAPR)}(t1)', 'lui t2, 0x8005', f'sw zero, {L(SNAPR)}(t1)', 'addiu t6, zero, 2',
                 'beq t5, t6, bit1', 'lw t3, 0x7458(t2)', 'lw t4, 0x745c(t2)',     # SNAPR 2: a retry, not a new cup
                 'nop', 'or t3, t3, t4', 'bnez t3, bit1', 'nop', f'sw zero, {L(TRIES)}(t1)', 'bit1:'] if snap else []
-        out += [*la('t1', VARS), *la('t2', VARS + VARS_LEN), 'biz:', 'sw zero, 0(t1)', 'addiu t1, t1, 4', 'bne t1, t2, biz', 'nop',
+        out += [*la('t1', VARS2 if clear2 else VARS), *la('t2', VARS + VARS_LEN), 'biz:', 'sw zero, 0(t1)', 'addiu t1, t1, 4', 'bne t1, t2, biz', 'nop',
                 f'jal {FLUSH}', 'nop', 'lw ra, 0x10(sp)', 'lw a0, 0x14(sp)', 'lw a1, 0x18(sp)', 'lw a2, 0x1c(sp)',
                 f'j {SBC1_TAIL}', 'addiu sp, sp, 0x20']
         return out
@@ -375,7 +381,7 @@ def ops(disc):
     c2 = c2 + [(SAVE_SITE, 0x10000004)]
     out += [['w', '/SBC2.BIN', a - OVL, w2(a), x] for a, x in c2 + [(SBC2_SITE, J(3, l2['btr'])),
                                                                       (EXIT_SITE, J(2, l2['rtr'])), (EXIT_SITE + 4, 0x00408021)]]
-    return out + free_ops(disc) + exit_ops(disc)
+    return out + free_ops(disc) + exit_ops(disc) + vs_ops(disc)
 
 
 def free_ops(disc):
@@ -430,3 +436,46 @@ def exit_ops(disc):
     c += [(spr + i, struct.unpack_from('<I', blob, i)[0]) for i in range(0, 12, 4)]
     c += [(EX_DRAW_SITE, J(3, l['exd'])), (EX_BOUND, 0x24420002), (EX_SEL_SITE, J(2, l['exs'])), (EX_SEL_SITE + 4, 0)]
     return [['w', '/SBC2.BIN', a - OVL, w2(a), x] for a, x in c]
+
+
+# v76: the boost in the 2-player Free Style (VS.BIN). The per-player HUD function func_8005F354 (s0 = the player's
+# racer, called once per player and frame) calls func_8006C150 at 0x8005F464: that call goes through `bvt`, which
+# picks the player (racer == D_800A3668[1]: player 2) and fills VS_CUR (racer, work words VARS / VARS2, pad word
+# 0x800A2810 / 0x800A2812, rider / jacket 0x80057408 / 0x80057412, alias crew.ALIASV / ALIAS2), then bmain (image
+# image(VS_P), copied at VS's entry from dead functions of VS). Same switch as the Free Style (bit 21).
+VS_CUR = 0x801F3E80                          # racer, vars, pad pointer, rider base, alias pointer
+VARS2 = VS_CUR + 0x14
+assert VARS2 + VARS_LEN <= VARS
+VS_SITE, VS_TAIL = 0x8005F464, 0x8006C150
+VS_ENTRY, VS_RACERS = 0x8005AEC0, 0x800A3668
+VS_CAVES = [(0x8007F22C, 0x8007FA10), (0x80070034, 0x80070440), (0x8008EEF4, 0x8008F0F8), (0x800722E4, 0x80072448)]
+VS_BVT = (0x800932C4, 0x800933D0)
+VS_JPAL = 0x800944C0; VS_DIRS = VS_JPAL + 4 * len(JPAL_WORDS); VS_JTAB = 0x80093D44
+assert VS_DIRS + 40 <= 0x80094588 and VS_JTAB + len(JTAB_BYTES) <= 0x80093DB8
+VS_ALIAS2 = 0x8001FC98                       # crew.ALIAS2
+VS_P = dict(riders=VS_CUR, vel=VEL - 8, tail=VS_TAIL, jtab=VS_JTAB, jpal=VS_JPAL, bit=FREE_BIT, bx=-68, by=-46,
+            phase=0x8009DABC, dirs=VS_DIRS, vs=True)
+
+
+def vs_ops(disc):
+    vs = disc.read_file('/VS.BIN'); wv = lambda a: struct.unpack_from('<I', vs, a - OVL)[0]
+    assert wv(VS_SITE) == J(3, VS_TAIL) and wv(VS_ENTRY) == J(3, SBC1_TAIL)
+    img, l = image(VS_P)
+    assert BASE + 4 * len(img) <= VS_CUR, hex(BASE + 4 * len(img))
+    c1, l1 = sbc1_code(img, VS_CAVES, SBC1_TAIL, snap=False, clear2=True)
+    S = ['bvt:', f'lui t0, {H(VS_CUR)}', f'sw s0, {L(VS_CUR)}(t0)', f'lui t1, {H(VS_RACERS)}', f'lw t1, {L(VS_RACERS) + 4}(t1)',
+         *la('t2', VARS), *li('t3', 0x800A2810), *li('t4', G_RIDER), *la('t5', ALIAS),
+         'bne t1, s0, bv1', 'nop', *la('t2', VARS2), 'addiu t3, t3, 2', 'addiu t4, t4, 10', *la('t5', VS_ALIAS2),
+         'bv1:', f'sw t2, {L(VS_CUR) + 4}(t0)', f'sw t3, {L(VS_CUR) + 8}(t0)', f'sw t4, {L(VS_CUR) + 12}(t0)', f'sw t5, {L(VS_CUR) + 16}(t0)',
+         f'lui t0, {H(BASE)}', f'lw t0, {L(BASE)}(t0)', *li('t1', MAGIC), 'bne t0, t1, bv9', 'nop', f'j {l["bmain"]}', 'nop',
+         'bv9:', f'j {VS_TAIL}', 'nop']
+    c2, _ = asm(S, VS_BVT[0]); assert c2[-1][0] < VS_BVT[1]
+    tb = JTAB_BYTES + bytes(-len(JTAB_BYTES) % 4)
+    c2 += [(VS_JPAL + 4 * i, w) for i, w in enumerate(JPAL_WORDS)] + [(VS_JTAB + i, struct.unpack_from('<I', tb, i)[0]) for i in range(0, len(tb), 4)]
+    c2 += [(VS_DIRS + 4 * i, (dx & 0xffff) | ((dy & 0xffff) << 16)) for i, (dx, dy) in enumerate(DIRS)]
+    # bins also clears VARS2 (the work words of player 2): VARS2 .. VARS is cleared with VARS by widening its range
+    return [['w', '/VS.BIN', a - OVL, wv(a), x] for a, x in c1 + c2 + [(VS_ENTRY, J(3, l1['bins'])), (VS_SITE, J(3, l2_bvt(c2)))]]
+
+
+def l2_bvt(c2):
+    return VS_BVT[0]
