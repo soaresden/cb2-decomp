@@ -63,9 +63,12 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('hplive', 'Notes du half-pipe en direct', 'Live half-pipe marks',
      'En half-pipe, les cinq notes des juges (figures, amplitude, réception, rotation, mérite technique) et le total s’affichent en haut à droite pendant le run, et montent à chaque figure.',
      'In the half-pipe, the five judges’ marks (manoeuvres, amplitude, landing, rotation, technical merit) and the total are shown at the top right during the run, and go up with each trick.'),
+    ('radar', 'Radar de course avec les têtes', 'Race radar with heads',
+     'En Boarder Cross de la Compétition, la barre de progression en haut à gauche (S … F) montre la tête de chaque rider à sa place dans la course au lieu d’un petit carré de couleur ; la tienne passe devant, avec un cadre jaune qui clignote.',
+     'In the competition’s Boarder Cross, the progress bar at the top left (S … F) shows each rider’s head at their place in the race instead of a small coloured square; yours is in front, with a blinking yellow frame.'),
     ('options', 'Options dans le jeu', 'In-game options',
-     'Sur l’écran de choix du mode, maintiens R1 : le panneau REMIX OPTIONS s’affiche ; L1 descend d’une ligne, R2 active ou coupe : vue arrière, notes du half-pipe en direct, annonces de déblocage, figures en l’air, chocs en Boarder Cross, et écran large 16:9 (coupé au départ : à utiliser avec l’image étirée en 16:9 et sans le « widescreen hack » de l’émulateur). Dernière ligne, UNLOCK EVERYTHING : un premier R2 affiche un avertissement, un second débloque tout d’un coup (riders, pistes, planches SPECIAL, Mirror, Hard, trophées : la sauvegarde devient 100 %, sans retour arrière) pour tout essayer. Le réglage est gardé dans ta sauvegarde.',
-     'On the mode select screen, hold R1: the REMIX OPTIONS panel shows; L1 moves down a line, R2 switches it on or off: rear view, live half-pipe marks, unlock announcements, air control, Boarder Cross ramming, and widescreen 16:9 (off at first: use it with the picture stretched to 16:9 and without the emulator’s widescreen hack). Last line, UNLOCK EVERYTHING: a first R2 shows a warning, a second one unlocks everything at once (riders, courses, SPECIAL boards, Mirror, Hard, trophies: the save becomes 100 %, no undo) to try it all. The setting is kept in your save.'),
+     'Sur l’écran de choix du mode, maintiens R1 : le panneau REMIX OPTIONS s’affiche ; L1 descend d’une ligne, R2 active ou coupe : vue arrière, notes du half-pipe en direct, annonces de déblocage, figures en l’air, chocs en Boarder Cross, écran large 16:9 (coupé au départ : à utiliser avec l’image étirée en 16:9 et sans le « widescreen hack » de l’émulateur) et radar de course avec les têtes. Dernière ligne, UNLOCK EVERYTHING : un premier R2 affiche un avertissement, un second débloque tout d’un coup (riders, pistes, planches SPECIAL, Mirror, Hard, trophées : la sauvegarde devient 100 %, sans retour arrière) pour tout essayer. Le réglage est gardé dans ta sauvegarde.',
+     'On the mode select screen, hold R1: the REMIX OPTIONS panel shows; L1 moves down a line, R2 switches it on or off: rear view, live half-pipe marks, unlock announcements, air control, Boarder Cross ramming, widescreen 16:9 (off at first: use it with the picture stretched to 16:9 and without the emulator’s widescreen hack) and the race radar with heads. Last line, UNLOCK EVERYTHING: a first R2 shows a warning, a second one unlocks everything at once (riders, courses, SPECIAL boards, Mirror, Hard, trophies: the save becomes 100 %, no undo) to try it all. The setting is kept in your save.'),
     ('news', 'Annonces de déblocage', 'Unlock announcements',
      'De retour au menu après une course, un bandeau qui brille annonce ce que tu viens de gagner : Boss, Gray, Snowman, planche SPECIAL, Mirror, Hard, nouvelles pistes, trophée, et les 100 % (CONGRATULATIONS, avec Jicchi, Nick et Kelly si leur mod est coché).',
      'Back in the menu after a race, a shining banner tells what you just won: Boss, Gray, Snowman, SPECIAL board, Mirror, Hard, new courses, trophy, and the 100 % (CONGRATULATIONS, with Jicchi, Nick and Kelly if their mod is on).'),
@@ -239,6 +242,9 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     pkg['ops']['hplive'] = _hl.ops(O)
     import options as _op
     pkg['ops']['options'] = _op.ops(O)
+    import radar as _rd      # heads made by crew's operations (face, icons), repeated so that the mod works alone
+    pkg['ops']['radar'] = _rd.ops(O, _cw.ALIASV, _cw.BASEV, _cw.MODESV, _cw.FBD, _cw.ICON_X, _cw.ICON_Y, _cw.ICON_CLUT_X, _cw.ICON_CLUT_Y,
+                                  [_cw.face_op(), _cw.icons_op()])
     # sectors: everything else the reference changes (new blobs in free sectors, Boss voice bank at the end of the
     # intro movie, moved small files) -> 'riders', taken from the published delta (copies from the player's disc)
     P = gzip.decompress(open(delta_gz, 'rb').read()); n = struct.unpack_from('<I', P, 16)[0]; o = 20; entries = {}
@@ -277,7 +283,7 @@ def apply(disc, pkg, feats, log=lambda m: None):
     def buf(p):
         if p not in files: files[p] = bytearray(orig(p))
         return files[p]
-    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'crew', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'rear', 'news', 'hplive', 'options', INPUT, 'input_noair', BRAND) if f in feats]
+    order = [f for f in ('unlock', 'special', 'hardmirror', 'riders', 'crew', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'rear', 'news', 'hplive', 'radar', 'options', INPUT, 'input_noair', BRAND) if f in feats]
     for feat in order:
         for op in pkg['ops'][feat]:
             t = op[0]
@@ -685,7 +691,7 @@ def load(path): return json.loads(gzip.decompress(open(path, 'rb').read()))
 B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 # bit order of the configuration code: fixed (never reorder; new mods go at the end), the same as the site's seed.js
 IDS = ['unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'crew', 'rear',
-       'news', 'hplive', 'options']
+       'news', 'hplive', 'options', 'radar']
 assert sorted(IDS) == sorted(f[0] for f in FEATURES)
 RETIRED = {'lift'}                       # kept in IDS so that old codes still decode; no longer offered
 SHOWN = [f for f in IDS if f not in RETIRED]

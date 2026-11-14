@@ -255,7 +255,7 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
 
 - Les interrupteurs sont des bits de 0x80057438 (bit à 1 = coupé) : 1 vue arrière, 2 notes du half-pipe en direct,
   4 annonces de déblocage, 8 figures en l'air (`air`), 16 chocs en Boarder Cross (`ramming`), 32 écran large (à 1 =
-  actif : coupé par défaut), 64 UNLOCK EVERYTHING fait. Cet octet fait partie
+  actif : coupé par défaut), 64 radar avec les têtes (`radar`), 128 UNLOCK EVERYTHING fait. Cet octet fait partie
   du bloc 0x80057434..0x8005744D copié dans la sauvegarde mais n'est jamais lu par le jeu (docs/progression.md) : le
   réglage suit la carte mémoire. À 0, tout est actif comme avant.
 - `rear`, `hplive`, `news` lisent leur bit. `air` et `ramming` sont coupés là où leur code vit, dans l'exe (toujours
@@ -267,10 +267,10 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
   seulement lue par les fonctions de vue) passe de 0x1000 à 0xC00 : le jeu calcule lui-même un champ 16:9, à afficher
   étiré en 16:9 (sans le « widescreen hack » de l'émulateur). Valeur reprise du code DuckStation de PeterDelta pour ce
   disque (SCES-00992 : A7059288 10000C00, github.com/PeterDelta/PCSX2). Vérifié : course de Free Style en 16:9.
-- UNLOCK EVERYTHING (dernière ligne, bit 64 = fait, affiché ON) : une action, pas un interrupteur. Premier R2 : mot
+- UNLOCK EVERYTHING (dernière ligne, bit 128 = fait, affiché ON) : une action, pas un interrupteur. Premier R2 : mot
   `conf` à 1, trois lignes d'avertissement sous le panneau (`owr`) ; second R2 (`ounl`, dans l'exe) : le bloc de
   progression reçoit les valeurs d'une partie à 100 % (0x743C/0x743E = 10, 0x7440 |= 0x7F, 0x7442 |= 7,
-  0x7444/0x7446 = 1, 0x7448/0x744A/0x744C = 0x3FF), bit 64 mis, `conf` remis à 0. Bouger le curseur annule
+  0x7444/0x7446 = 1, 0x7448/0x744A/0x744C = 0x3FF), bit 128 mis, `conf` remis à 0. Bouger le curseur annule
   l'avertissement. La sauvegarde garde le tout (pas de retour arrière). Sert à essayer tous les modes et toutes les
   options d'un coup ; débloque aussi Jicchi, Nick et Kelly (porte 100 % de `crew`).
 - Tampon de primitives du panneau : 0x801F8000 + 0x2000 par image (0x801F0000..0x801FF000 n'est pas touché sur cet
@@ -283,3 +283,31 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
   Style avec air et ramming coupés ; notes du half-pipe absentes avec le bit 2 ; vue arrière normale avec le bit 1 ;
   annonce non lancée avec le bit 4. Pas encore vérifié : l'octet relu après un vrai enregistrement puis chargement de
   la carte.
+
+## Radar de course avec les têtes (`radar`, v27)
+
+Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D614`, données dans `func_8007BEB8`).
+
+- La barre de progression du Boarder Cross de la Compétition (en haut à gauche, S … F) est dessinée par
+  `func_8006D2A4` de SBC2 (appelée en 0x8005F56C avec le tableau des coureurs D_8009146C, 8 × 0x1288 octets) :
+  bande translucide (TILE 0x62, x -0x90, y -0x78, 0x70 × 0xD, rectangle en sp + 0x18), puis par coureur un carré 4×4
+  à x = -0x90 + (0x70 - 4) × `func_8007E4B0`(piste, coureur + 0) / 255, y = -0x78 + 1 + place, couleur de la table
+  D_8008DD88 (rouge, vert, bleu, jaune, magenta, cyan, blanc, noir) selon la place (coureur + 3), chaque carré dans
+  sa propre entrée de l'ordering table (3, 4, …, les plus basses dessinées en dernier), celui du joueur clignotant
+  (sp + 0x70) ; enfin la bande et les lettres S et F. Coureur + 0x58 = place dans la course (1 à 8).
+- Places de l'effectif de la Compétition : YAGGI JIN CINDY IRIN JICCHI NICK KELLY BOSS ; le joueur a la place
+  `g_rider` (Boss, Gray ou Snowman joueur remplacent Jicchi, Nick ou Kelly).
+- Crochet : 0x8006D410 (« addu s3, zero, zero », début de la boucle) → `rad`. Option coupée (bit 64 de 0x80057438) :
+  retour à la boucle d'origine. Sinon : bande de 0x16 de haut à partir de y -0x7E (TIME est juste dessous), les dix
+  têtes de la rangée du menu BOARDER (YAGGI JIN CINDY IRIN JICCHI NICK KELLY BOSS GRAY SNOWMAN, faites par les
+  opérations `face` et `icons` du mod crew dans TITLE/MAIN_SEL.FBD, recopiées ici par `fcopy` ; le mod les répète
+  pour marcher seul) envoyées à chaque image par LoadImage en VRAM (768, 472) (4 bits) et leurs palettes en
+  (768.., 490) : zone vide pendant la course, vérifiée sur les 8 pistes de la Compétition. Par coureur : SPRT 16×16
+  (ordinateur : tête de sa place ; joueur : tête de `g_rider`, ou de l'alias du mod crew s'il est choisi pour ce
+  mode, même test que la voix), les places impaires sur la rangée du haut et les paires 4 pixels plus bas (un
+  peloton reste lisible), le joueur entouré d'un contour jaune qui clignote comme le carré d'origine, et un DR_TPAGE
+  de la page des têtes en tête de chaque entrée (le texte du HUD, S et F compris, change la page dans les mêmes
+  entrées). Retour en 0x8006D540 avec s2 (primitives) et s6 (entrée suivante) comme la boucle les laisse.
+- Vérifié dans l'émulateur : têtes et contour en course, option coupée (carrés d'origine), alias (tête de Jicchi
+  pour le joueur), zone de VRAM vide sur les 8 pistes. COMB.BIN a une barre du même genre à 2 coureurs
+  (`func_8006C884`), pas modifiée.

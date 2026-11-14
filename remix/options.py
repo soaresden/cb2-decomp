@@ -30,9 +30,9 @@ CAVES = [(0x800654A8, 0x8006562C), (0x8006F680, 0x8006F71C), (0x8006F7C4, 0x8006
 DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data
 X0, X1, Y0, DY = -150, 70, -48, 13
 LINES = [('REAR VIEW (CIRCLE)', 1), ('LIVE HALF-PIPE MARKS', 2), ('UNLOCK NEWS', 4), ('AIR CONTROL', 8), ('BOARDER CROSS RAMMING', 16),
-         ('WIDESCREEN 16:9', 32), ('UNLOCK EVERYTHING', 64)]
-INV = 32 | 64                          # lines whose bit set means ON (off by default)
-UNLOCK_LINE = 6                        # an action, not a switch: R2 shows the warning, R2 again unlocks (bit 64 = done)
+         ('WIDESCREEN 16:9', 32), ('RACE RADAR HEADS', 64), ('UNLOCK EVERYTHING', 128)]
+INV = 32 | 128                         # lines whose bit set means ON (off by default)
+UNLOCK_LINE = 7                        # an action, not a switch: R2 shows the warning, R2 again unlocks (bit 128 = done)
 WARN = ['R2 AGAIN UNLOCKS ALL RIDERS,', 'COURSES, BOARDS, MIRROR, HARD,', 'TROPHIES. SAVED. NO UNDO!']     # <= 30 letters (box)
 # the progress block as a 100 % game (remix/progress.py): courses, riders (Boss, Gray, Snowman), SPECIAL boards,
 # Mirror, Hard, the 30 Free Style trophies; the save keeps it
@@ -102,7 +102,7 @@ def routines(D):
           'oun1:', f'sw zero, {L(D["conf"])}(t2)', 'lui t8, 0x8005']
     for o, v, k in UNLOCK:
         S += ([f'lhu t9, {o}(t8)', 'nop', f'ori t9, t9, {v}'] if k == 'o' else [f'addiu t9, zero, {v}']) + [f'sh t9, {o}(t8)']
-    S += ['ori t6, t6, 64', f'sb t6, {L(FLAGS)}(t0)', 'j op4', 'nop']
+    S += ['ori t6, t6, 128', f'sb t6, {L(FLAGS)}(t0)', 'j op4', 'nop']
     yb = Y0 + DY * (n + 1 + len(WARN))
     S += ['drw:', 'sw ra, 0x2c(sp)', 'sw t4, 0x10(sp)', 'sw t5, 0x14(sp)', 'sw t6, 0x18(sp)', 'sw t7, 0x1c(sp)', 'sw zero, 0x20(sp)',
           'move a0, s5', 'move a1, s6', f'lui a2, {H(FONT)}', f'addiu a2, a2, {L(FONT)}', f'jal {TEXT}', f'addiu a3, zero, {CLUT}',
