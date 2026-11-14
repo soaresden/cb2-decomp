@@ -147,6 +147,23 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
   seul premier appel, la hiérarchie humaine revenait. Vérifié dans l'émulateur : Big Air (1re étape) et Boarder
   Cross (2e étape), Snowman entier, animé comme en Free Style.
 
+## Snowman : mémoire du Boarder Cross (v33)
+
+- Manches 3, 6 et 7 bloquées sur l'écran de chargement avec Snowman : TOD_SM (82 Ko) dans le tas, et la piste ne tenait
+  plus (`func_8001F270` = malloc s'arrête sur `break 1, 7` quand un fichier ne tient pas). Place libre en course
+  (avec Boss) : manches 1..8 = 206, 218, 62, 181, 305, 40, 51, 176 Ko ; pendant le chargement de la manche 6, un
+  bloc temporaire de 228 Ko et un de 32 Ko (libérés au démarrage de SBC2) ne laissent que ~15 Ko. 1re étape : ~600 Ko.
+- `func_8001CCE0` reçoit en a3 (s3) le paramètre de `func_8001C748` : 0 = 1re étape depuis le menu, 1 = 1re étape à
+  nouveau (2e essai), 2 = Boarder Cross. Le numéro de fichier de la file (`func_80013BD0`) est un index de la table
+  0x800583E8 (8 octets : MSF, taille) sans limite : des entrées à nous en RAM libre marchent.
+- v33 : 1re étape = TOD_SM entier (comme avant). Boarder Cross = TOD_SM « tassé » (`snowtod.pack`) : les paquets
+  parent / attribut répétés au début de chaque mouvement (945, identiques à la mise en place) retirés, et seulement
+  les mouvements que la course joue (mesurés : rider + 0x6C4 = mouvement en cours, échantillonné sur des courses avec
+  tous les boutons, 4 riders, plusieurs pistes) ; les autres renvoient à des voisins (DROP). 37 Ko en deux fichiers
+  (fin du générique) : A (32 Ko) en 0x801F4000 (RAM libre, la pile descend jusqu'à 0x801FDBC0), B (5 Ko) dans le tas.
+  SBC1 (`hins`, au début de chaque SBC1) copie `hlp` en 0x801F3000 et y dirige l'appel 0x8001D014 de l'exe.
+- Vérifié : manches 1, 3, 6 et 7 (forcées en 0x80057458) chargent et courent avec Snowman entier.
+
 ## Voix de Gray et Snowman en Boarder Cross (v32, `remix/voices.py`, mod `riders`)
 
 - SBC2 n'a que 4 banques de voix de course (jeux de sons 35..38 = SBC2ND0..3, 48 échantillons : commentateur et

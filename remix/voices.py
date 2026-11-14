@@ -9,7 +9,8 @@
 # (sample 38) is a silence (their free-ride banks have no such clip). Both banks have the same layout (each sample
 # padded to the longer of the two), so one offset table serves both.
 #   disc: the two banks go just before the last RESERVE sectors of the credits movie STAFFE.STR (kept for MODE_SEL,
-#         moved there when it grows), which is cut accordingly (about 1.4 s). Built from copies of the player's disc.
+#         moved there when it grows), Snowman's packed TOD before them (layout), the movie cut accordingly (about
+#         1.7 s). Built from copies of the player's disc.
 #   SBC2: the call of `bsnd` (0x80066CB4) goes to `vsnd` in the dead function func_80070E9C: Boss as before, Gray and
 #         Snowman get their bank (file entry: MSF + size, in the same place) and the shared offset table.
 import json, os, struct
@@ -97,16 +98,26 @@ def sbc2_code(fe, tb):
     return asm(S, tb + 4 * 49)
 
 
+def layout(disc):
+    """the end of the credits movie: [Snowman's packed TOD A, B (remix/snowtod.py)] [Gray's bank] [Snowman's bank]
+    [RESERVE: MODE_SEL]; -> {'tsmA', 'tsmB', 5, 6: first sectors, 'cut': the movie's new size}"""
+    import snowtod
+    _, _, total = banks(disc); n = -(-total // 2048)
+    _, la, _, lb = snowtod.pack(disc); na = -(-la // 2048); nb = -(-lb // 2048)
+    sl, ss, _ = disc.files['/MOVIE/STAFFE.STR']; sn = ss // 2048
+    first = sl + sn - RESERVE - 2 * n
+    return {5: first, 6: first + n, 'tsmB': first - nb, 'tsmA': first - nb - na, 'cut': (first - nb - na - sl) * 2048}
+
+
 def ops(disc, riders_ops):
     """the bank sectors, STAFFE's record, the SBC2 table and code; riders_ops: the call of bsnd is repointed there"""
     parts, offs, total = banks(disc)
     n = -(-total // 2048)
-    sl, ss, _ = disc.files['/MOVIE/STAFFE.STR']; sn = ss // 2048
-    first = sl + sn - RESERVE - 2 * n
-    out = [['rec', '/MOVIE/STAFFE.STR', sl, (sn - RESERVE - 2 * n) * 2048]]
-    lbas = {}
+    lay = layout(disc)
+    sl = disc.files['/MOVIE/STAFFE.STR'][0]
+    out = [['rec', '/MOVIE/STAFFE.STR', sl, lay['cut']]]
+    lbas = {r: lay[r] for r in parts}
     for k, r in enumerate(sorted(parts)):
-        lbas[r] = first + k * n
         for i, sec in enumerate(_sectors(parts[r], total)):
             sub = bytes([0, 0, 0x89 if i == n - 1 else 0x08, 0]) * 2
             out.append(['sec', lbas[r] + i, sub.hex(), sec])
