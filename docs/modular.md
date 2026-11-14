@@ -759,3 +759,9 @@ même appui ; il voyait donc le curseur déjà sur la dernière ligne et prenait
 sauté). Maintenant MAX n'est pris que si le curseur était déjà sur la dernière ligne à l'image d'avant (PREVCUR
 0x801E7FF0, écrit par maxb à chaque image, dans ses 10 nop ; `boardmax.fix_down`). Vérifié : Bas TYPE-1 → 2 → 3 →
 SPECIAL → MAX, Haut remonte. Half-pipe avec tenue cachée (Irin), 2e tenue (Kelly) et veste de Jin : chargent (v79).
+
+v81 : **stats MAX du rider plus appliquées au Big Air Master** (OMT.BIN). Le drapeau MAX (R1 sur l'écran BOARDER,
+0x8002957C) est global : choisi dans un autre mode, il passait au Big Air Master, qui n'a pas d'écran BOARDER pour le
+voir ou le couper. Le crochet `maxc_s0` d'OMT.BIN (0x80063C58) est retiré (aussi de toggle_sites) : Yaggi y garde ses
+stats. La planche MAX reste, elle se choisit sur l'écran BOARD de ce mode. Vérifié : mot d'origine 0x00431021 dans
+OMT.BIN, crochets de FREE / HP inchangés, Big Air Master lancé normalement.

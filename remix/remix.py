@@ -113,7 +113,8 @@ def patches():
     for a_,w_ in ((FLAG,0),(MAXE,0x1400),(MAXE+4,0x1400),(MAXE+8,(29<<16)|(-136&0xffff)),(MAXE+12,(113<<16)|12),(SAVE,0),(EDGE,0)):
         P.append(('/SCES_009.92',a_,struct.unpack_from('<I',_ex,a_-0x8000f800)[0],w_))
     JL=lambda t:(3<<26)|((t>>2)&0x3ffffff)
-    for f,a_,b in (('/SBC1.BIN',0x80063f04,'s3'),('/SBC2.BIN',0x80065be4,'s3'),('/VS.BIN',0x80064e08,'s0'),('/OMT.BIN',0x80063c58,'s0'),('/BP.BIN',0x80063b1c,'s0'),
+    # (v81: not in OMT.BIN, the Big Air Master: no BOARDER screen there to see or switch it, Yaggi keeps his stats)
+    for f,a_,b in (('/SBC1.BIN',0x80063f04,'s3'),('/SBC2.BIN',0x80065be4,'s3'),('/VS.BIN',0x80064e08,'s0'),('/BP.BIN',0x80063b1c,'s0'),
                    ('/HP.BIN',0x80063d0c,'s0'),('/FREE.BIN',0x8006465c,'s0'),('/TM.BIN',0x80063c38,'s0'),('/COMB.BIN',0x80064b88,'s0')):
         P.append((f,a_,0x00431021,JL(lmx['maxc_'+b])))
     P+=[('/MAIN_SEL.BIN',0x800614b8,0x84a40000,JL(lmx['maxd'])),('/MAIN_SEL.BIN',0x800626e4,0x0c01731e,JL(lmx['maxl']))]
