@@ -703,3 +703,11 @@ session : TIME passe à 1'00"040, YOUR GRADE IS…, puis le classement TRICK MAS
 
 v74 : « GRAY IN n » du Big Air Master revient en haut à droite sous le nom de la note, 16 pixels plus haut (y -76)
 qu'en v53..v72 (il mordait sur les noms de figures) ; EXIT sous SAVE après une manche gagnée (voir competition.md).
+
+v75 : **STOP du Big Air Master réparé pour les longues sessions** : la session ne dure pas 60 s fixes. D_80094288 est
+la limite en millisecondes (60000 au départ), rallongée par les figures réussies (func_8005F960, appelée chaque image
+avec le temps écoulé D_8009B954 × 40) ; le gros compteur en haut au milieu = (limite − écoulé) / 1000, et la session
+finit quand il atteint 0. Jusqu'à la v74, STOP mettait l'écoulé à 60 s : après une longue session (limite de 25 min),
+la limite restait au-dessus, le jeu continuait comme après Continue et le compteur affichait 999. Maintenant STOP met
+la limite à 0 : la session finit tout de suite, avec le vrai temps (TIME n'est plus forcé à 1'00"). Vérifié : limite
+900000 ms (compteur 894), STOP → compteur 0, « YOUR GRADE IS… », TIME 0'07"640.

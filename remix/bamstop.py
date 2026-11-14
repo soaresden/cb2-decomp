@@ -13,6 +13,7 @@ from asm import asm
 EXE_BASE, OVL = 0x8000F800, 0x8005AEA8
 BX, BX_END = 0x8002934C, 0x80029370            # 9 words: the mod air's code follows
 TIMER, LIMIT = 0x8009B954, 0x5DC
+TLIMIT = 0x80094288        # the session's time limit in ms (60000 at the start, + the tricks' bonus time)
 EXIT_STR = 0x8009225C
 CONTINUE = 0x8005CCE8
 
@@ -21,8 +22,10 @@ def ops(disc):
     ex = disc.read_file('/SCES_009.92'); tm = disc.read_file('/TM.BIN')
     we = lambda a: struct.unpack_from('<I', ex, a - EXE_BASE)[0]
     # STOP: back to the menu's Continue path (0x8005CCE8: the pause closes) instead of the store of the choice
+    # v75: the session's time limit (D_80094288, ms) set to 0 instead of the clock to 60 s: the limit grows with the
+    # tricks (a 25 min session: the clock set back to 60 s was under it, the game went on, the countdown showed 999)
     c, _ = asm(['bx:', 'lui t0, 0x800a', f'lw t1, {TIMER - 0x800A0000}(t0)', 'lui t2, 0x8006', 'bltz t1, bx9',
-                f'addiu t1, zero, {LIMIT}', f'sw t1, {TIMER - 0x800A0000}(t0)', f'addiu ra, t2, {CONTINUE - 0x80060000}',
+                f'lui t3, {(TLIMIT + 0x8000) >> 16:#x}', f'sw zero, {TLIMIT - (((TLIMIT + 0x8000) >> 16) << 16)}(t3)', f'addiu ra, t2, {CONTINUE - 0x80060000}',
                 'bx9:', 'jr ra', 'addiu v0, zero, 3'], BX)
     assert c[-1][0] < BX_END
     assert tm[EXIT_STR - OVL:EXIT_STR - OVL + 5] == b'Exit\0'
