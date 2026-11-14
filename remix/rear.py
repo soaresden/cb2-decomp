@@ -19,7 +19,9 @@ CAVE = 0x800280B8; CAVE_END = 0x8002815C          # dead functions of the exe (n
 CAVE2 = 0x8002E7D0; CAVE2_END = 0x8002E864
 WS = 0x80058E20; WORK = 0x80059220
 ENDING_W1 = 0x27BDCAB0
-OPT_FLAGS, OPT_BIT = 0x80057438, 1          # in-game options (mod options): bit set = rear view off
+OPT_FLAGS, OPT_BIT = 0x8005744E, 1          # in-game options (mod options): bit set = rear view off (v81: the REAR VIEW
+                                            # of the mode, copied by options' `pmd` into this unsaved byte, cleared at boot
+                                            # and never read by the game; until v80 bit 0 of the saved word 0x80057438)
 
 
 def code():

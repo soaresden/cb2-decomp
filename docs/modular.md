@@ -760,8 +760,18 @@ sauté). Maintenant MAX n'est pris que si le curseur était déjà sur la derni�
 0x801E7FF0, écrit par maxb à chaque image, dans ses 10 nop ; `boardmax.fix_down`). Vérifié : Bas TYPE-1 → 2 → 3 →
 SPECIAL → MAX, Haut remonte. Half-pipe avec tenue cachée (Irin), 2e tenue (Kelly) et veste de Jin : chargent (v79).
 
-v81 : **stats MAX du rider plus appliquées au Big Air Master** (OMT.BIN). Le drapeau MAX (R1 sur l'écran BOARDER,
-0x8002957C) est global : choisi dans un autre mode, il passait au Big Air Master, qui n'a pas d'écran BOARDER pour le
-voir ou le couper. Le crochet `maxc_s0` d'OMT.BIN (0x80063C58) est retiré (aussi de toggle_sites) : Yaggi y garde ses
-stats. La planche MAX reste, elle se choisit sur l'écran BOARD de ce mode. Vérifié : mot d'origine 0x00431021 dans
-OMT.BIN, crochets de FREE / HP inchangés, Big Air Master lancé normalement.
+v82 : **Big Air Master : plus de stats MAX du rider, et JUMP AT MAX** (Big Air Master = TM.BIN ; OMT.BIN est le Big
+Air Contest, qui a un écran BOARDER et garde le MAX : la v81 l'avait retiré là par erreur). Le drapeau MAX (R1 sur l'écran BOARDER, 0x8002957C) est global :
+choisi dans un autre mode, il passait au Big Air Master, qui n'a pas d'écran BOARDER. Le crochet `maxc_s0` de TM.BIN
+(0x80063C38) est retiré (aussi de toggle_sites). À sa place `bamjump` (mod bam, `remix/bamjump.py`) : le premier mot de
+la ligne de paramètres du rider (16 octets par rider, D_80094300 dans TM, la même table que les autres overlays) est la
+**puissance du saut** : 4096 Yaggi, 3072 Jin / Cindy / Snowman, 3584 Irin, 5120 Boss / Gray, exactement les barres JUMP
+de l'écran BOARDER. Mesuré dans l'émulateur : 8192 au lieu de 4096 → 105 images en l'air au lieu de 58 ; les autres
+champs (0x4, 0x8, 0xA, 0xC, 0xE) ne changent pas le saut. `jmx` (dans le code mort func_8007EDA4 de TM, après bamlive)
+écrit 8192 dans la ligne quand le bit 0 des réglages est à 0 : nouvelle ligne REMIX « BIG AIR MASTER JUMP AT MAX »
+(onglet AIR, active au départ). 5120 (le meilleur du jeu) donnait trop peu d'air en plus (56 / 30 / 32 images contre
+62 / 50 / 42). Le bit 0 était une copie de travail de la vue arrière du mode (écrite par `pmd`) : elle va dans l'octet
+0x8005744E (remis à 0 au démarrage, hors sauvegarde, jamais lu par le jeu), que `rear` lit. **Message 16:9** : en
+activant WIDESCREEN 16:9 sur l'écran REMIX, trois lignes sous la liste (conf = 2, le même emplacement que
+l'avertissement d'UNLOCK EVERYTHING) : SET YOUR EMULATOR TO 16:9 / FOR THIS GAME. ON A REAL TV, / SET THE TV TO 16:9
+(WIDE). Vérifié : onglet AIR, message, ligne de Yaggi à 8192 (4096 réglage coupé), vue arrière en Free Style.

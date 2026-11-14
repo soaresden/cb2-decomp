@@ -40,7 +40,8 @@ DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data (code since v37)
 import toggles
 SCR_DATA = toggles.SCREEN[0]           # the screen's data: start of MODE_SEL's 84th sector
 X0, X1, Y0, DY = -150, 70, -64, 13
-LINES = ['REAR VIEW (O)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', 'AIR CONTROL', 'KNOCK RIDERS DOWN', 'WIDESCREEN 16:9',
+# v81: line / bit 0 = BIG AIR MASTER JUMP AT MAX (remix/bamjump.py; before, the working copy of the REAR VIEW)
+LINES = ['BIG AIR MASTER JUMP AT MAX', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', 'AIR CONTROL', 'KNOCK RIDERS DOWN', 'WIDESCREEN 16:9',
          'RACE RADAR LINE', 'RACE RANKING',
          # the other mods (remix/toggles.py: bits 8..16, in the order of toggles.BITS)
          'SPECIAL BOARDS ALWAYS', 'NEW HARD+MIRROR CUP', 'BOSS GRAY SNOWMAN IN COMP', 'HIDDEN OUTFITS FOR GIRLS', 'CAN MAX RIDERS AND BOARD',
@@ -61,6 +62,8 @@ UNLOCK_LINE = 18                                # an action, not a switch: R2 sh
 INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
 VIS = 10                               # lines shown at a time: the list scrolls with the cursor
 WARN = ['X AGAIN UNLOCKS ALL RIDERS,', 'COURSES, BOARDS, MIRROR, HARD,', 'TROPHIES. SAVED. NO UNDO!']     # <= 30 letters (box)
+WIDE_LINE = 5
+WIDE = ['SET YOUR EMULATOR TO 16:9', 'FOR THIS GAME. ON A REAL TV,', 'SET THE TV TO 16:9 (WIDE).']   # v81: shown when 16:9 is switched on
 # the progress block as a 100 % game (remix/progress.py): courses, riders (Boss, Gray, Snowman), SPECIAL boards,
 # Mirror, Hard, the 30 Free Style trophies; the save keeps it
 UNLOCK = [(0x743C, 10, 'h'), (0x743E, 10, 'h'), (0x7440, 0x7F, 'o'), (0x7442, 7, 'o'), (0x7444, 1, 'h'), (0x7446, 1, 'h'),
@@ -87,11 +90,12 @@ def L(a): return a - (H(a) << 16)
 # the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
 TABS = [('COMP', [22, 19, 3, 7, 6, 17, 4, 20, 15, 9, 10]),        # v67: the race first, then the cup        # v63: one tab per game mode, then the game-wide ones
         ('FREE', [23, 21, 17, 27]),                                        # (v64: REAR VIEW / AIR CONTROL with their own bit
-        ('AIR', [13, 24, 28]),                                     # in each mode)
+        ('AIR', [13, 0, 24, 28]),                                  # v81: + JUMP AT MAX (Big Air Master)                                     # in each mode)
         ('PIPE', [1, 25, 29]),
         ('PARK', [16, 26, 30]),
         ('GAME', [11, 12, 8, 14, 2, 5, 18])]
 # mode select cursor (0 COMP, 1 BIG AIR, 2 HALFPIPE, 3 FREE STYLE, 4 BOARD PARK, else as FREE) -> (REAR VIEW, AIR CONTROL) bits
+REAR_RT = 0x8005744E                     # v81: the REAR VIEW of the mode under the cursor (unsaved byte; read by remix/rear.py)
 PMT = [(22, 3), (24, 28), (25, 29), (23, 27), (26, 30), (23, 27), (23, 27), (23, 27)]
 TAB_X0, TAB_X1 = -132, 136               # the tabs' names (menu font, 8 pixels a letter): v67 from the lines' left edge to
                                         # the ON / OFF column's right edge, the same gap between names
@@ -167,6 +171,7 @@ def data():
     put('tabl', b''.join(bytes(l) + bytes(16 - len(l)) for _, l in TABS))
     for i, t in enumerate(LINES): put('l%d' % i, t.encode() + b'\0')
     for i, t in enumerate(WARN): put('w%d' % i, t.encode() + b'\0')
+    for i, t in enumerate(WIDE): put('v%d' % i, t.encode() + b'\0')
     assert all(lab['l%d' % i] >> 16 == 0x8008 for i in range(len(LINES)))
     put('ltab', b''.join(struct.pack('<H', lab['l%d' % i] & 0xffff) for i in range(len(LINES))))   # v63: halfwords (0x8008....)
     put('ttab', b''.join(struct.pack('<I', lab['t%d' % i]) for i in range(len(TABS))))
@@ -220,6 +225,8 @@ def routines(D):
          'sll t5, t6, 4', 'addu t5, t5, t7', *la('t8', D['tabl']), 'addu t8, t8, t5', 'lbu t5, 0(t8)',
          f'lui t0, {H(FLAGS)}', f'lw t9, {L(FLAGS)}(t0)', f'addiu t8, zero, {UNLOCK_LINE}', 'bne t5, t8, po6', 'nop', 'j ounl', 'nop',
          'po6:', 'addiu t8, zero, 1', 'sllv t8, t8, t5', 'xor t9, t9, t8', f'sw t9, {L(FLAGS)}(t0)',
+         # v81: 16:9 switched on -> its note under the list (conf 2), off -> none
+         f'addiu t8, zero, {WIDE_LINE}', 'bne t5, t8, pwz', f'andi t8, t9, {1 << WIDE_LINE}', f'srl t8, t8, {WIDE_LINE - 1}', *sw('t8', 'conf'),
          'pwz:', f'lui t1, {H(PADV)}'] + [f'sh zero, {L(PADV) + k}(t1)' for k in range(0, 12, 2)] + \
         [*lw('t0', 'pg'), 'beqz t0, pw9', 'addiu t0, zero, 0x100', f'lui t1, {H(PADV)}', f'sh t0, {L(PADV)}(t1)',
          'pw9:', 'lw ra, 0x18(sp)', 'nop', 'jr ra', 'addiu sp, sp, 0x20']
@@ -300,7 +307,9 @@ def routines(D):
           'di3:', 'addiu t4, zero, 112', 'lw t5, 0x28(sp)', 'jal drw', 'nop',
           'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', 'j di1', 'nop']
     wl = lambda i: ['addiu t4, zero, -132', f'addiu t5, zero, {64 + 12 * i}', *la('t6', D['w%d' % i]), *la('t7', D['rgbt']), 'jal drw', 'nop']
-    S += ['dh:', *lw('t0', 'conf'), 'beqz t0, dh1', 'nop'] + [x for i in range(len(WARN)) for x in wl(i)] + \
+    vl = lambda i: ['addiu t4, zero, -132', f'addiu t5, zero, {64 + 12 * i}', *la('t6', D['v%d' % i]), *la('t7', D['rgbt']), 'jal drw', 'nop']
+    S += ['dh:', *lw('t0', 'conf'), 'beqz t0, dh1', 'addiu t1, zero, 2', 'beq t0, t1, dhv', 'nop'] + [x for i in range(len(WARN)) for x in wl(i)] + \
+         ['j dh1', 'nop', 'dhv:'] + [x for i in range(len(WIDE)) for x in vl(i)] + \
          ['dh1:', 'addiu t4, zero, -132', 'addiu t5, zero, 102', *la('t6', D['help']), *la('t7', D['rgbh']), 'jal drw', 'nop',
           'jal dtri', 'nop', 'j box', 'nop']
     # dtri: the Triangle button (outline in the PlayStation's green: a black POLY_F3 inside a green one; table tri)
@@ -323,8 +332,8 @@ def routines(D):
     # `fx` (the flags' low byte for oap)
     S += ['pmd:', f'lui t0, {H(CURSOR)}', f'lw t1, {L(CURSOR)}(t0)', 'nop', 'andi t1, t1, 7', 'sll t1, t1, 1', *la('t2', D['pmt']),
           'addu t2, t2, t1', 'lbu t3, 0(t2)', 'lbu t4, 1(t2)', f'lui t0, {H(FLAGS)}', f'lw t5, {L(FLAGS)}(t0)', 'nop',
-          'srlv t6, t5, t3', 'andi t6, t6, 1', 'srlv t7, t5, t4', 'andi t7, t7, 1', 'addiu at, zero, -2', 'and t5, t5, at', 'or t5, t5, t6',
-          f'sw t5, {L(FLAGS)}(t0)', 'andi t8, t5, 0xf7', 'sll t7, t7, 3', 'or t8, t8, t7', *sw('t8', 'fx'), 'jr ra', 'nop']
+          'srlv t6, t5, t3', 'andi t6, t6, 1', 'srlv t7, t5, t4', 'andi t7, t7, 1',
+          f'sb t6, {L(REAR_RT)}(t0)', 'andi t8, t5, 0xf7', 'sll t7, t7, 3', 'or t8, t8, t7', *sw('t8', 'fx'), 'jr ra', 'nop']
     S += ['oap:', *lw('t6', 'fx'), *la('t0', D['ptab']), f'addiu t5, t0, {16 * len(PATCH)}', 'move t9, zero',
           'oa1:', 'lw t1, 0(t0)', 'lw t2, 4(t0)', 'lw t3, 8(t0)', 'lw t4, 12(t0)', 'lw t7, 0(t1)', 'and t4, t4, t6', 'beqz t4, oa2', 'move t8, t2',
           'move t8, t3', 'oa2:', 'beq t7, t8, oa3', 'nop', 'beq t7, t2, oa4', 'nop', 'bne t7, t3, oa3', 'nop',
