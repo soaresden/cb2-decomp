@@ -46,8 +46,9 @@ NH, ZMIN = 8, 60
 TRAIL_ENT, BAR_ENT = 12, 4
 BX, BY, BW, BH = -140, -54, 80, 6          # the bar (HUD coordinates: centre of the screen = 0, 0)
 TPAGE = 0xE100041C                         # half-and-half blending (as radar's)
-# trail colours by g_rider (0x00BBGGRR): Yaggi, Jin, Cindy, Irin, Boss, Gray, Snowman, (other)
-COLS = [0x2040FF, 0x40E040, 0xC060FF, 0xFF8040, 0x00C8FF, 0xFF60A0, 0xFFE060, 0x00FFFF]
+# trail colours by g_rider (0x00BBGGRR), the jacket's: Yaggi pink, Jin orange, Cindy red, Irin light blue, Boss gold,
+# Gray silver, Snowman red (his scarf), (other)
+COLS = [0xB469FF, 0x148CFF, 0x3C28E6, 0xFFBE5A, 0x00C8FF, 0xE6D2C8, 0x281EE6, 0xFFFFFF]
 WTAB = [max(8, 48 - 14 * i) for i in range(NH + 1)]   # half width of the ribbon at history point i (world units)
 import math
 DIRS = [(round(128 * math.cos(math.radians(a))), round(-128 * math.sin(math.radians(a)))) for a in (-15, 10, 35, 60, 82, 98, 120, 145, 170, 195)]

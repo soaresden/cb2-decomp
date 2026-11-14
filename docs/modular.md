@@ -432,3 +432,10 @@ SPRT avec son DR_TPAGE (`dlogo`) ; atténué quand le curseur est ailleurs, il p
 v46 : dans l'écran REMIX, « TRIANGLE BACK » devient un triangle dessiné (deux POLY_F3 : contour vert façon bouton PlayStation, `dtri`, la police du menu n'a pas ce signe) suivi de BACK, et REAR VIEW (CIRCLE) devient REAR VIEW (O).
 
 v47 : l'aide de l'écran REMIX montre des flèches gauche / droite dessinées (deux POLY_F3 de plus dans `dtri`) à la place de « L R » : les onglets se changent avec la croix.
+
+v49 : **MAX pendant la pose** (`remix/maxanim.py`) : après le choix de la tenue, le rider prend la pose et dit sa
+réplique ; ces images dessinent les barres avec deux autres copies de la boucle (MAIN_SEL 0x80061300, 0x80061910 :
+`lh a0, 0(a1)` → `maxv`) et quatre lectures fixes (0x800644B4, 0x8006450C, 0x8006484C, 0x800648A4 : `addu v0, s2, v0`
+→ `maxw`, qui fait aussi la lecture ; le `lh v1, 0(v0)` suivant devient un nop, car le mot d'après, `addiu v0, zero, 1`,
+passait avant la routine). Les barres restaient à la valeur du rider. **Boost** : couleur du blouson (Yaggi rose,
+Jin orange, Cindy rouge, Irin bleu clair, Boss or, Gray argent, Snowman rouge).
