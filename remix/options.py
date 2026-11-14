@@ -40,7 +40,7 @@ DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data (code since v37)
 import toggles
 SCR_DATA = toggles.SCREEN[0]           # the screen's data: start of MODE_SEL's 84th sector
 X0, X1, Y0, DY = -150, 70, -64, 13
-LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', 'AIR CONTROL', 'MAKE RIDERS FALL AGAINST THEM', 'WIDESCREEN 16:9',
+LINES = ['REAR VIEW (O)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', 'AIR CONTROL', 'MAKE RIDERS FALL AGAINST THEM', 'WIDESCREEN 16:9',
          'RACE RADAR LINE', 'RACE RANKING',
          # the other mods (remix/toggles.py: bits 8..16, in the order of toggles.BITS)
          'SPECIAL BOARDS ALWAYS', 'NEW HARD+MIRROR CUP', 'BOSS GRAY SNOWMAN IN COMP', 'HIDDEN OUTFITS FOR GIRLS', 'CAN MAX RIDERS AND BOARD',
@@ -108,7 +108,8 @@ def logo():
     px = np.zeros((h, W), np.uint8); px[:, :w] = idx
     pix = bytes((px[:, 0::2] | (px[:, 1::2] << 4)).astype(np.uint8).flatten())
     return W, h, pix, cl
-HELP = 'X ON/OFF   L R TAB   TRIANGLE BACK'
+HELP = 'X ON/OFF   L R TAB     BACK'          # a drawn triangle in the gap (dtri; the menu font has none)
+TRI_X, TRI_Y = -132 + 21 * 8 + 2, 102          # its left edge and top (8 pixels a letter)
 
 
 def data():
@@ -120,7 +121,10 @@ def data():
     W, Hh, pix, cl = logo()
     put('lrect', struct.pack('<4h', LOGO_VRAM[0], LOGO_VRAM[1], W // 4, Hh)); put('crect', struct.pack('<4h', LOGO_CLUT[0], LOGO_CLUT[1], 16, 1))
     put('lclut', struct.pack('<16H', *cl)); put('lpix', pix); put('blink', bytes(4))
-    put('title', b'REMIX\0'); put('on', b'ON\0'); put('off', b'OFF\0'); put('help', HELP.encode() + b'\0')
+    X, Y = TRI_X, TRI_Y; xy = lambda x, y: (y & 0xffff) << 16 | (x & 0xffff)
+    put('tri', struct.pack('<8I', 0x20000000, xy(X + 5, Y + 4), xy(X + 2, Y + 9), xy(X + 8, Y + 9),
+                                  0x2050D080, xy(X + 5, Y - 1), xy(X - 1, Y + 11), xy(X + 11, Y + 11)))
+    put('on', b'ON\0'); put('off', b'OFF\0'); put('help', HELP.encode() + b'\0')
     for i, (name, _) in enumerate(TABS): put('t%d' % i, name.encode() + b'\0')
     put('cnts', bytes(len(l) for _, l in TABS))
     put('tabl', b''.join(bytes(l) + bytes(16 - len(l)) for _, l in TABS))
@@ -219,7 +223,13 @@ def routines(D):
           'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', 'j di1', 'nop']
     wl = lambda i: ['addiu t4, zero, -132', f'addiu t5, zero, {64 + 12 * i}', *la('t6', D['w%d' % i]), *la('t7', D['rgbt']), 'jal drw', 'nop']
     S += ['dh:', *lw('t0', 'conf'), 'beqz t0, dh1', 'nop'] + [x for i in range(len(WARN)) for x in wl(i)] + \
-         ['dh1:', 'addiu t4, zero, -132', 'addiu t5, zero, 102', *la('t6', D['help']), *la('t7', D['rgbh']), 'jal drw', 'nop', 'j box', 'nop']
+         ['dh1:', 'addiu t4, zero, -132', 'addiu t5, zero, 102', *la('t6', D['help']), *la('t7', D['rgbh']), 'jal drw', 'nop',
+          'jal dtri', 'nop', 'j box', 'nop']
+    # dtri: the Triangle button (outline in the PlayStation's green: a black POLY_F3 inside a green one; table tri)
+    S += ['dtri:', 'move t9, ra', *la('t8', D['tri']), 'addiu t7, t8, 32',
+          'dtr1:', 'lui t0, 0x400', 'sw t0, 0(s6)', 'lw t0, 0(t8)', 'lw t1, 4(t8)', 'lw t2, 8(t8)', 'lw t3, 12(t8)',
+          'sw t0, 4(s6)', 'sw t1, 8(s6)', 'sw t2, 12(s6)', 'sw t3, 16(s6)', 'move a0, s6', 'jal dlnk', 'addiu s6, s6, 20',
+          'addiu t8, t8, 16', 'bne t8, t7, dtr1', 'nop', 'jr t9', 'nop']
     S += ['drw:', 'sw ra, 0x2c(sp)', 'sw t4, 0x10(sp)', 'sw t5, 0x14(sp)', 'sw t6, 0x18(sp)', 'sw t7, 0x1c(sp)', 'sw zero, 0x20(sp)',
           'move a0, s5', 'move a1, s6', f'lui a2, {H(FONT)}', f'addiu a2, a2, {L(FONT)}', f'jal {TEXT}', f'addiu a3, zero, {CLUT}',
           'lw ra, 0x2c(sp)', 'move s6, v0', 'jr ra', 'nop']
@@ -239,7 +249,7 @@ def routines(D):
     return S
 
 
-TOP = {'pw', 'ounl', 'opt', 'drs', 'di1', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk'}
+TOP = {'pw', 'ounl', 'opt', 'drs', 'di1', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk', 'dtri'}
 
 
 def place(S, tables, extra=()):

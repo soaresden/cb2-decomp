@@ -426,3 +426,5 @@ v45 : l'entrée REMIX sous le panneau OPTIONS et le titre de l'écran REMIX sont
 Noto Sans Black Italic, dégradé doré, contour, penché), en petit (taille 16 → 60 × 25), calculé à la construction en
 16 couleurs, envoyé chaque image dans la VRAM libre de l'écran des modes (x 448, y 0 ; palette en y 64) et dessiné en
 SPRT avec son DR_TPAGE (`dlogo`) ; atténué quand le curseur est ailleurs, il pulse quand le curseur est dessus.
+
+v46 : dans l'écran REMIX, « TRIANGLE BACK » devient un triangle dessiné (deux POLY_F3 : contour vert façon bouton PlayStation, `dtri`, la police du menu n'a pas ce signe) suivi de BACK, et REAR VIEW (CIRCLE) devient REAR VIEW (O).
