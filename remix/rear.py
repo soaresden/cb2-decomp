@@ -4,8 +4,11 @@
 # 0x80059220), set each frame by the race camera through GsSetView2 (exe 0x80030984). The view is relative to the
 # rider: the origin of the world is the rider (translation of the matrix = where the rider is for the camera).
 # While Circle (pad 0x8004FBF0, bit 0x20) is held in a race overlay (word 0 of the overlay = 8, ENDING excepted), the
-# end of GsSetView2 turns both matrices by 180 degrees around the vertical axis of the world (columns X and Z
-# negated): the camera goes round the rider, in front of him, at the same distance and height, and looks back.
+# end of GsSetView2 turns both matrices by 180 degrees around the camera's own vertical axis through the rider (rows
+# X and Z negated): the camera goes round the rider, in front of him, and looks back with the same angle to the slope
+# (the race camera follows the slope: 0..5 degrees on flat ground, up to ~34 in the descents). v26 turned them around
+# the world's vertical axis (columns negated): in the steep descents the camera, in front and still looking down,
+# showed the snow instead of the rider and the slope behind him (v33).
 # Hook: "addu v0, zero, zero" after the copy into GsWSMATRIX (its delay slot is the next instruction, a register
 # reload: ra is kept in t3 around the calls), the code comes back right after.
 import struct
@@ -26,9 +29,9 @@ def code():
          'move t3, ra', f'lui t0, {(WS + 0x8000) >> 16:#x}', f'addiu t0, t0, {WS - (((WS + 0x8000) >> 16) << 16)}', 'jal rvf', 'nop',
          f'lui t0, {(WORK + 0x8000) >> 16:#x}', f'addiu t0, t0, {WORK - (((WORK + 0x8000) >> 16) << 16)}', 'jal rvf', 'nop', 'move ra, t3',
          'rv9:', f'j {BACK}', 'move v0, zero']
-    # rvf: negate columns 0 and 2 of the MATRIX at t0 (3x3 s16, rows of 3), t1 scratch
+    # rvf: negate rows 0 and 2 of the MATRIX at t0 (3x3 s16, rows of 3), t1 scratch
     F = ['rvf:']
-    for o in (0, 4, 6, 0xA, 0xC, 0x10):
+    for o in (0, 2, 4, 0xC, 0xE, 0x10):
         F += [f'lh t1, {o}(t0)', 'nop', 'subu t1, zero, t1', f'sh t1, {o}(t0)']
     F += ['jr ra', 'nop']
     c2, l2 = asm(F, CAVE2)

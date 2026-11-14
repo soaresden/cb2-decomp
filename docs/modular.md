@@ -197,8 +197,12 @@ Code : `remix/rear.py` (opérations calculées par `generate()`). Les courses r�
 `GsSetView2` (libgs, exe 0x80030984), qui écrit GsWSMATRIX (0x80058E20) ; la vue est relative au rider (l'origine
 du monde est le rider). Rond maintenu (0x8004FBF0, bit 0x20) dans un overlay de course (mot 0 de l'overlay = 8, sauf
 ENDING) : à la fin de `GsSetView2`, GsWSMATRIX et sa copie de travail (0x80059220) tournent de 180° autour de l'axe
-vertical du monde (colonnes X et Z opposées) : la caméra passe devant le rider, même distance et même hauteur, et
-regarde derrière lui. Code dans deux fonctions mortes de l'exe (0x800280B8, 0x8002E7D0).
+vertical de la caméra passant par le rider (lignes X et Z opposées, v33) : la caméra passe devant le rider et regarde
+derrière lui avec le même angle par rapport à la pente. La caméra de course suit la pente (0 à 5° sur le plat,
+jusqu'à ~34° dans les descentes) ; la v26 tournait autour de la verticale du monde (colonnes opposées) : dans les
+grandes descentes, la caméra devant le rider regardait encore vers le bas et ne montrait que la neige. Vérifié sur la
+piste de la manche 2 (descentes, plat, porte de checkpoint visible derrière). Code dans deux fonctions mortes de l'exe
+(0x800280B8, 0x8002E7D0).
 Limite : le jeu ne dessine que la piste devant le rider, des trous blancs peuvent apparaître au loin derrière.
 `GsSetRefView2` (0x8002F830) n'est pas la caméra de course : il est appelé des dizaines de fois par image pour
 d'autres rendus.
