@@ -113,7 +113,7 @@ PLAY = 0x80015D18; VOICE_CH, VOICE_PITCH = 0x100000, 0x5CE
 VOICE_SITES = {'/FREE.BIN': 0x8007EBA4, '/TM.BIN': 0x8007E420, '/HP.BIN': 0x8007DCE8, '/BP.BIN': 0x8007C700, '/OMT.BIN': 0x8007CD70, '/COMB.BIN': 0x8007E51C}
 VOICE_SEMI = [-1.5, -4, 3]
 BASE = [0, 1, 2]
-MODES = (1 << 2) | (1 << 3) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8)   # Free Style (1P, 2P), Big Air, Big Air Master, Halfpipe, Board Park
+MODES = (1 << 2) | (1 << 3) | (1 << 5) | (1 << 7) | (1 << 8)   # Free Style (1P, 2P), Big Air, Halfpipe, Board Park (Big Air Master: Yaggi only)
 STAT_BARS = [(3, 4, 4, 6, 6, 8), (2, 4, 6, 4, 8, 6), (6, 8, 6, 6, 4, 4)]    # BOARDER screen bars (display only)
 SBC2_PARAMS = 0x8008F1F8; SBC2_SLOT = [4, 5, 6]                               # race parameters of the CPU riders
 NAV = 0x80063E7C; FACE = 0x80063324; NAME = 0x800637A4; ENQ = 0x80013BD0

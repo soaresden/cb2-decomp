@@ -107,8 +107,8 @@ l'exe), voir remix/boardmax.py. Un concurrent de l'ordinateur qui aurait la mêm
 Code et données : `remix/crew.py` ; ses opérations sont calculées par `generate()` directement (hors build de
 référence et hors delta). Les trois riders sont des **alias** : le jeu garde un numéro de rider normal (BASE : Jicchi
 → Yaggi, Nick → Jin, Kelly → Cindy, pour les animations, voix, etc.) et une variable ALIAS (1 à 3) dit qu'il s'agit
-en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 5 Big Air, 6 Big Air Master,
-7 Halfpipe, 8 Board Park (pas 0/1 Compétition, ni 3/4 VS).
+en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 3 VS, 5 Big Air, 7 Halfpipe,
+8 Board Park (pas 0/1 Compétition ; pas 6 Big Air Master, réservé à Yaggi : y choisir Kelly chargeait à l'infini, v56).
 
 | Partie | Accroche |
 |---|---|
@@ -504,3 +504,8 @@ au début de la course (`addiu v0, zero, 0x5CE` puis `sw` : FREE 0x8007EBA4, TM 
 OMT 0x8007CD70, COMB 0x8007E51C). Ces mots deviennent `jal apitch`, qui rend la hauteur de l'alias quand il est le rider
 choisi dans un mode permis (sinon 0x5CE) ; le crochet de 0x80015D18 est retiré (la foule retrouve sa hauteur). Vérifié
 dans l'émulateur : Nick en Free Style 1179, Kelly en half-pipe 1767.
+
+v56 : **Big Air Master réservé à Yaggi** : ce mode n'a pas d'écran de choix du rider (le jeu y met Yaggi). Le mode 6
+était dans `MODES` de `crew` : si Jicchi, Nick ou Kelly restait choisi d'un autre mode, le chargement du Big Air Master
+prenait les fichiers de l'alias et ne finissait jamais (Kelly). Le bit 6 est retiré ; vérifié dans l'émulateur (ALIAS
+forcé à Kelly, la session démarre avec Yaggi).
