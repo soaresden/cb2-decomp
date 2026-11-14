@@ -693,3 +693,10 @@ courses du jeu (func_800173F0 : position courante gardée en D_800509CC, CdlGetl
 remet le mode « report » (CdControl(CdlSetmode, 4)) puis la reprise du jeu (func_800174F8 : CdlPlay depuis la
 position). Mesuré : plus de redémarrage (le niveau ne repart pas sur l'intro) ; il reste un silence d'environ 0,3 s
 pendant la lecture.
+
+v73 : **Big Air Master** : « GRAY IN n » / « GRAY OK! » (bamlive) passe en haut à gauche sous UNCOOL (x -150, y -56) :
+en haut à droite, sous le nom de la note, il était coupé par les combos. Notes du Big Air Master relevées : le
+compteur D_8009B954 vaut -1 pendant l'essai (PRACTICE) et passe à 0 au « GO!! » de la session (func_8005BBDC, appelée
+en 0x800749D8 quand le niveau D_8009CF10 vaut 0) ; Pause → Restart pendant l'essai le relance. STOP (bamstop) en
+session : TIME passe à 1'00"040, YOUR GRADE IS…, puis le classement TRICK MASTER avec 1'00"040 (vérifié, niveau 114
+→ GRAY).
