@@ -45,7 +45,7 @@ FEATURES = [   # id, French name, English name, description FR, description EN
     ('ramming', 'Chocs en Boarder Cross', 'Boarder Cross ramming',
      'Fonce dans un adversaire : le plus rapide des deux reste debout.', 'Ram an opponent: the faster of the two stays up.'),
     ('bam', 'Big Air Master', 'Big Air Master',
-     'Touches toujours affichées, figures suivantes (NEXT) à droite, et Exit dans la pause termine la session avec ta note et le classement.', 'Keys always shown, the next tricks (NEXT) on the right, and Exit in the pause menu ends the session with your grade and the ranking.'),
+     'Touches toujours affichées, figures suivantes (NEXT) à droite, et Stop dans la pause met le chrono à 0 : la session se termine avec ta note et le classement.', 'Keys always shown, the next tricks (NEXT) on the right, and Stop in the pause menu sets the clock to 0: the session ends with your grade and the ranking.'),
     ('progress', 'Progression dans le jeu', 'In-game progress',
      'SELECT maintenu sur l’écran des modes : riders cachés, Mirror, Hard, Hard + Mirror, planches SPECIAL, trophées et pourcentage.',
      'Hold SELECT on the mode select screen: hidden riders, Mirror, Hard, Hard + Mirror, SPECIAL boards, trophies and percentage.'),
@@ -232,6 +232,8 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     _bmx.fix_label_y(pkg['ops']['max'])          # MAX label of the BOARD screen: always under SPECIAL
     import maxanim as _mxa
     pkg['ops']['max'] = _mxa.merge(O, pkg['ops']['max'])   # MAX bars in the rider's pose too (v49)
+    import bamstop as _bst
+    pkg['ops']['bam'] = _bst.merge(O, pkg['ops']['bam'])   # STOP in the Big Air Master pause menu (v52)
     import maxlabel as _mxl
     pkg['ops']['max'] = _mxl.merge(O, pkg['ops']['max'])   # MAX line in the style of the board labels (v50)
     import skipq as _skq

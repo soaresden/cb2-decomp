@@ -471,3 +471,10 @@ que la traînée se voie), rangée dans SBC2 après `rtr` (0x8007C760 : index d'
 coupe en cours, reprise par LOAD dans le menu Compétition, `func_8008601C`) qu'après les rounds 3 et 6 (SBC2
 0x8008262C `beq v1, 2` / `5`) : un `b` la propose après chaque round. **Écran REMIX** : le X de l'aide est dessiné en
 bleu (deux barres de deux POLY_F3, table `crx` après `tri`).
+
+v52 : **STOP dans la pause du Big Air Master** (`remix/bamstop.py`, mod `bam`) : la session dure 60 s (TM compte ses
+images dans D_8009B954, 25 par seconde, -1 pendant l'essai d'entraînement ; fin à 0x5DC). Le menu de pause
+(Continue / Restart / Exit, choix écrit dans D_8009B950 via `bx`, exe 0x8002934C) : « Exit » devient « Stop » ; pendant
+la session, `bx` met le compteur à 0x5DC et revient sur le chemin de Continue (0x8005CCE8 : la pause se ferme) : le jeu
+termine la session lui-même comme à la fin du temps (YOUR GRADE IS…, puis le classement TRICK MASTER). Pendant
+l'entraînement, il quitte comme avant. Vérifié dans l'émulateur. (Jusqu'à la v51, Exit rendait le code de fin 5.)
