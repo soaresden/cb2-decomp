@@ -103,6 +103,25 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
 - Essai : charger TOD_SM à la place pour Snowman (0x8001D05C → petite fonction) bloque l'écran d'étape : le même TOD
   sert aussi aux adversaires simulés, et TOD_SM n'a pas leurs mouvements. Piste : un second tampon (82 Ko) pour le
   joueur et son pointeur d'animation dirigé dessus, ou un TOD_SM réduit aux mouvements utiles.
+- v27 (`remix/snowtod.py`, pas encore actif) :
+  - Place : le tas de l'exe (`func_8001F270` = réserve, `func_8001F448` = libère ; blocs à en-tête de 16 octets :
+    précédent, suivant, taille, occupé ; tête D_800592BC ; un tas par overlay) a ~200 Ko libres pendant le Boarder
+    Cross (bloc libre de 0x80162C90 jusqu'au tampon des TOD humains). Le chargeur de la Compétition `func_8001CCE0`
+    met ses fichiers en file avec `func_80013BD0(fichier, dest, &ptr, drapeaux)` (dest 0 = dans le tas) : son appel
+    en 0x8001D014 peut aussi mettre TOD_SM (fichier 237) en file quand g_rider = 6 → chargé à chaque épreuve.
+    (La fonction « morte » 0x80025820 est le gestionnaire d'interruptions écrit à la main, installé par adresse :
+    la toucher empêche le jeu de démarrer ; 0x8001FA98 a un point d'entrée 0x8001FAAC appelé par les overlays.)
+  - TOD en mémoire : « TO », 0, nombre de mouvements (100 humains, 46 Snowman), puis leurs adresses. Le fichier a
+    « TO2 » et des décalages en mots : chaque overlay les convertit (FREE : `func_8008F878` pour l'en-tête, puis
+    `func_80095F98` pour chaque mouvement : décalages + adresse du mouvement, octet 1 de 2 à 0xFE) ; SBC2 a les
+    mêmes en 0x8008655C / 0x8008CC7C, SBC1 en 0x80083DC0 / 0x8008A4E0.
+  - Tables d'un rider (init `func_80064674` de SBC2, rider + 0x1E4) : +0x204 adresse du mouvement + 8, +0x39C son
+    nombre d'images, +0x530 le numéro de sa première image, 100 entrées. Free Style avec Snowman : les 100 entrées
+    pointent dans TOD_SM selon une correspondance mouvement humain → mouvement de Snowman (MAP dans snowtod.py, lue
+    dans l'émulateur). Les trois tables écrites ainsi pour le joueur : la course tourne (avec la seule première,
+    erreur d'adresse en 0x8008C278 : le lecteur sortait des mouvements de Snowman, plus courts), mais les morceaux
+    de Snowman sont énormes et éparpillés autour de la caméra : SBC2 n'applique pas TOD_SM à ce modèle comme FREE
+    (échelle des paquets, numéros d'objets ou repère du modèle converti par `riders`). À comparer ensuite.
 
 ## Compteur en bas à gauche (Free Style)
 

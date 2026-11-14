@@ -27,7 +27,7 @@ R1, L1, R2 = 0x8, 0x4, 0x2
 PRIMS = 0x801F8000
 CAVES = [(0x800654A8, 0x8006562C), (0x8006F680, 0x8006F71C), (0x8006F7C4, 0x8006F83C),   # MODE_SEL (after crewrank's code in the first)
          (0x80031180, 0x8003120C), (0x8003BD98, 0x8003BE10), (0x80040AA4, 0x80040B0C),     # exe: dead functions kept for this mod
-         (0x8001829C, 0x80018320), (0x8003EAC4, 0x8003EB80), (0x800123C8, 0x80012448)]     # (see crew.CAVES)
+         (0x8001829C, 0x80018320), (0x8003EAC4, 0x8003EB30), (0x800123C8, 0x80012448)]   # (0x8003EB30.. : snowtod)     # (see crew.CAVES)
 DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data
 X0, X1, Y0, DY = -150, 70, -56, 13
 LINES = [('REAR VIEW (CIRCLE)', 1), ('LIVE HALF-PIPE MARKS', 2), ('UNLOCK NEWS', 4), ('AIR CONTROL', 8), ('BOARDER CROSS RAMMING', 16),
