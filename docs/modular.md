@@ -750,3 +750,12 @@ EPC 0x801F202C, relevés dans l'état de l'émulateur), BIOS en boucle, écran �
 avec n'importe quelle tenue cachée vue en aperçu. Les copies vont maintenant à 0x801DB000 / 0x801E0000 (après MENU_SAVE
 de crew ; 0x801DA800..0x801E8000 vérifié intact dans les menus avec un motif). Vérifié : Irin en tenue cachée en Board
 Park et en Free Style, Cindy en tenue cachée en Free Style.
+
+v80 : **lettre M du Board Park avant la séparation des pistes** (-146750, z -216400 : milieu de la piste unique, sections
+125 / 126, 3000 avant la fourche de la section 127 vers 128 / 140 ; sol 121483 calculé sur les triangles piste + terrain).
+En v70..v79 elle était devant le premier sapin de l'îlot, impossible à attraper. **Écran BOARD : Bas ne saute plus
+de TYPE-2 / TYPE-3 à MAX** : maxb tourne dans la boucle des libellés, après que le jeu a déjà bougé son curseur pour ce
+même appui ; il voyait donc le curseur déjà sur la dernière ligne et prenait MAX tout de suite (TYPE-3, ou SPECIAL,
+sauté). Maintenant MAX n'est pris que si le curseur était déjà sur la dernière ligne à l'image d'avant (PREVCUR
+0x801E7FF0, écrit par maxb à chaque image, dans ses 10 nop ; `boardmax.fix_down`). Vérifié : Bas TYPE-1 → 2 → 3 →
+SPECIAL → MAX, Haut remonte. Half-pipe avec tenue cachée (Irin), 2e tenue (Kelly) et veste de Jin : chargent (v79).

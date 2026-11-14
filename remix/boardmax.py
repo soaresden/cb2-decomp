@@ -138,3 +138,31 @@ def fix_label_y(ops):
             for k in range(11): ops[[j for oo, j in exe if oo == o + 4 * k][0]][4] = new[k]
             return 1
     return 0
+
+
+# v80: Down went straight from TYPE-2 to MAX (or from TYPE-3 to MAX, skipping SPECIAL): maxb runs in the label loop,
+# after the game has moved its cursor on that same press, so it saw the cursor already on the last line. Now MAX is
+# taken only when the cursor was on the last line on the frame before too (PREVCUR: the cursor, stored by maxb every
+# frame; free menu RAM after the hidden outfits' previews, remix/wearprev.py). The code goes in place of maxb's 10 nops
+# (fix_label_y) and its bm_go (3 words: 'addiu t4, zero, 1 / j bm_mask / sw t4, FL(at)').
+PREVCUR = 0x801E7FF0
+
+
+def fix_down(ops):
+    """the 'max' ops: maxb's DOWN test made edge-safe (in place) -> 1 when done (0: already done / not found)"""
+    exe = {op[2] + 0x8000F800: i for i, op in enumerate(ops) if op[0] == 'w' and op[1] == '/SCES_009.92'}
+    val = lambda a: ops[exe[a]][4] if a in exe else None
+    andi = [a for a in exe if val(a) == 0x316F4000]                      # andi t7, t3, 0x4000 (Down, just pressed)
+    if len(andi) != 1: return 0
+    go = andi[0] + 0x4C                                                  # bm_go
+    if val(go) != 0x240C0001 or (val(go + 4) >> 26) != 2 or (val(go + 8) >> 16) != 0xAC2C: return 0
+    mask = ((val(go + 4) & 0x3FFFFFF) << 2) | (go & 0xF0000000)
+    ly = [a for a in exe if (val(a) or 0) >> 16 == 0x2407 and all(val(a + 4 * k) == 0 for k in range(1, 11))]
+    if len(ly) != 1: return 0
+    n0 = ly[0] + 4; bm_y = n0 + 40; chk = n0 + 16; sw = val(go + 8)
+    new_go, _ = asm([f'j {chk:#x}', f'lui t9, {hi(PREVCUR)}'], go)
+    tail, _ = asm([f'lui t9, {hi(PREVCUR)}', f'sh t6, {lo(PREVCUR)}(t9)', f'b {bm_y:#x}', 'nop',
+                   f'lh t9, {lo(PREVCUR)}(t9)', 'nop', f'bne t9, t6, {mask:#x}', 'addiu t4, zero, 1', f'j {mask:#x}', 'nop'], n0)
+    for a, w in new_go + tail: ops[exe[a]][4] = w
+    ops[exe[n0 + 36]][4] = sw                                            # delay slot of j bm_mask: sw t4, FL(at)
+    return 1

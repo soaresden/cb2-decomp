@@ -2,8 +2,8 @@
 # letters spin along the course; riding through a letter collects it (a sound); the five in one run unlock Jicchi, Nick
 # and Kelly for good (bit 31 of the saved word 0x80057438, which crew's `acomp` reads instead of the 100 % of the
 # progress page). Each new run (back at the top) the letters are there again; the unlock happens once.
-# v70: R hidden behind a slalom gate, E on the metal rail near its end (slide with L1 / R1), M where the lanes part in
-# front of the tree island's first fir, I on the roof of the first truck of the car park (a ramp at its back), X just
+# v70: R hidden behind a slalom gate, E on the metal rail near its end (slide with L1 / R1), M (v80) just before the lanes
+# part, I on the roof of the first truck of the car park (a ramp at its back), X just
 # before the final jump on the right. At the start of a run (and when the
 # five are taken), an overlay says the goal and the status, LOCKED (red) or UNLOCKED (green), with the game's own text
 # routine of BP (func_80086F14, its ASCII font is in VRAM: x 320, y 256, palette 992, 460). The REMIX screen's switch
@@ -49,8 +49,10 @@ UP = 150                                          # a letter's centre this much 
 POS = [(-19660, 14543 - UP, -54500, 550, R),        # R: behind the gate of section 21 (its panels: x -20138..-19190, z -53920)
        (-92160, 47483 - UP, -96400, R, 500),       # E: on the metal rail near its downhill end (object 576, section 53; its
                                                   # top 47483 there, the snow 660 lower): taken sliding on it (L1 / R1)
-       (-144896, 122815 - UP, -225500, R, R),      # M (v70): where the two lanes part, in front of the island's first fir
-                                                  # (section 130: tree at -144896, -226590)
+       (-146750, 121483 - UP, -216400, 650, R),    # M (v80): before the lanes part (sections 125 / 126, the middle of the
+                                                  # single lane, 3000 above the split at section 127 -> 128 / 140); v70..v79
+                                                  # it stood in front of the island's first fir (-144896, z -225500): not
+                                                  # reachable
        (-83310, 154500 - UP, -298000, R, R),       # I (v70): on the roof of the first truck (ramp at its back; a rider on
                                                   # it: y 154390..154520 at z -296800..-298100, the snow 156155 under it)
        (-56538, 179419 - UP, -364134, R, R)]       # X (v70): just before the final jump (its lip: section 222), on the
