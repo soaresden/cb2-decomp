@@ -395,7 +395,7 @@ Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D
 
 ## Boost de figures (`radar`, v43 : `remix/boost.py`)
 
-À la SSX / Speed Freaks, dans le Boarder Cross de la Compétition. Ligne TRICK BOOST (R2) de l'onglet RACE de l'écran
+À la SSX / Speed Freaks, dans le Boarder Cross de la Compétition. Ligne SSX STYLE BOOST de l'onglet RACE de l'écran
 REMIX (bit 19 des options, actif par défaut ; le tableau des onglets passe à 16 octets par onglet, RACE en a 9).
 
 - **Jauge** (0..480) : en l'air (rider + 0x3E ≠ 0), +1 par image de jeu (25 / s), +2 tant qu'une figure joue

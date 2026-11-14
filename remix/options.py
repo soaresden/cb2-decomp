@@ -48,7 +48,7 @@ LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREE
          'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY PLAYABLE',
          'FALLS AS A NUMBER',                   # bit 17 (radar.py: one ball and x13 instead of the row of balls)
          'UNLOCK EVERYTHING',                   # line i = bit i of the flags word (bit set = off)
-         'TRICK BOOST (R2)']                    # bit 19 (remix/boost.py, with the mod radar)
+         'SSX STYLE BOOST']                    # bit 19 (remix/boost.py, with the mod radar)
 UNLOCK_LINE = 18                                # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
 INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
 VIS = 10                               # lines shown at a time: the list scrolls with the cursor

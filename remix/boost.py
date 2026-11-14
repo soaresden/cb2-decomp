@@ -1,6 +1,6 @@
 # Trick boost (part of the mod `radar`, v43): in the Boarder Cross of the competition, airs and tricks fill a boost
 # meter (an SSX / Speed Freaks style bar under the times, top left); R2 on the ground spends it: the rider goes 50 %
-# faster and leaves a trail of his colour. REMIX OPTIONS, RACE: TRICK BOOST (R2) (bit 19 of the options, on by default).
+# faster and leaves a trail of his colour. REMIX OPTIONS, RACE: SSX STYLE BOOST (bit 19 of the options, on by default).
 #
 # Where: the code (`bmain`, ~1.3 KB) lives in free static RAM (BASE 0x801F3100, the snowtod helper below it, the packed
 # TOD A of the Boarder Cross above 0x801F4000); its work words just under B_PTR (VARS).
