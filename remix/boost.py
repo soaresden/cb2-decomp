@@ -38,6 +38,12 @@ SBC2_SITE, SBC2_TAIL = 0x8005F33C, 0x8006D0C0  # jal func_8006D0C0 (falls) in SB
 BTR = 0x8007C700                           # after radar's rfall, in radar's data function (DATA_END 0x8007C81C)
 FLUSH = 0x8003CB2C
 OPT_FLAGS, BOOST_BIT = 0x80057438, 19
+# RETRY (v50): 3 retries of a failed Boarder Cross per cup (REMIX OPTIONS, RACE: RETRY ROUND (3 PER CUP), bit 20)
+RETRY_BIT, RETRIES = 20, 3
+COMP, COMP_END = 0x80057458, 0x800579A4      # round, stage, ..., the roster (8 x 0xA8): what a RETRY of the game resets
+SNAP = 0x801F2AB0                             # its copy at the start of the Boarder Cross (free RAM in every scene)
+SNAPR, TRIES = 0x801F3FE8, 0x801F3FEC         # snapshot taken (cleared at each start of SBC1); retries used this cup
+EXIT_SITE, EXIT_BACK, BX_AGAIN = 0x8005B084, 0x8005B08C, 0x8005B1A0   # sbc2_entry: exit code -> s0; reload the BX
 RIDERS, G_RIDER, PAD = 0x8009B9A8, 0x80057408, 0x8004FBF0
 WS, PRIMS = 0x80058E20, 0x80058E0C
 VEL, CAP = 0x48F0, 310                     # the racer's velocity (about 400 x its move per frame); boost cap (move per frame)
@@ -71,7 +77,23 @@ def xy(x, y): return ((y & 0xffff) << 16) | (x & 0xffff)
 
 def main_code(tables):
     V = lambda o: f'{o}(s1)'
-    S = ['bmain:', 'addiu sp, sp, -0x70', 'sw ra, 0x10(sp)', 'sw a0, 0x14(sp)', 'sw a1, 0x18(sp)', 'sw a2, 0x1c(sp)', 'sw a3, 0x20(sp)',
+    S = ['bsnap:', f'lui t0, {H(SNAPR)}', f'lw t1, {L(SNAPR)}(t0)', 'lui t2, 0x8005', 'bnez t1, bsn9', 'lw t3, 0x7420(t2)',
+         'addiu t4, zero, 1', 'bne t3, t4, bsn9', 'lw t3, 0x745c(t2)', 'nop', 'bne t3, t4, bsn9', 'lw t3, 0x7458(t2)', 'nop',
+         'bltz t3, bsn9', 'nop', f'sw t4, {L(SNAPR)}(t0)', *la('t5', COMP), *la('t6', SNAP), *la('t7', COMP_END),
+         'bsn1:', 'lw t8, 0(t5)', 'addiu t5, t5, 4', 'sw t8, 0(t6)', 'bne t5, t7, bsn1', 'addiu t6, t6, 4',
+         'bsn9:', 'j bmain', 'nop']
+    # rrest (sbc2_entry, the exit code in s0): RETRY chosen on GAME OVER (round = -1) in the competition, option on,
+    # a snapshot and retries left: the championship as it was at the start of this Boarder Cross, which is loaded again
+    S += ['rrest:', 'lui t2, 0x8005', 'lw t3, 0x7420(t2)', 'addiu t4, zero, 1', 'bne t3, t4, rr9', 'lw t3, 0x7458(t2)', 'nop',
+          'bgez t3, rr9', f'lw t3, {OPT_FLAGS & 0xffff:#x}(t2)', f'lui t5, {(1 << RETRY_BIT) >> 16:#x}', 'and t3, t3, t5', 'bnez t3, rr9',
+          f'lui t0, {H(SNAPR)}', f'lw t1, {L(SNAPR)}(t0)', f'lw t6, {L(TRIES)}(t0)', 'beqz t1, rr9', f'slti at, t6, {RETRIES}',
+          'beqz at, rr9', 'addiu t6, t6, 1', f'sw t6, {L(TRIES)}(t0)', *la('t5', SNAP), *la('t6', COMP), *la('t7', COMP_END),
+          'rr1:', 'lw t8, 0(t5)', 'addiu t5, t5, 4', 'sw t8, 0(t6)', 'addiu t6, t6, 4', 'bne t6, t7, rr1', 'nop',
+          # the whole round again from its 1st STAGE (as after a won round: SBC1 loaded by func_8001C748(ctx, 1))
+          'lui t2, 0x8005', 'sw zero, 0x7420(t2)', 'sw zero, 0x745c(t2)', 'addiu t4, zero, 2', f'sw t4, {L(SNAPR)}(t0)',
+          f'j {BX_AGAIN}', 'nop',
+          'rr9:', f'j {EXIT_BACK}', 'slti v0, s0, 5']
+    S += ['bmain:', 'addiu sp, sp, -0x70', 'sw ra, 0x10(sp)', 'sw a0, 0x14(sp)', 'sw a1, 0x18(sp)', 'sw a2, 0x1c(sp)', 'sw a3, 0x20(sp)',
          'sw s0, 0x24(sp)', 'sw s1, 0x28(sp)', 'sw s2, 0x2c(sp)', 'sw s3, 0x30(sp)', 'sw s4, 0x34(sp)', 'sw s5, 0x38(sp)',
          'sw s6, 0x3c(sp)', 'sw s7, 0x40(sp)',
          f'lui t0, {H(OPT_FLAGS)}', f'lw t0, {L(OPT_FLAGS)}(t0)', f'lui t1, {(1 << BOOST_BIT) >> 16:#x}', 'and t0, t0, t1', 'bnez t0, bout', 'nop',
@@ -249,6 +271,9 @@ def sbc1_code(img):
         for k, (src, n) in enumerate(chunks):
             out += [*la('t0', src), *la('t2', src + 4 * n), f'bi{k}:', 'lw t3, 0(t0)', 'addiu t0, t0, 4', 'sw t3, 0(t1)',
                     f'bne t0, t2, bi{k}', 'addiu t1, t1, 4']
+        out += [f'lui t1, {H(SNAPR)}', f'lw t5, {L(SNAPR)}(t1)', 'lui t2, 0x8005', f'sw zero, {L(SNAPR)}(t1)', 'addiu t6, zero, 2',
+                'beq t5, t6, bit1', 'lw t3, 0x7458(t2)', 'lw t4, 0x745c(t2)',     # SNAPR 2: a retry, not a new cup
+                'nop', 'or t3, t3, t4', 'bnez t3, bit1', 'nop', f'sw zero, {L(TRIES)}(t1)', 'bit1:']
         out += [*la('t1', VARS), *la('t2', VARS + VARS_LEN), 'biz:', 'sw zero, 0(t1)', 'addiu t1, t1, 4', 'bne t1, t2, biz', 'nop',
                 f'jal {FLUSH}', 'nop', 'lw ra, 0x10(sp)', 'lw a0, 0x14(sp)', 'lw a1, 0x18(sp)', 'lw a2, 0x1c(sp)',
                 f'j {SBC1_TAIL}', 'addiu sp, sp, 0x20']
@@ -270,9 +295,12 @@ def sbc1_code(img):
     return c, l
 
 
-def sbc2_code(bmain):
-    S = ['btr:', f'lui t0, {H(BASE)}', f'lw t0, {L(BASE)}(t0)', *li('t1', MAGIC), 'bne t0, t1, bt9', 'nop', f'j {bmain}', 'nop',
-         'bt9:', f'j {SBC2_TAIL}', 'nop']
+def sbc2_code(bsnap, rrest):
+    S = ['btr:', f'lui t0, {H(BASE)}', f'lw t0, {L(BASE)}(t0)', *li('t1', MAGIC), 'bne t0, t1, bt9', 'nop', f'j {bsnap}', 'nop',
+         'bt9:', f'j {SBC2_TAIL}', 'nop',
+         # rtr: sbc2_entry's "addu s0, v0, zero" moved into the delay slot of the jump here
+         'rtr:', f'lui t0, {H(BASE)}', f'lw t0, {L(BASE)}(t0)', *li('t1', MAGIC), 'bne t0, t1, rt9', 'nop', f'j {rrest}', 'nop',
+         'rt9:', f'j {EXIT_BACK}', 'slti v0, s0, 5']
     return asm(S, BTR)
 
 
@@ -284,10 +312,12 @@ def ops(disc):
     assert w2(SBC2_SITE) == J(3, SBC2_TAIL)
     img, l = image()
     c1, l1 = sbc1_code(img)
-    c2, l2 = sbc2_code(l['bmain'])
+    c2, l2 = sbc2_code(l['bsnap'], l['rrest'])
+    assert w2(EXIT_SITE) == 0x00408021 and w2(EXIT_SITE + 4) == 0x2A020005 and w2(BX_AGAIN) == J(3, 0x8005B220)
     assert c2[-1][0] < 0x8007C81C
     out = [['w', '/SBC1.BIN', a - OVL, w1(a), x] for a, x in c1 + [(SBC1_SITE, J(3, l1['bins']))]]
-    out += [['w', '/SBC2.BIN', a - OVL, w2(a), x] for a, x in c2 + [(SBC2_SITE, J(3, l2['btr']))]]
+    out += [['w', '/SBC2.BIN', a - OVL, w2(a), x] for a, x in c2 + [(SBC2_SITE, J(3, l2['btr'])),
+                                                                      (EXIT_SITE, J(2, l2['rtr'])), (EXIT_SITE + 4, 0x00408021)]]
     return out
 
 

@@ -232,6 +232,8 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     _bmx.fix_label_y(pkg['ops']['max'])          # MAX label of the BOARD screen: always under SPECIAL
     import maxanim as _mxa
     pkg['ops']['max'] = _mxa.merge(O, pkg['ops']['max'])   # MAX bars in the rider's pose too (v49)
+    import maxlabel as _mxl
+    pkg['ops']['max'] = _mxl.merge(O, pkg['ops']['max'])   # MAX line in the style of the board labels (v50)
     import skipq as _skq
     pkg['ops']['skipq'] = [op for op in pkg['ops']['skipq'] if not (op[0] == 'w' and op[2] + 0x8000F800 in _skq.SELECT_SITES)]
     pkg['ops']['skipq'] += _skq.select_ops(O.read_file('/SCES_009.92'))   # SELECT alone on the 1st STAGE screen

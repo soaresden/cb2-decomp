@@ -439,3 +439,26 @@ réplique ; ces images dessinent les barres avec deux autres copies de la boucle
 → `maxw`, qui fait aussi la lecture ; le `lh v1, 0(v0)` suivant devient un nop, car le mot d'après, `addiu v0, zero, 1`,
 passait avant la routine). Les barres restaient à la valeur du rider. **Boost** : couleur du blouson (Yaggi rose,
 Jin orange, Cindy rouge, Irin bleu clair, Boss or, Gray argent, Snowman rouge).
+
+## RETRY en Compétition (v50, `radar` : `remix/boost.py`)
+
+Ligne RETRY ROUND (3 PER CUP) de l'onglet RACE (bit 20, active par défaut). Dans le jeu, RETRY sur l'écran GAME OVER
+d'un Boarder Cross remet tout le championnat à zéro (manche = -1, effectif réinitialisé, retour au panneau de départ).
+Ici : au premier passage de la boucle de course de chaque Boarder Cross (`bsnap`, avant `bmain`), l'état du
+championnat (0x80057458..0x800579A3 : manche, épreuve, …, l'effectif 8 × 0xA8) est copié en 0x801F2AB0 (RAM libre dans
+toutes les scènes, vérifié) ; à la sortie de SBC2 (`sbc2_entry` 0x8005B084, code de sortie → `rtr` → `rrest`), si la
+manche vaut -1 (RETRY choisi) en Compétition, option active, copie prise et moins de 3 essais utilisés (0x801F3FEC) :
+l'état est remis, mode 0 et épreuve 0, et la sortie prend le chemin d'une manche gagnée (0x8005B1A0 :
+`func_8005B220`, `func_8001C748(ctx, 1)`) : la manche recommence à son écran « 1st STAGE » (SELECT la passe avec
+`skipq`). Le compteur d'essais est remis à 0 au début de SBC1 sur une nouvelle coupe (manche 0, épreuve 0, sauf
+après un RETRY : SNAPR = 2). Vérifié dans l'émulateur : échec, RETRY → round 1 rejoué (Big Air puis Boarder Cross),
+essais 1/3. (Relancer seulement le Boarder Cross par `func_8001C748(ctx, 2)` laissait l'écran « 2nd STAGE » sans ses
+images.)
+
+## Ligne MAX dans le style des planches (v50, `remix/maxlabel.py`)
+
+Les libellés TYPE-1…SPECIAL sont des images 4 bits 64 × 16 (VRAM 320..383 × 496..511 de MAIN_SEL.FBD, palette
+0x71FC), dessinées en POLY_FT4 64 × 22 (0x7F7F7F choisi, 0x323232 sinon). Un « MAX » dans ce style (lettres blanches,
+ombre orange à gauche, contour sombre, Noto Sans Black Italic) est calculé à la construction avec les indices de cette
+palette, écrit dans MAIN_SEL.FBD en VRAM (1000, 360) (place libre), et `msp` saute à `mspl`, qui chaîne le même
+POLY_FT4 que le jeu (table d'ordre *(a0 + 0x14 × D_8005AE7C + 4) + 0x34, comme func_8005CC78).

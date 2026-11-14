@@ -48,7 +48,8 @@ LINES = ['REAR VIEW (O)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', '
          'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY PLAYABLE',
          'FALLS AS A NUMBER',                   # bit 17 (radar.py: one ball and x13 instead of the row of balls)
          'UNLOCK EVERYTHING',                   # line i = bit i of the flags word (bit set = off)
-         'SSX STYLE BOOST']                    # bit 19 (remix/boost.py, with the mod radar)
+         'SSX STYLE BOOST',                    # bit 19 (remix/boost.py, with the mod radar)
+         'RETRY ROUND (3 PER CUP)']            # bit 20 (remix/boost.py: RETRY on GAME OVER replays the Boarder Cross)
 UNLOCK_LINE = 18                                # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
 INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
 VIS = 10                               # lines shown at a time: the list scrolls with the cursor
@@ -77,7 +78,7 @@ def L(a): return a - (H(a) << 16)
 
 
 # the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
-TABS = [('RACE', [0, 19, 6, 7, 17, 1, 3, 4, 13]),
+TABS = [('RACE', [0, 19, 20, 6, 7, 17, 1, 3, 4, 13]),
         ('RIDERS', [10, 16, 11, 12, 8]),
         ('GAME', [9, 15, 14, 2, 5, 18])]
 UP, RIGHT, DOWN, LEFT, TRI, CIRC, CROSS = 0x1000, 0x2000, 0x4000, 0x8000, 0x10, 0x20, 0x40
