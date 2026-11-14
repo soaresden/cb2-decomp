@@ -183,7 +183,8 @@ def routines(D):
           'oun1:', *sw('zero', 'conf'), 'lui t8, 0x8005']
     for o, v, k in UNLOCK:
         S += ([f'lhu t7, {o}(t8)', 'nop', f'ori t7, t7, {v}'] if k == 'o' else [f'addiu t7, zero, {v}']) + [f'sh t7, {o}(t8)']
-    S += [f'lui t8, {(1 << UNLOCK_LINE) >> 16:#x}', 'or t9, t9, t8', f'lui t0, {H(FLAGS)}', f'sw t9, {L(FLAGS)}(t0)', 'j pwz', 'nop']
+    # + bit 31: Jicchi, Nick, Kelly (the R-E-M-I-X letters of the Board Park, remix/bpletters.py; v60)
+    S += [f'lui t8, {((1 << UNLOCK_LINE) | 0x80000000) >> 16:#x}', 'or t9, t9, t8', f'lui t0, {H(FLAGS)}', f'sw t9, {L(FLAGS)}(t0)', 'j pwz', 'nop']
     # opt (the TV function's GetClut call, every frame of the mode select screen): switches applied, the switches'
     # block installed, then the REMIX label (or the screen)
     S += ['opt:', 'addiu sp, sp, -0x50', 'sw ra, 0x4c(sp)', 'sw s5, 0x40(sp)', 'sw s6, 0x44(sp)', 'sw s7, 0x48(sp)',

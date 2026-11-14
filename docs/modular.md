@@ -574,3 +574,24 @@ v59 : **tenue inédite de Cindy retirée** (`bossout.CG_ON = False`). En course,
 couvert de traînées sombres sur les jambes : pas présentable. La 7e tenue n'est plus proposée (WEAR : 6 tenues), le
 menu ne précharge plus son modèle, ses fichiers de course ne sont plus construits. Le code (cgrider.py, cg_* de
 modular.py et disc.js, ldg, modèle de menu 5) reste, inactif, pour une reprise.
+
+v60 : **lettres R-E-M-I-X du Board Park** (`remix/bpletters.py`, mod `crew`), à la manière des lettres S-K-A-T-E de Tony
+Hawk's : Jicchi, Nick et Kelly ne se gagnent plus avec les 100 % mais en ramassant en une descente les cinq lettres qui
+flottent dans le Board Park.
+- BP.BIN : la boucle principale appelle à chaque image une fonction vide (func_80074344, 0x8005C31C, comme celle de HP
+  qu'utilise hplive) : l'appel passe par `rlx` (fonctions mortes 0x8006EA48..0x8006EE54, `rproj` 0x8006AB74, `rq`
+  0x800943B8 ; images en 0x8008ECAC / 0x80093FDC / 0x80070A64 ; tables et variables 0x8007CF1C).
+- Rider : D_8009FE24[0], position + 0x2C / 0x30 / 0x34 (32 bits, un rider fait ~265 de haut, y vers le bas), caméra
+  + 0x6D8 (H = + 0xA = 150). Projection comme la traînée du boost : (GsWSMATRIX 0x80058E20 (lettre − rider)) >> 12 +
+  translation 0x80058E34, écran = x H / z, y H / z (vérifié : le rider tombe sur ses pieds).
+- Lettres placées sur une descente enregistrée dans l'émulateur : sur la neige au début, en haut du 1er saut, sur la
+  neige, en haut du 2e saut, dans le bowl de la fin (150 au-dessus de la position enregistrée). Prise à moins de 450 sur
+  les trois axes (un son) ; dessinées jusqu'à 14 000 (POLY_FT4, demi-taille 220 H / z), images dans la police du logo
+  REMIX (remix/fonts, pas un fichier du jeu), 24 × 22, 4 bits, envoyées en VRAM libre (x 384, y 0 ; palette 448, 192).
+- Rangée REMIX en haut à gauche (prises en clair, les autres sombres) ; une nouvelle descente (la position saute) remet
+  à zéro ; les cinq : bit 31 du mot sauvegardé 0x80057438 (les interrupteurs du mod options utilisent 0..20), la rangée
+  clignote, et le MASK du mod news reçoit 0x10000 : bandeau JICCHI NICK KELLY UNLOCKED au retour au menu.
+- `acomp` de crew lit ce bit (ou le mot du mod unlock) au lieu de la formule des 100 % ; news : les 100 % donnent
+  CONGRATULATIONS + GAME COMPLETED seulement ; UNLOCK EVERYTHING (options) pose aussi le bit 31.
+- Vérifié dans l'émulateur : les cinq prises dans l'ordre, bit posé, bandeau au hub, Jicchi choisissable ; sans les
+  lettres (progression à 100 %), les trois restent gris ; RESTART remet les lettres à zéro.

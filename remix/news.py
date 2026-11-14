@@ -35,7 +35,8 @@ FRAMES = 210                                        # hub frames (the hub runs a
 LINE_H, BOX_X, BOX_W = 14, 32, 256
 CREW_WORD = (0x8001FBD4, 0x020100FF)                # mod crew: its BASE table (0xff, Yaggi, Jin, Cindy)
 UNLOCK_ALL = (0x80063EA8, 0x2403007F)                # mod unlock
-# (MASK bits, text): 0x10000 / 0x20000 = complete with / without crew (set by nhub)
+# (MASK bits, text): 0x20000 = complete (set by nhub); 0x10000 = Jicchi, Nick, Kelly: set by the Board Park when its five
+# R-E-M-I-X letters are taken (remix/bpletters.py, v60; before, with the 100 %)
 LINES = [(0x8000, 'CONGRATULATIONS !'), (0x10000, 'JICCHI NICK KELLY UNLOCKED'), (0x20000, 'GAME COMPLETED !'),
          (0x10, 'BOSS UNLOCKED'), (0x20, 'GRAY UNLOCKED'), (0x40, 'SNOWMAN UNLOCKED'), (0x700, 'SPECIAL BOARD UNLOCKED'),
          (0x800, 'MIRROR MODE UNLOCKED'), (0x1000, 'HARD MODE UNLOCKED'), (0x2000, 'NEW COURSES UNLOCKED'),
@@ -89,7 +90,7 @@ def ms_code():
          # 100 %: the game was not complete when SNAP was taken (some bit appeared), it is now
          'jal ncomp', 'nop', 'beqz v0, nh0', f'lui t0, {H(CREW_WORD[0])}', f'lw t0, {L(CREW_WORD[0])}(t0)',
          f'lui t1, {CREW_WORD[1] >> 16:#x}', f'ori t1, t1, {CREW_WORD[1] & 0xffff:#x}', 'ori s3, s3, 0x8000', 'bne t0, t1, nhx', 'lui t2, 2',
-         'lui t2, 1', 'nhx:', 'or s3, s3, t2',
+         'lui t2, 2', 'nhx:', 'or s3, s3, t2',
          # frame counter: starts at FRAMES, MASK = 0 at the end
          'nh0:', f'lw t0, {CNT}(s4)', 'nop', 'bnez t0, nh1', 'nop', f'addiu t0, zero, {FRAMES}',
          'nh1:', 'addiu t0, t0, -1', f'sw t0, {CNT}(s4)', 'bnez t0, nh2', 'nop', f'sw zero, {MASK}(s4)',

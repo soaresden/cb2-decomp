@@ -154,13 +154,11 @@ def routines(race_regs):
     S += ['amode:', 'lui at, 0x8005', 'lw v0, 0x7420(at)', f'lui at, {H(MODESV)}', f'lw at, {L(MODESV)}(at)', 'nop', 'srlv at, at, v0',
           'andi at, at, 1', 'bnez at, am1', 'nop', 'jr ra', 'move v0, zero', 'am1:', 'j acomp', 'addiu a1, zero, 1']
     # acomp(a1) -> v0 = a1 if the game is complete (100 % of the progress page) or with the 'unlock' mod, else 0 (uses at, v0)
+    # acomp(a1) -> v0 = a1 with the 'unlock' mod, or once the R-E-M-I-X letters of the Board Park are all taken in a run
+    # (bit 31 of the saved word 0x80057438, remix/bpletters.py; v60: before, the 100 % of the progress page), else 0
     S += ['acomp:', f'lui at, {H(UNLOCK_ALL[0])}', f'lw v0, {L(UNLOCK_ALL[0])}(at)', f'lui at, {UNLOCK_ALL[1] >> 16:#x}', f'ori at, at, {UNLOCK_ALL[1] & 0xffff:#x}',
-          'beq v0, at, ac1', 'lui at, 0x8005', 'lhu v0, 0x7440(at)', 'nop', 'srl v0, v0, 4', 'andi v0, v0, 7', 'xori v0, v0, 7', 'bnez v0, ac0',
-          'lhu v0, 0x7442(at)', 'nop', 'andi v0, v0, 7', 'xori v0, v0, 7', 'bnez v0, ac0',
-          *[x for o in (0x7448, 0x744A, 0x744C) for x in (f'lhu v0, {o}(at)', 'nop', 'andi v0, v0, 0x3ff', 'xori v0, v0, 0x3ff', 'bnez v0, ac0')],
-          'lhu v0, 0x7444(at)', 'nop', 'beqz v0, ac0', 'lhu v0, 0x7446(at)', 'nop', 'beqz v0, ac0',
-          'lhu v0, 0x743c(at)', 'nop', 'sltiu v0, v0, 10', 'bnez v0, ac0', 'lhu v0, 0x743e(at)', 'nop', 'sltiu v0, v0, 10', 'bnez v0, ac0', 'nop',
-          'ac1:', 'jr ra', 'move v0, a1', 'ac0:', 'jr ra', 'move v0, zero']
+          'beq v0, at, ac1', 'lui at, 0x8005', 'lw v0, 0x7438(at)', 'nop', 'bltz v0, ac1', 'nop', 'jr ra', 'move v0, zero',
+          'ac1:', 'jr ra', 'move v0, a1']
     # setcur(a0 = alias): ACUR, AB (base + 1, 0 = none), ASTP (stat bars row)
     S += ['setcur:', f'lui at, {H(ACUR)}', f'sw a0, {L(ACUR)}(at)', 'beqz a0, sc0', 'move v0, zero',
           f'lui at, {H(BASEV)}', 'addu at, at, a0', f'lbu v0, {L(BASEV)}(at)', 'nop', 'addiu v0, v0, 1',
@@ -583,7 +581,9 @@ def ops(disc):
         for k, c in enumerate(chunks):
             out.append(['sec', lba + k, (bytes([0, 0, 0x89 if k == len(chunks) - 1 else 0x08, 0]) * 2).hex(), c])
     # Boss's black outfit (WEAR screen, menu model 4, race texture): remix/bossout.py, v57
-    return bossout.merge(disc, out, LABELS)
+    out = bossout.merge(disc, out, LABELS)
+    import bpletters        # R-E-M-I-X letters of the Board Park (v60)
+    return out + bpletters.ops(disc)
 
 
 # ---------------------------------------------------------------------------------------------------- menu models
