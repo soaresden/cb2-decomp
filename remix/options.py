@@ -50,7 +50,13 @@ LINES = ['REAR VIEW (O)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', '
          'UNLOCK EVERYTHING',                   # line i = bit i of the flags word (bit set = off)
          'SSX STYLE BOOST',                    # bit 19 (remix/boost.py, with the mod radar)
          'RETRY ROUND (3 PER CUP)',            # bit 20 (remix/boost.py: RETRY on GAME OVER replays the Boarder Cross)
-         'PARK ICONS JICCHI NICK KELLY']         # bit 21 (remix/bpletters.py: the letters that unlock Jicchi, Nick, Kelly)
+         'PARK ICONS JICCHI NICK KELLY',
+         # v64: per game mode values of the switches found in several modes (bits 22..30; COMP keeps bit 3 for AIR
+         # CONTROL): REAR VIEW for COMP, FREE, AIR, PIPE, PARK, AIR CONTROL for FREE, AIR, PIPE, PARK. On the mode
+         # select screen `pmd` copies the REAR VIEW of the mode under the cursor into bit 0 (read by the mod rear in the
+         # race) and gives `oap` the AIR CONTROL of that mode
+         'REAR VIEW (O)', 'REAR VIEW (O)', 'REAR VIEW (O)', 'REAR VIEW (O)', 'REAR VIEW (O)',
+         'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL']         # bit 21 (remix/bpletters.py: the letters that unlock Jicchi, Nick, Kelly)
 UNLOCK_LINE = 18                                # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
 INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
 VIS = 10                               # lines shown at a time: the list scrolls with the cursor
@@ -79,12 +85,14 @@ def L(a): return a - (H(a) << 16)
 
 
 # the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
-TABS = [('COMP', [0, 19, 20, 15, 6, 7, 17, 3, 4, 9, 10]),          # v63: one tab per game mode (a switch can be in several:
-        ('FREE', [0, 3]),                                          # it is the same bit), then the game-wide ones
-        ('AIR', [13, 0, 3]),
-        ('PIPE', [1, 3]),
-        ('PARK', [21, 0, 3]),
+TABS = [('COMP', [22, 19, 20, 15, 6, 7, 17, 3, 4, 9, 10]),        # v63: one tab per game mode, then the game-wide ones
+        ('FREE', [23, 27]),                                        # (v64: REAR VIEW / AIR CONTROL with their own bit
+        ('AIR', [13, 24, 28]),                                     # in each mode)
+        ('PIPE', [1, 25, 29]),
+        ('PARK', [21, 26, 30]),
         ('GAME', [16, 11, 12, 8, 14, 2, 5, 18])]
+# mode select cursor (0 COMP, 1 BIG AIR, 2 HALFPIPE, 3 FREE STYLE, 4 BOARD PARK, else as FREE) -> (REAR VIEW, AIR CONTROL) bits
+PMT = [(22, 3), (24, 28), (25, 29), (23, 27), (26, 30), (23, 27), (23, 27), (23, 27)]
 TAB_X0, TAB_DX = -148, 52                # the tabs' names (menu font)
 UP, RIGHT, DOWN, LEFT, TRI, CIRC, CROSS = 0x1000, 0x2000, 0x4000, 0x8000, 0x10, 0x20, 0x40
 PADV = 0x800832BA                      # MODE_SEL's pad words (held, ...: 0x800832BA..0x800832C5), set by func_8005CCE4
@@ -152,6 +160,7 @@ def data():
     assert all(lab['l%d' % i] >> 16 == 0x8008 for i in range(len(LINES)))
     put('ltab', b''.join(struct.pack('<H', lab['l%d' % i] & 0xffff) for i in range(len(LINES))))   # v63: halfwords (0x8008....)
     put('ttab', b''.join(struct.pack('<I', lab['t%d' % i]) for i in range(len(TABS))))
+    put('pmt', bytes(b for p in PMT for b in p)); put('fx', bytes(4))
     put('ptab', b''.join(struct.pack('<4I', a, on, off, bit) for a, on, off, bit in PATCH))
     data.side = bytes(d2)
     return bytes(d), lab
@@ -200,7 +209,7 @@ def routines(D):
     # opt (the TV function's GetClut call, every frame of the mode select screen): switches applied, the switches'
     # block installed, then the REMIX label (or the screen)
     S += ['opt:', 'addiu sp, sp, -0x50', 'sw ra, 0x4c(sp)', 'sw s5, 0x40(sp)', 'sw s6, 0x44(sp)', 'sw s7, 0x48(sp)',
-          f'jal {HOOK_FN}', 'nop', 'sw v0, 0x34(sp)', 'jal oap', 'nop', 'jal tins', 'nop',
+          f'jal {HOOK_FN}', 'nop', 'sw v0, 0x34(sp)', 'jal pmd', 'nop', 'jal oap', 'nop', 'jal tins', 'nop',
           'addiu t0, zero, 2', *sw('t0', 'alive'),
           'sll v1, s1, 2', 'addu v1, v1, s1', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw s5, 4(v1)', 'sll v0, s1, 13',
           f'lui s6, {H(PRIMS)}', 'addu s6, s6, v0', f'addiu s6, s6, {L(PRIMS)}',
@@ -264,7 +273,13 @@ def routines(D):
     # oap: apply the switches to the PATCH words (table ptab: address, on, off, bit), FlushCache after a write
     import toggles
     S += toggles.installer(la)
-    S += ['oap:', f'lui t0, {H(FLAGS)}', f'lbu t6, {L(FLAGS)}(t0)', *la('t0', D['ptab']), f'addiu t5, t0, {16 * len(PATCH)}', 'move t9, zero',
+    # pmd: the per mode switches of the mode under the cursor: REAR VIEW -> bit 0 of the flags; AIR CONTROL -> bit 3 of
+    # `fx` (the flags' low byte for oap)
+    S += ['pmd:', f'lui t0, {H(CURSOR)}', f'lw t1, {L(CURSOR)}(t0)', 'nop', 'andi t1, t1, 7', 'sll t1, t1, 1', *la('t2', D['pmt']),
+          'addu t2, t2, t1', 'lbu t3, 0(t2)', 'lbu t4, 1(t2)', f'lui t0, {H(FLAGS)}', f'lw t5, {L(FLAGS)}(t0)', 'nop',
+          'srlv t6, t5, t3', 'andi t6, t6, 1', 'srlv t7, t5, t4', 'andi t7, t7, 1', 'addiu at, zero, -2', 'and t5, t5, at', 'or t5, t5, t6',
+          f'sw t5, {L(FLAGS)}(t0)', 'andi t8, t5, 0xf7', 'sll t7, t7, 3', 'or t8, t8, t7', *sw('t8', 'fx'), 'jr ra', 'nop']
+    S += ['oap:', *lw('t6', 'fx'), *la('t0', D['ptab']), f'addiu t5, t0, {16 * len(PATCH)}', 'move t9, zero',
           'oa1:', 'lw t1, 0(t0)', 'lw t2, 4(t0)', 'lw t3, 8(t0)', 'lw t4, 12(t0)', 'lw t7, 0(t1)', 'and t4, t4, t6', 'beqz t4, oa2', 'move t8, t2',
           'move t8, t3', 'oa2:', 'beq t7, t8, oa3', 'nop', 'beq t7, t2, oa4', 'nop', 'bne t7, t3, oa3', 'nop',
           'oa4:', 'sw t8, 0(t1)', 'addiu t9, zero, 1',
@@ -272,7 +287,7 @@ def routines(D):
     return S
 
 
-TOP = {'pw', 'ounl', 'opt', 'drs', 'di1', 'di4', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk', 'dtri'}
+TOP = {'pw', 'ounl', 'opt', 'pmd', 'drs', 'di1', 'di4', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk', 'dtri'}
 
 
 def place(S, tables, extra=()):

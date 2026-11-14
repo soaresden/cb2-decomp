@@ -633,3 +633,14 @@ dans plusieurs : c'est le même bit, partagé), GAME les réglages de tout le je
 sauvegardé 0x80057438 (un seul mot libre dans la sauvegarde : pas de valeurs séparées par mode).
 - Place : MODE_SEL passe à 85 secteurs (`toggles.SCREEN` = 0x1000 octets, le tas du menu démarre 0x800 plus loin ;
   vérifié : Board Park et une course Free Style démarrent) ; pointeurs des lignes en demi-mots.
+
+v64 : **réglages par mode** : VUE ARRIÈRE et CONTRÔLE AÉRIEN, les seules options présentes dans plusieurs modes, ont
+un bit par mode dans les bits libres du mot sauvegardé (REAR VIEW : COMP 22, FREE 23, AIR 24, PIPE 25, PARK 26 ; AIR
+CONTROL : COMP 3, FREE 27, AIR 28, PIPE 29, PARK 30) ; le reste est global (onglet GAME, ou option d'un seul mode).
+`pmd` (appelé par `opt` à chaque image de l'écran des modes, avant `oap`) lit le curseur (0x80070B2C : 0 COMP, 1 BIG
+AIR, 2 HALFPIPE, 3 FREE STYLE, 4 BOARD PARK ; table `pmt`) : la vue arrière du mode sous le curseur va dans le bit 0
+(lu par le mod rear en course), son contrôle aérien dans le bit 3 de `fx` (l'octet des drapeaux que lit `oap` pour
+les mots de l'exe). Vérifié : FREE coupé → bit 0 posé et mot 0x8004FA44 à sa valeur « off » curseur sur FREE,
+valeurs « on » sur les autres modes ; onglets FREE OFF / OFF, les autres ON.
+Site : la page Progression lit le mot 0x80057438 (déblocage des lettres, bit 31, et les réglages de l'écran REMIX
+par onglet). Sauvegarde de coupe après chaque round : déjà en place depuis la v51 (`boost.SAVE_SITE`).
