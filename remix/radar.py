@@ -17,6 +17,8 @@
 # crew alias), the player with a yellow outline that blinks like the original square, and a DR_TPAGE for the heads'
 # page (the HUD text in the same entries changes it); then back to 0x8006D540 with s2 (primitives) and s6 (next entry)
 # as the loop leaves them. Code and data in two dead functions of SBC2 (no call, jump or pointer to them).
+# Falls (v35): the row of balls of the bottom left (func_80078E58 from 0x8006D12C, x -0x98, y 0x68) went under the
+# line; with the line on, `rfall` gives it y -0x7C: at the top left, where the original bar was (above TIME).
 # Ranking panel (bit 128 of the options off): before that, `rank` draws on the right three rows (the place ahead of the
 # player, the player's, the one behind), each with the place in SBC2's HUD font (gold, silver, bronze shimmering for
 # the first three), the head and the gap to the player in seconds, timed at the course's segments (see docs/modular.md).
@@ -37,6 +39,8 @@ HEADS_VRAM, CLUT_VRAM = (768, 472), (768, 490)   # empty in the race (bottom of 
 N = 10                                      # heads, in the order of crew.STRIP_ORDER
 PIX, CLUTS, RECT1, RECT2, POSS, PCT, COLS = 0, 1280, 1600, 1608, 1616, 1652, 1660   # data block (end 1684)
 LAST, PIDX, PPL, PRAC, RIDX = 1684, 1688, 1692, 1696, 1700     # work words (LAST = 0 in the file, the others not)
+FALL_SITE = 0x8006D114                     # addiu a1, zero, -0x98 / addiu a2, zero, 0x68 (x, y of the falls' balls)
+FALL_CODE = DATA + 0x700                    # `rfall`, after the data block and its work words
 RINGS = (0x8006C488, 0x80074F48)            # dead functions of SBC2 used as RAM: gates of racers 0..3 and 4..7
 PX, PY, ROW = 66, -24, 18                   # ranking panel: places, heads, gaps (right side, mid height)
 # text colours (the font is white, 0x80 = as is): gold, silver, bronze, others; value = base + step * t, t = 0..15..0
@@ -218,6 +222,12 @@ def ops(disc, aliasv, basev, modesv, fbd, icon_x, icon_y, clut_x, clut_y, pre):
     assert w(COLOR_SITE) == 0x97A90022 and w(COLOR_SITE + 4) == 0x240200FF
     P = [(a, x) for a, x in c] + [(HOOK, J(2, l['rad'])), (COLOR_SITE, 0x8FA2007C), (COLOR_SITE + 4, 0x97A90022)]
     dw = data_words(); P += [(DATA + RECT1 + i, struct.unpack_from('<I', dw, i)[0]) for i in range(0, len(dw), 4)]
+    # the falls' balls: y from the line's switch (rfall)
+    assert w(FALL_SITE) == 0x2405FF68 and w(FALL_SITE + 4) == 0x24060068 and DATA + LAST + 24 <= FALL_CODE
+    cf, lf = asm(['rfall:', 'lui a2, 0x8005', f'lbu a2, {OPT_FLAGS & 0xffff:#x}(a2)', 'addiu a1, zero, -0x98', f'andi a2, a2, {LINE_BIT}',
+                  'beqz a2, rf1', 'addiu a2, zero, 0x68', 'jr ra', 'nop', 'rf1:', 'jr ra', 'addiu a2, zero, -0x7c'], FALL_CODE)
+    assert cf[-1][0] < DATA_END
+    P += cf + [(FALL_SITE, J(3, lf['rfall'])), (FALL_SITE + 4, 0)]
     out = list(pre) + [['w', FILE, a - OVL, w(a), x] for a, x in P]
     vo = lambda x, y: 20 + (y * 704 + x - 320) * 2               # TITLE/MAIN_SEL.FBD (x 320.., 704 wide)
     segs = [[vo(icon_x, icon_y + y), DATA - OVL + PIX + 8 * N * y, 8 * N] for y in range(16)]

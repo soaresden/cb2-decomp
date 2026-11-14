@@ -329,6 +329,12 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
 
 Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D614`, données dans `func_8007BEB8`).
 
+- Boules des chutes (v35) : la rangée de boules du bas à gauche (sprites 8 × 8 du modèle n° 8 de D_8009ABE0, dessinés
+  par `func_80078E58`, appelée en 0x8006D12C avec x -0x98, y 0x68) passait sous la ligne. Avec la ligne active,
+  `rfall` (dans `func_8007BEB8`, après les données) leur donne y -0x7C : en haut à gauche, à la place de la barre
+  d'origine, au-dessus de TIME. Ligne coupée : à leur place d'origine. Trouvé en neutralisant une à une, en mémoire,
+  les fonctions qui utilisent ces modèles.
+
 - La barre de progression du Boarder Cross de la Compétition (en haut à gauche, S … F) est dessinée par
   `func_8006D2A4` de SBC2 (appelée en 0x8005F56C avec le tableau des coureurs D_8009146C, 8 × 0x1288 octets) :
   bande translucide (TILE 0x62, x -0x90, y -0x78, 0x70 × 0xD, rectangle en sp + 0x18), puis par coureur un carré 4×4
