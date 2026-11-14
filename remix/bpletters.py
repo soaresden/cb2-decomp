@@ -2,9 +2,9 @@
 # letters spin along the course; riding through a letter collects it (a sound); the five in one run unlock Jicchi, Nick
 # and Kelly for good (bit 31 of the saved word 0x80057438, which crew's `acomp` reads instead of the 100 % of the
 # progress page). Each new run (back at the top) the letters are there again; the unlock happens once.
-# v61: R hidden behind a slalom gate, E and M at the top of the two big jumps, I at the end of the log slide (left lane
-# of the tree island), X on the roof of the first truck of the car park (the trucks, logs and rails of the course are
-# walls for the game: it is taken riding along the truck, as close as possible). At the start of a run (and when the
+# v61: R hidden behind a slalom gate, E on the metal rail and I on the log slide (left lane of the tree island), near
+# their ends (slide on them with L1 / R1), M at the top of the second big jump, X on the roof of the first truck of the
+# car park (a ramp at its back). At the start of a run (and when the
 # five are taken), an overlay says the goal and the status, LOCKED (red) or UNLOCKED (green), with the game's own text
 # routine of BP (func_80086F14, its ASCII font is in VRAM: x 320, y 256, palette 992, 460). The REMIX screen's switch
 # 21 (PARK ICONS JICCHI NICK KELLY, tab RIDERS) turns the letters off.
@@ -47,11 +47,12 @@ R, FAR, SZ, ZMIN, JUMP = 450, 14000, 220, 100, 3000
 UP = 150                                          # a letter's centre this much above the ground (or the rider's feet)
 # (x, y of the centre, z, radius on x / z, radius on y): taken when the rider is within both
 POS = [(-19660, 14543 - UP, -54500, 550, R),        # R: behind the gate of section 21 (its panels: x -20138..-19190, z -53920)
-       (-69382, 39531 - UP, -82123, R, 900),      # E: top of the first big jump (a recorded run; 1100 above the snow)
-       (-94384, 55986 - UP, -119112, R, 900),     # M: top of the second big jump
-       (-140650, 127494 - UP, -247000, R, R),     # I: just past the end of the log slide (object 584, section 137)
-       (-83310, 154616 - SZ - 10, -300800, 900, 2300)]   # X: on the roof of the first truck (objects 611..613; y 154616,
-                                                 # x -83807..-82812, the snow 156410 under it): along its side
+       (-92160, 47483 - UP, -96400, R, 500),       # E: on the metal rail near its downhill end (object 576, section 53; its
+                                                  # top 47483 there, the snow 660 lower): taken sliding on it (L1 / R1)
+       (-94384, 55986 - UP, -119112, R, 900),      # M: top of the second big jump (a recorded run)
+       (-140650, 126933 - UP, -246100, R, 400),    # I: on the log slide near its end (object 584, section 137; top 126933)
+       (-83310, 154500 - UP, -298000, R, R)]       # X: on the roof of the first truck (ramp at its back; a rider on it:
+                                                  # y 154390..154520 at z -296800..-298100, the snow 156155 under it)
 SND_PICK, SND_DONE = 0x13, 0x12                   # sounds of BP's bank: 0x13 a short high ding (0.6 s, ~2 kHz), 0x12
                                                   # louder (0x15, 0x16: silent; measured in the emulator)
 HUD_X, HUD_Y, HUD_S, HUD_DX = -148, -100, 9, 18

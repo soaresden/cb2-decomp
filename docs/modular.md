@@ -618,3 +618,11 @@ v61 : **lettres R-E-M-I-X refaites** (`remix/bpletters.py`).
   `di1` coupé en deux, les tables tri / crx / lclut déplacées au début de DATA.
 - Vérifié : les cinq prises (lettres posées sur la trajectoire du pilote automatique), bit 31, UNLOCKED en vert,
   rangée allumée ; positions réelles calculées sur la géométrie du parcours.
+
+v62 : lettres revues après retour du joueur : on **monte sur les camions** (rampe à l'arrière de la remorque) et on
+**glisse sur les rails / troncs** (L1 / R1 une fois dessus). Dans l'émulateur : un rider passé par la rampe roule sur
+le toit (y 154390..154520 à z −296800..−298100, la neige 156155 dessous) — X y est maintenant posé (rayon 450 partout)
+et ramassé en test (code v61 injecté dans un état du parking). E passe sur la glissière métallique près de son bout
+(dessus 47483 à z −96400, rayon y 500 : la neige est 660 plus bas), I sur le tronc près de son bout (dessus 126933 à
+z −246100, rayon y 400) : on ne les prend qu'en glissant dessus. M reste en haut du 2e grand saut, R derrière la porte.
+(Monter sur un rail n'a pas pu être automatisé : le pilote le longe.)
