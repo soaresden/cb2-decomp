@@ -9,7 +9,7 @@ près**.
 | `unlock` | Tout débloqué | INIT (valeurs de départ), MAIN_SEL 0x80063EA8 (riders sélectionnables avec une ancienne sauvegarde) |
 | `special` | Planches SPECIAL partout | MAIN_SEL 0x8005B0C4 + lectures de 0x80057442 |
 | `hardmirror` | Hard + Mirror | exe 0x8004F878–0x8004F89F, MODE_SEL (dont 0x800647DC : 3e ligne de la télé), étiquette « H+M L1+R1+X » dans `TITLE/MODE_SEL.FBD` |
-| `riders` | Boss, Gray et Snowman en championnat (Snowman avec ses animations et son squelette, v29 : remix/snowtod.py) | caves de l'exe, MAIN_SEL, SBC1/SBC2, ENEMY1, EFCT_SBC (plaques), LOCTBL, paquets de modèles, voix de Boss (fin du film d'intro coupée) |
+| `riders` | Boss, Gray et Snowman en championnat (Snowman avec ses animations et son squelette, v29 : remix/snowtod.py ; voix de Gray et Snowman en Boarder Cross, v32 : remix/voices.py) | caves de l'exe, MAIN_SEL, SBC1/SBC2, ENEMY1, EFCT_SBC (plaques), LOCTBL, paquets de modèles, voix de Boss (fin du film d'intro coupée) |
 | `outfits` | Tenues cachées de Cindy et Irin | MAIN_SEL (grandit : déplacé à la fin de SBCMOVE.STR, coupée), exe |
 | `max` | Stats MAX | MAIN_SEL + écrans de course |
 | `air` | Figures en l'air | overlays de course |

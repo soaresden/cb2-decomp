@@ -147,6 +147,21 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
   seul premier appel, la hiérarchie humaine revenait. Vérifié dans l'émulateur : Big Air (1re étape) et Boarder
   Cross (2e étape), Snowman entier, animé comme en Free Style.
 
+## Voix de Gray et Snowman en Boarder Cross (v32, `remix/voices.py`, mod `riders`)
+
+- SBC2 n'a que 4 banques de voix de course (jeux de sons 35..38 = SBC2ND0..3, 48 échantillons : commentateur et
+  bruits 0..33, répliques du rider 34..47). Boss avait déjà la sienne (`bsnd`, remix.py) ; Gray et Snowman prenaient
+  celles de Jin et de Yaggi (Snowman parlait avec la voix de Yaggi).
+- Maintenant : la banque de Yaggi avec ses répliques remplacées par celles de leur banque de Big Air (SBC1ST5 / ST6 :
+  2 cris chacun, des silences ailleurs ; l'échantillon 38, réplique du Free Style, devient un silence). Même
+  disposition pour les deux (chaque échantillon complété au plus long), donc une seule table de positions.
+- Disque : les deux banques (106 secteurs chacune) juste avant les 96 derniers secteurs du générique STAFFE.STR
+  (gardés pour MODE_SEL quand il grandit) ; le générique est raccourci d'environ 1,5 s. Le moteur (modular.apply et
+  disc.js) prend la plus courte des deux tailles du générique.
+- SBC2 : l'appel de `bsnd` (0x80066CB4) va à `vsnd` dans la fonction morte `func_80070E9C` (entrées de fichier MSF +
+  taille, table de positions, code) : Boss comme avant, Gray et Snowman leur banque, à la place de l'entrée du jeu 35.
+- Vérifié dans l'émulateur : la mémoire du SPU contient leurs cris et le commentateur, plus la voix de Yaggi.
+
 ## Compteur en bas à gauche (Free Style)
 
 - Les boules rouges : `func_8006CF34` (FREE) dessine jusqu'à 3 grosses boules puis des petites ; le nombre vient du

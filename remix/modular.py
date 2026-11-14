@@ -237,6 +237,8 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     import snowtod as _sn
     _sk = {(op[1], op[2]) for op in _sn.ops(O)}
     pkg['ops']['riders'] = [op for op in pkg['ops']['riders'] if not (op[0] == 'w' and (op[1], op[2]) in _sk)] + _sn.ops(O)
+    import voices as _vo                   # Gray and Snowman's own voices in the Boarder Cross
+    pkg['ops']['riders'] = _vo.merge(O, pkg['ops']['riders'])
     import crew as _cw
     pkg['ops']['crew'] = _cw.ops(O)
     import rear as _rv
@@ -334,7 +336,8 @@ def apply(disc, pkg, feats, log=lambda m: None):
     md = files.get('/MODE_SEL.BIN')
     if md is not None and -(-len(md) // 2048) > -(-loc['/MODE_SEL.BIN'][1] // 2048):
         n2 = -(-len(md) // 2048); sl, ss = loc['/MOVIE/STAFFE.STR']; sn = ss // 2048; ml = sl + sn - n2
-        recs['/MOVIE/STAFFE.STR'] = (sl, (sn - n2) * 2048); recs['/MODE_SEL.BIN'] = (ml, len(md))
+        recs['/MOVIE/STAFFE.STR'] = (sl, min(recs.get('/MOVIE/STAFFE.STR', (sl, ss))[1], (sn - n2) * 2048))   # (riders' voices may cut it more)
+        recs['/MODE_SEL.BIN'] = (ml, len(md))
         blob = bytes(md) + bytes((-len(md)) % 2048)
         for k in range(n2): mods[ml + k] = (bytes([0, 0, 0x89 if k == n2 - 1 else 0x08, 0]) * 2, blob[k * 2048:(k + 1) * 2048])
         del files['/MODE_SEL.BIN']
