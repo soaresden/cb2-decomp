@@ -47,8 +47,9 @@ LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREE
          'BIG AIR MASTER KEYS SHOWN',
          'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY PLAYABLE',
          'FALLS AS A NUMBER',                   # bit 17 (radar.py: one ball and x13 instead of the row of balls)
-         'UNLOCK EVERYTHING']                   # line i = bit i of the flags word (bit set = off)
-UNLOCK_LINE = len(LINES) - 1           # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
+         'UNLOCK EVERYTHING',                   # line i = bit i of the flags word (bit set = off)
+         'TRICK BOOST (R2)']                    # bit 19 (remix/boost.py, with the mod radar)
+UNLOCK_LINE = 18                                # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
 INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
 VIS = 10                               # lines shown at a time: the list scrolls with the cursor
 WARN = ['R2 AGAIN UNLOCKS ALL RIDERS,', 'COURSES, BOARDS, MIRROR, HARD,', 'TROPHIES. SAVED. NO UNDO!']     # <= 30 letters (box)
@@ -76,7 +77,7 @@ def L(a): return a - (H(a) << 16)
 
 
 # the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
-TABS = [('RACE', [0, 6, 7, 17, 1, 3, 4, 13]),
+TABS = [('RACE', [0, 19, 6, 7, 17, 1, 3, 4, 13]),
         ('RIDERS', [10, 16, 11, 12, 8]),
         ('GAME', [9, 15, 14, 2, 5, 18])]
 UP, RIGHT, DOWN, LEFT, TRI, CIRC, CROSS = 0x1000, 0x2000, 0x4000, 0x8000, 0x10, 0x20, 0x40
@@ -96,7 +97,7 @@ def data():
     put('title', b'REMIX\0'); put('on', b'ON\0'); put('off', b'OFF\0'); put('help', HELP.encode() + b'\0')
     for i, (name, _) in enumerate(TABS): put('t%d' % i, name.encode() + b'\0')
     put('cnts', bytes(len(l) for _, l in TABS))
-    put('tabl', b''.join(bytes(l) + bytes(8 - len(l)) for _, l in TABS))
+    put('tabl', b''.join(bytes(l) + bytes(16 - len(l)) for _, l in TABS))
     for i, t in enumerate(LINES): put('l%d' % i, t.encode() + b'\0')
     for i, t in enumerate(WARN): put('w%d' % i, t.encode() + b'\0')
     put('ltab', b''.join(struct.pack('<I', lab['l%d' % i]) for i in range(len(LINES))))
@@ -133,7 +134,7 @@ def routines(D):
          'po4:', f'andi t5, t2, {DOWN}', 'beqz t5, po5', 'nop', 'addiu t7, t7, 1', 'slt t5, t7, t8', 'bnez t5, po4b', 'nop', 'move t7, zero',
          'po4b:', *sw('zero', 'conf'),
          'po5:', *sw('t6', 'tab'), *sw('t7', 'item'), f'andi t5, t2, {CROSS}', 'beqz t5, pwz', 'nop',
-         'sll t5, t6, 3', 'addu t5, t5, t7', *la('t8', D['tabl']), 'addu t8, t8, t5', 'lbu t5, 0(t8)',
+         'sll t5, t6, 4', 'addu t5, t5, t7', *la('t8', D['tabl']), 'addu t8, t8, t5', 'lbu t5, 0(t8)',
          f'lui t0, {H(FLAGS)}', f'lw t9, {L(FLAGS)}(t0)', f'addiu t8, zero, {UNLOCK_LINE}', 'bne t5, t8, po6', 'nop', 'j ounl', 'nop',
          'po6:', 'addiu t8, zero, 1', 'sllv t8, t8, t5', 'xor t9, t9, t8', f'sw t9, {L(FLAGS)}(t0)',
          'pwz:', f'lui t1, {H(PADV)}'] + [f'sh zero, {L(PADV) + k}(t1)' for k in range(0, 12, 2)] + \
@@ -163,7 +164,7 @@ def routines(D):
           'dt2:', 'jal drw', 'nop', 'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', f'slti t0, s7, {NT}', 'bnez t0, dt1', 'nop',
           'move s7, zero', 'j di1', 'nop']
     S += ['di1:', *lw('t0', 'tab'), *la('t1', D['cnts']), 'addu t1, t1, t0', 'lbu t1, 0(t1)', 'nop', 'slt t2, s7, t1', 'bnez t2, dic', 'nop', 'j dh', 'nop', 'dic:',
-          'sw s7, 0x30(sp)', 'sll t0, t0, 3', 'addu t0, t0, s7', *la('t1', D['tabl']), 'addu t1, t1, t0', 'lbu t3, 0(t1)', 'nop', 'sw t3, 0x24(sp)',
+          'sw s7, 0x30(sp)', 'sll t0, t0, 4', 'addu t0, t0, s7', *la('t1', D['tabl']), 'addu t1, t1, t0', 'lbu t3, 0(t1)', 'nop', 'sw t3, 0x24(sp)',
           'sll t0, t3, 2', *la('t1', D['ltab']), 'addu t1, t1, t0', 'lw t6, 0(t1)',
           'addiu t0, zero, 14', 'mult s7, t0', 'mflo t5', 'addiu t5, t5, -56', 'sw t5, 0x28(sp)', 'addiu t4, zero, -132',
           *la('t7', D['rgbn']), *lw('t0', 'item'), 'bne t0, s7, di2', 'nop', *la('t7', D['rgbs']),

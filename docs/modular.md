@@ -392,3 +392,32 @@ Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D
 - Vérifié dans l'émulateur : têtes et contour en course, option coupée (barre et carrés d'origine en haut), alias
   (tête de Jicchi pour le joueur), zone de VRAM vide sur les 8 pistes. COMB.BIN a une barre du même genre à 2 coureurs
   (`func_8006C884`), pas modifiée.
+
+## Boost de figures (`radar`, v43 : `remix/boost.py`)
+
+À la SSX / Speed Freaks, dans le Boarder Cross de la Compétition. Ligne TRICK BOOST (R2) de l'onglet RACE de l'écran
+REMIX (bit 19 des options, actif par défaut ; le tableau des onglets passe à 16 octets par onglet, RACE en a 9).
+
+- **Jauge** (0..480) : en l'air (rider + 0x3E ≠ 0), +1 par image de jeu (25 / s), +2 tant qu'une figure joue
+  (mouvement + 0x6C4 ≠ 47, le saut simple), +1 tant qu'une touche de figure est tenue (L1 L2 R1 Triangle Rond Carré) ;
+  ces points restent « en attente » (en blanc translucide dans la barre) et ne comptent qu'à une réception propre
+  (10 images sans chute, + 0x740), avec 25 de bonus après 15 images en l'air ; une chute les perd. Exemple mesuré :
+  un saut avec grab de 17 images = 41 + 25.
+- **R2 au sol** (jauge > 0, pas de chute) : le déplacement de l'image est fait 1,5 fois (la moitié ajoutée aux cinq copies
+  de la position : + 0x2C, 0x84, 0x134, 0x4A74, 0xDC), jauge − 4 par image (une jauge pleine = 120 images, 4,8 s).
+  Mesuré : +24 % de distance sur 60 images (la moitié en boost), sans chute.
+- **Barre** sous les temps (x −140, y −54, 80 × 6, entrée 4 de la table d'ordre) : bord clair, fond noir, jauge à la
+  couleur du rider (table par `g_rider`), traits aux quarts ; pleine, elle clignote en blanc ; elle flashe à chaque gain.
+- **Traînée** (entrée 12, avant le HUD) : les 8 dernières positions projetées par la vue (GsWSMATRIX 0x80058E20,
+  translation 0x80058E34 : le rider est l'origine du monde, mêmes unités que la position ; sx = x · H / z, H = caméra
+  + 0xA) ; un ruban translucide (moitié-moitié, DR_TPAGE) qui s'affine en s'éloignant du rider, un cœur plus clair,
+  coupé à z = 60. Avec la caméra de poursuite, il part de la planche vers le bas de l'écran (la trace est entre le
+  rider et la caméra) ; en vue arrière il s'étire derrière. Plus 10 traits de vitesse (POLY_F3) qui partent du rider.
+- Une avance de plus de 4000 en une image (nouvelle course, recommencer) remet tout à zéro.
+
+Où : le code (3,4 Ko) tourne en RAM statique (0x801F3100, au-dessus de l'aide de snowtod ; ses variables en 0x801F3F40,
+sous B_PTR). SBC1 l'installe à chaque démarrage (l'appel de func_8001BFD4 en 0x8005AEC0 passe par `bins`, rangé
+avec l'image dans quatre fonctions mortes de SBC1 : func_8007E4D8, func_80073F20, func_8005EF1C, func_8006FAD8) :
+la 1re épreuve passe toujours avant le Boarder Cross. SBC2 : l'appel de la fonction des chutes (0x8005F33C, une fois
+par image, après la physique) passe par `btr` (fin de la fonction morte de données du radar) : `bmain` si l'image
+est là (mot MAGIC), sinon la fonction d'origine ; `bmain` garde a0..a3 et finit par elle.

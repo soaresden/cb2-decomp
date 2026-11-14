@@ -258,4 +258,5 @@ def ops(disc, aliasv, basev, modesv, fbd, icon_x, icon_y, clut_x, clut_y, pre):
     segs = [[vo(icon_x, icon_y + y), DATA - OVL + PIX + 8 * N * y, 8 * N] for y in range(16)]
     segs += [[vo(clut_x + 16 * (i % 6), clut_y + i // 6), DATA - OVL + CLUTS + 32 * i, 32] for i in range(N)]
     out.append(['fcopy', fbd, FILE, segs])
-    return out
+    import boost                                                 # trick boost (v43): SBC1 installer, SBC2 hook
+    return out + boost.ops(disc)
