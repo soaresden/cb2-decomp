@@ -12,5 +12,5 @@ SITES = {
     'hardmirror': [('/MODE_SEL.BIN', 0x8005b81c), ('/MODE_SEL.BIN', 0x800647dc)],
     'progress': [('/MODE_SEL.BIN', 0x800643b4)],
     'skipq': [('/SBC1.BIN', 0x8005b058), ('/SCES_009.92', 0x800149b4), ('/SCES_009.92', 0x80014984)],
-    'bam': [('/TM.BIN', 0x8005ccc0), ('/TM.BIN', 0x80075758), ('/TM.BIN', 0x80075738), ('/TM.BIN', 0x800953b0), ('/TM.BIN', 0x800953b4), ('/TM.BIN', 0x80094f18), ('/TM.BIN', 0x80094f1c), ('/TM.BIN', 0x80074cfc)],
+    'bam': [('/TM.BIN', 0x8005ccc0), ('/TM.BIN', 0x80075758), ('/TM.BIN', 0x80075738), ('/TM.BIN', 0x800953b0), ('/TM.BIN', 0x800953b4), ('/TM.BIN', 0x80094f18), ('/TM.BIN', 0x80094f1c), ('/TM.BIN', 0x80074cfc), ('/TM.BIN', 0x80075908)],
 }

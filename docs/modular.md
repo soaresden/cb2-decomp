@@ -478,3 +478,12 @@ images dans D_8009B954, 25 par seconde, -1 pendant l'essai d'entraînement ; fin
 la session, `bx` met le compteur à 0x5DC et revient sur le chemin de Continue (0x8005CCE8 : la pause se ferme) : le jeu
 termine la session lui-même comme à la fin du temps (YOUR GRADE IS…, puis le classement TRICK MASTER). Pendant
 l'entraînement, il quitte comme avant. Vérifié dans l'émulateur. (Jusqu'à la v51, Exit rendait le code de fin 5.)
+
+v53 : **Big Air Master, note en direct et NEXT sans nom** (`remix/bamlive.py`, mod `bam`). La note de fin
+(func_8007461C) vaut g = min(max(niveau − 1, 0) / 2, 10), niveau = D_8009CF10 (numéro de la figure à faire) ; Gray se
+débloque à g = 10 (func_800893C4 : 10 − g = 0), donc à partir de la 21e figure. Sous TIME / COOL / UNCOOL : « GRADE g/10 »
+et « GRAY IN n » (figures restantes) ou « GRAY OK! », pour savoir quand Stop suffit pour Gray. La colonne NEXT (`tl`)
+appelle la boîte de figure par `nxw`, qui lève un drapeau ; l'appel de la ligne du nom (0x80075908, func_8006A820)
+passe par `nnm`, qui la saute pendant ce temps : la figure suivante ne montre que ses touches. Les deux lignes sont
+écrites avec la police du jeu (0x8008FFF4) dans l'emplacement de table d'ordre suivant celui de `tl` (qui décale tout ce
+qui est lié dans le sien). Code dans la fonction morte func_8007EDA4 de TM. Vérifié dans l'émulateur.
