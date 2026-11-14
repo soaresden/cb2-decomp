@@ -43,8 +43,9 @@ X0, X1, Y0, DY = -150, 70, -64, 13
 LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'UNLOCK NEWS', 'AIR CONTROL', 'BOARDER CROSS RAMMING', 'WIDESCREEN 16:9',
          'RACE RADAR LINE', 'RACE RANKING',
          # the other mods (remix/toggles.py: bits 8..16, in the order of toggles.BITS)
-         'SPECIAL BOARDS', 'HARD + MIRROR', 'BOSS GRAY SNOWMAN COMP.', 'HIDDEN OUTFITS', 'MAX STATS AND BOARD', 'BIG AIR MASTER KEYS SHOWN',
-         'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY',
+         'SPECIAL BOARDS ALWAYS', 'HARD + MIRROR', 'BOSS GRAY SNOWMAN IN COMP', 'CINDY IRIN HIDDEN OUTFITS', 'MAX STATS (R1) AND BOARD',
+         'BIG AIR MASTER KEYS SHOWN',
+         'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY PLAYABLE',
          'FALLS AS A NUMBER',                   # bit 17 (radar.py: one ball and x13 instead of the row of balls)
          'UNLOCK EVERYTHING']                   # line i = bit i of the flags word (bit set = off)
 UNLOCK_LINE = len(LINES) - 1           # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
