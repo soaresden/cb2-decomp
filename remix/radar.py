@@ -17,8 +17,9 @@
 # crew alias), the player with a yellow outline that blinks like the original square, and a DR_TPAGE for the heads'
 # page (the HUD text in the same entries changes it); then back to 0x8006D540 with s2 (primitives) and s6 (next entry)
 # as the loop leaves them. Code and data in two dead functions of SBC2 (no call, jump or pointer to them).
-# Falls (v35): the row of balls of the bottom left (func_80078E58 from 0x8006D12C, x -0x98, y 0x68) went under the
-# line; with the line on, `rfall` gives it y -0x7C: at the top left, where the original bar was (above TIME).
+# Falls (v35): the row of balls of the bottom left (func_80078E58 from 0x8006D12C, x -0x98, y 0x68: tens as big balls,
+# units as small ones, of the rider's + 0xCDE) went under the line; with the line on, `rfall` gives it y -0x7C: at the
+# top left, where the original bar was (above TIME). v36: with FALLS AS A NUMBER (options, bit 17), one ball and "x13".
 # Ranking panel (bit 128 of the options off): before that, `rank` draws on the right three rows (the place ahead of the
 # player, the player's, the one behind), each with the place in SBC2's HUD font (gold, silver, bronze shimmering for
 # the first three), the head and the gap to the player in seconds, timed at the course's segments (see docs/modular.md).
@@ -40,7 +41,9 @@ N = 10                                      # heads, in the order of crew.STRIP_
 PIX, CLUTS, RECT1, RECT2, POSS, PCT, COLS = 0, 1280, 1600, 1608, 1616, 1652, 1660   # data block (end 1684)
 LAST, PIDX, PPL, PRAC, RIDX = 1684, 1688, 1692, 1696, 1700     # work words (LAST = 0 in the file, the others not)
 FALL_SITE = 0x8006D114                     # addiu a1, zero, -0x98 / addiu a2, zero, 0x68 (x, y of the falls' balls)
-FALL_CODE = DATA + 0x700                    # `rfall`, after the data block and its work words
+FALL_STR = DATA + 0x6F0                     # "x13" (rfall), after the data block and its work words
+FALL_CODE = DATA + 0x700                    # `rfall`
+FALL_NUM_BIT = 17                           # options: FALLS AS A NUMBER (bit set = off)
 RINGS = (0x8006C488, 0x80074F48)            # dead functions of SBC2 used as RAM: gates of racers 0..3 and 4..7
 PX, PY, ROW = 66, -24, 18                   # ranking panel: places, heads, gaps (right side, mid height)
 # text colours (the font is white, 0x80 = as is): gold, silver, bronze, others; value = base + step * t, t = 0..15..0
@@ -212,6 +215,29 @@ def code(aliasv, basev, modesv):
     return c, l
 
 
+def fall_code():
+    """rfall (jal from FALL_SITE, in func_8006D0C0, before func_80078E58(t0, x, y, count a3, phase)): x -0x98; y 0x68 with
+    the line off, -0x7C (top left) with it on; with FALLS AS A NUMBER and count > 0: count = 1 (one ball) and "x<count>"
+    in SBC2's HUD font after it. The caller's mult is pending (its mfhi after the call): HI and LO are kept."""
+    H_ = lambda a: (a + 0x8000) >> 16
+    L_ = lambda a: a - (H_(a) << 16)
+    return ['rfall:', 'addiu sp, sp, -0x40', 'sw ra, 0x38(sp)', 'sw t0, 0x34(sp)', 'mfhi t1', 'sw t1, 0x30(sp)', 'mflo t1', 'sw t1, 0x2c(sp)',
+            f'lui t9, {H_(OPT_FLAGS)}', f'lw t9, {L_(OPT_FLAGS)}(t9)', 'addiu a1, zero, -0x98', f'andi t8, t9, {LINE_BIT}',
+            'bnez t8, rf1', 'addiu a2, zero, 0x68', 'addiu a2, zero, -0x7c',
+            'rf1:', f'srl t8, t9, {FALL_NUM_BIT}', 'andi t8, t8, 1', 'bnez t8, rf9', 'nop', 'blez a3, rf9', 'nop',
+            'sw a2, 0x28(sp)',
+            # "x" + the count's digits, at FALL_STR
+            f'lui t1, {H_(FALL_STR + 8)}', f'addiu t1, t1, {L_(FALL_STR + 8)}', 'sb zero, 0(t1)', 'move t2, a3', 'addiu t3, zero, 10',
+            'rd1:', 'divu t2, t3', 'mfhi t4', 'mflo t2', 'addiu t4, t4, 0x30', 'addiu t1, t1, -1', 'bnez t2, rd1', 'sb t4, 0(t1)',
+            'addiu t1, t1, -1', 'addiu t4, zero, 0x78', 'sb t4, 0(t1)', 'sw t1, 0x24(sp)',
+            f'lui a0, {H_(FONT)}', f'lw a0, {L_(FONT)}(a0)', 'addiu a1, zero, 0x80', 'addiu a2, zero, 0x80', f'jal {TEXT_RGB}', 'addiu a3, zero, 0x80',
+            'lw t0, 0x34(sp)', 'lw a2, 0x24(sp)', 'lw a0, 4(t0)', f'lui a1, {H_(FONT)}', f'lw a1, {L_(FONT)}(a1)', 'addiu a0, a0, 0xc',
+            'lw t1, 0x28(sp)', 'addiu a3, zero, -0x86', 'addiu t1, t1, 8', 'sw t1, 0x10(sp)', f'jal {TEXT}', 'sw zero, 0x14(sp)',
+            'lw a2, 0x28(sp)', 'addiu a1, zero, -0x98', 'addiu a3, zero, 1',
+            'rf9:', 'lw t1, 0x30(sp)', 'nop', 'mthi t1', 'lw t1, 0x2c(sp)', 'nop', 'mtlo t1', 'lw t0, 0x34(sp)', 'lw ra, 0x38(sp)',
+            'nop', 'jr ra', 'addiu sp, sp, 0x40']
+
+
 def ops(disc, aliasv, basev, modesv, fbd, icon_x, icon_y, clut_x, clut_y, pre):
     """pre: the crew operations that make the heads in the FBD ('face', 'icons'), applied again before the copy"""
     d = disc.read_file(FILE); w = lambda a: struct.unpack_from('<I', d, a - OVL)[0]
@@ -222,10 +248,9 @@ def ops(disc, aliasv, basev, modesv, fbd, icon_x, icon_y, clut_x, clut_y, pre):
     assert w(COLOR_SITE) == 0x97A90022 and w(COLOR_SITE + 4) == 0x240200FF
     P = [(a, x) for a, x in c] + [(HOOK, J(2, l['rad'])), (COLOR_SITE, 0x8FA2007C), (COLOR_SITE + 4, 0x97A90022)]
     dw = data_words(); P += [(DATA + RECT1 + i, struct.unpack_from('<I', dw, i)[0]) for i in range(0, len(dw), 4)]
-    # the falls' balls: y from the line's switch (rfall)
-    assert w(FALL_SITE) == 0x2405FF68 and w(FALL_SITE + 4) == 0x24060068 and DATA + LAST + 24 <= FALL_CODE
-    cf, lf = asm(['rfall:', 'lui a2, 0x8005', f'lbu a2, {OPT_FLAGS & 0xffff:#x}(a2)', 'addiu a1, zero, -0x98', f'andi a2, a2, {LINE_BIT}',
-                  'beqz a2, rf1', 'addiu a2, zero, 0x68', 'jr ra', 'nop', 'rf1:', 'jr ra', 'addiu a2, zero, -0x7c'], FALL_CODE)
+    # the falls' balls: y from the line's switch, one ball and "x13" with FALLS AS A NUMBER (rfall)
+    assert w(FALL_SITE) == 0x2405FF68 and w(FALL_SITE + 4) == 0x24060068 and DATA + LAST + 24 <= FALL_STR
+    cf, lf = asm(fall_code(), FALL_CODE)
     assert cf[-1][0] < DATA_END
     P += cf + [(FALL_SITE, J(3, lf['rfall'])), (FALL_SITE + 4, 0)]
     out = list(pre) + [['w', FILE, a - OVL, w(a), x] for a, x in P]

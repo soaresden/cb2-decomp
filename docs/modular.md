@@ -265,7 +265,7 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
 - Les interrupteurs sont des bits de 0x80057438 (bit à 1 = coupé) : 1 vue arrière, 2 notes du half-pipe en direct,
   4 annonces de déblocage, 8 figures en l'air (`air`), 16 chocs en Boarder Cross (`ramming`), 32 écran large (à 1 =
   actif : coupé par défaut), 64 ligne du radar (`radar`), 128 classement (`radar`), puis les autres mods (section
-  suivante) et UNLOCK EVERYTHING (bit 17) : le mot 0x80057438 entier. Cet octet fait partie
+  suivante) et UNLOCK EVERYTHING (bit 18 depuis la v36 ; 17 = FALLS AS A NUMBER) : le mot 0x80057438 entier. Cet octet fait partie
   du bloc 0x80057434..0x8005744D copié dans la sauvegarde mais n'est jamais lu par le jeu (docs/progression.md) : le
   réglage suit la carte mémoire. À 0, tout est actif comme avant.
 - `rear`, `hplive`, `news` lisent leur bit. `air` et `ramming` sont coupés là où leur code vit, dans l'exe (toujours
@@ -299,7 +299,7 @@ Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées)
 - Le panneau REMIX OPTIONS a 18 lignes (10 visibles, la liste défile avec le curseur) ; ligne i = bit i du mot
   0x80057438 (32 bits : 0x80057438..0x8005743B sont sauvegardés et jamais lus par le jeu). Bits 0..7 : vue arrière,
   notes du half-pipe, annonces, figures en l'air, chocs, 16:9, ligne du radar, classement ; 8..16 : `special`,
-  `hardmirror`, `riders`, `outfits`, `max`, `bam`, `progress`, `skipq`, `crew` ; 17 : UNLOCK EVERYTHING (fait).
+  `hardmirror`, `riders`, `outfits`, `max`, `bam`, `progress`, `skipq`, `crew` ; 17 : FALLS AS A NUMBER (v36) ; 18 : UNLOCK EVERYTHING (fait).
 - Les « sites » de chaque mod (`remix/toggle_sites.py`, 232 mots) : les mots du jeu qu'il change et que le jeu atteint
   (instructions remplacées, données), pas son code dans des fonctions mortes (que plus rien n'atteint une fois les
   sites remis). Trouvés une fois depuis le désassemblage (fonction morte = aucun appel, saut ni pointeur dans aucun
@@ -334,6 +334,10 @@ Code : `remix/radar.py` (SBC2.BIN, deux fonctions mortes : code dans `func_8007D
   `rfall` (dans `func_8007BEB8`, après les données) leur donne y -0x7C : en haut à gauche, à la place de la barre
   d'origine, au-dessus de TIME. Ligne coupée : à leur place d'origine. Trouvé en neutralisant une à une, en mémoire,
   les fonctions qui utilisent ces modèles.
+- Les boules comptent le champ rider + 0xCDE (`func_8006D0C0` le passe en a3) : une grosse boule par dizaine, une
+  petite par unité. v36 : option FALLS AS A NUMBER (bit 17 des options ; UNLOCK EVERYTHING passe au bit 18) : une seule
+  boule et « x13 » dans la police du HUD de SBC2 (`func_8008AFC8`). `rfall` garde HI et LO (le `mult` de l'appelant est
+  en cours pendant l'appel : `mfhi` / `mthi`, `mflo` / `mtlo`).
 
 - La barre de progression du Boarder Cross de la Compétition (en haut à gauche, S … F) est dessinée par
   `func_8006D2A4` de SBC2 (appelée en 0x8005F56C avec le tableau des coureurs D_8009146C, 8 × 0x1288 octets) :

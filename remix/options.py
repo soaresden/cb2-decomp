@@ -37,6 +37,7 @@ LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'UNLOCK NEWS', 'AIR CONTR
          # the other mods (remix/toggles.py: bits 8..16, in the order of toggles.BITS)
          'SPECIAL BOARDS', 'HARD + MIRROR', 'BOSS GRAY SNOWMAN COMP.', 'HIDDEN OUTFITS', 'MAX STATS AND BOARD', 'BIG AIR MASTER',
          'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY',
+         'FALLS AS A NUMBER',                   # bit 17 (radar.py: one ball and x13 instead of the row of balls)
          'UNLOCK EVERYTHING']                   # line i = bit i of the flags word (bit set = off)
 UNLOCK_LINE = len(LINES) - 1           # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
 INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
