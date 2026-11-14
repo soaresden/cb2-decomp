@@ -667,3 +667,14 @@ le remet tant que la page est ouverte (ligne 14 : PROGRESS PAGE (MENU)). **Ongle
 entre le bord gauche des lignes et la colonne ON / OFF (table `tabx`) ; COMP réordonné (la course : vue arrière, boost,
 figures en l'air, classement, radar, chutes, chocs « KNOCK RIDERS DOWN » ; puis la coupe : RETRY, qualifications,
 Hard + Mirror, Boss / Gray / Snowman).
+
+v70 : **sortie du Free Style réparée** : depuis la v66, quitter une course de Free Style bloquait le chargement (tous
+les riders) : le boost rangeait le pointeur du rider en 0x801F3FFC = `toggles.NEXTA` (l'appel d'origine que le bloc
+des interrupteurs rappelle au chargement de l'overlay suivant) ; il est maintenant en 0x801F3FF8. Vérifié : Exit avec
+Kelly → retour au titre. **Couleur du boost** : la table suit la veste enregistrée (l'écran WEAR les montre dans
+l'ordre 0, 2, 1 : vestes 1 et 2 inversées jusqu'ici, la veste camouflage de Jin donnait du jaune) et les alias
+(Jicchi, Nick, Kelly : `crew.ALIASV`) ont leurs couleurs (Kelly : bleu glacier). **Boost plus franc** : vitesse + 1/8
+par image (avant 1/32) jusqu'au plafond 340 (avant 310) : 103 → 169 km/h en une seconde. **Barre du Free Style**
+sous les points de TOTAL TRICK (elle était cachée derrière l'étiquette). **Lettres du Board Park** : M à la
+séparation des pistes devant le premier sapin de l'îlot, I sur le toit du camion, X juste avant le saut final
+(section 222) sur la droite.

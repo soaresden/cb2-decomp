@@ -15,7 +15,7 @@
 #     + 1 while a trick button is held (L1 L2 R1 triangle circle square); a stumble (+ 0x740) loses it;
 #   - landing: LAND frames later, without a stumble, meter += pending (+ BONUS after an air of 15 frames or more);
 #   - R2 held on the ground, meter > 0, no stumble: the racer's velocity (+ 0x48F0, three words, about 400 x the move
-#     of a frame) grows by 1/32 each frame while the move is under CAP (normal top speed ~ 230; v43..v47 added half
+#     of a frame) grows by 1/8 each frame (v70; before 1/32) while the move is under CAP (normal top speed ~ 230; v43..v47 added half
 #     the move to the position afterwards, which the camera showed as jerks), meter - COST, the trail shown TRAILF
 #     more frames;
 #   - a move of more than 4000 (a new race, a retry) clears everything.
@@ -48,7 +48,7 @@ SAVE_SITE = 0x8008262C        # results of a Boarder Cross: "beq v1 (round), 2" 
 EXIT_SITE, EXIT_BACK, BX_AGAIN = 0x8005B084, 0x8005B08C, 0x8005B1A0   # sbc2_entry: exit code -> s0; reload the BX
 RIDERS, G_RIDER, PAD = 0x8009B9A8, 0x80057408, 0x8004FBF0
 WS, PRIMS = 0x80058E20, 0x80058E0C
-VEL, CAP = 0x48F0, 310                     # the racer's velocity (about 400 x its move per frame); boost cap (move per frame)
+VEL, CAP = 0x48F0, 340                     # the racer's velocity (about 400 x its move per frame); boost cap (move per frame)
 MAX, COST, BONUS, LAND, TRAILF = 480, 4, 25, 10, 10
 NH, ZMIN = 8, 60
 TRAIL_ENT, BAR_ENT = 12, 4
@@ -62,8 +62,9 @@ _C = dict(pink=(255, 105, 180), gold=(255, 200, 30), sky=(120, 195, 245), orange
           camo=(80, 140, 60), red=(230, 40, 60), peri=(140, 140, 250), green=(60, 190, 70), steel=(150, 155, 175),
           cyan=(70, 200, 245), brown=(170, 115, 60), teal=(90, 210, 200), navy=(50, 90, 230), blue=(40, 120, 220),
           silver=(205, 210, 225), ice=(130, 175, 240))
-JACKETS = [['pink', 'gold', 'sky'], ['orange', 'yellow', 'camo'], ['red', 'peri', 'green', 'steel', 'cyan', 'brown'],
-           ['teal', 'pink', 'gold', 'navy', 'blue', 'pink'],
+# v70: by the stored jacket (g_jacket): the WEAR screen shows them in the order 0, 2, 1 (checked: Jin's camo = 1)
+JACKETS = [['pink', 'sky', 'gold'], ['orange', 'camo', 'yellow'], ['red', 'green', 'peri', 'steel', 'cyan', 'brown'],
+           ['teal', 'gold', 'pink', 'navy', 'blue', 'pink'],
            ['gold', 'steel'], ['silver'], ['red'],                     # g_rider 4..6: Boss (v57: black outfit 1), Gray, Snowman
            ['gold'], ['silver'], ['red'],                              # 7..9 (not used)
            ['yellow'], ['blue'], ['ice', 'peri', 'green', 'steel', 'steel', 'steel']]   # Jicchi, Nick, Kelly
@@ -98,7 +99,8 @@ def xy(x, y): return ((y & 0xffff) << 16) | (x & 0xffff)
 SBC2_P = dict(riders=RIDERS, vel=VEL, tail=SBC2_TAIL, jtab=JTAB, jpal=JPAL, bit=BOOST_BIT)
 FREE_SITE, FREE_TAIL = 0x8005EFAC, 0x8006D274    # jal func_8006D274 in FREE's race loop (func_8005EEB0, s0 = the racer)
 FREE_ENTRY, FREE_ENTRY_TAIL = 0x8005AED0, 0x8001BFD4   # free_entry's call of func_8001BFD4
-FREE_SLOT = 0x801F3FFC                     # the racer pointer, stored by the FREE hook (`bft`)
+FREE_SLOT = 0x801F3FF8                     # the racer pointer, stored by the FREE hook (`bft`) (v70: was 0x801F3FFC = toggles.NEXTA:
+                                           # the exit of the Free Style crashed in the loading)
 FREE_CAVES = [(0x80070A40, 0x80070E4C), (0x8008F534, 0x8008F878), (0x8007F378, 0x8007F528), (0x80094864, 0x800949D4),
               (0x8006CD10, 0x8006CE78), (0x80072D1C, 0x80072E80), (0x80094C40, 0x80094D08), (0x800617C8, 0x80061868),
               (0x8006A8D0, 0x8006A948)]    # dead functions of FREE.BIN (as BP's: the same engine)
@@ -106,12 +108,13 @@ FREE_BFT = (0x80093A44, 0x80093B50)        # `bft` and the jacket tables
 FREE_BIT = 21
 FREE_JPAL = FREE_BFT[0] + 0x40; FREE_JTAB = FREE_JPAL + 4 * len(JPAL_WORDS)     # after bft (in FREE: no room left at BASE)
 assert FREE_JTAB + len(JTAB_BYTES) <= FREE_BFT[1]
-FREE_P = dict(riders=FREE_SLOT, vel=VEL - 8, tail=FREE_TAIL, jtab=FREE_JTAB, jpal=FREE_JPAL, bit=FREE_BIT)
+FREE_P = dict(riders=FREE_SLOT, vel=VEL - 8, tail=FREE_TAIL, jtab=FREE_JTAB, jpal=FREE_JPAL, bit=FREE_BIT, bx=-140, by=-28)   # v70: bar under TOTAL TRICK's points
 
 
 def main_code(tables, P=None):
     P = P or SBC2_P
     RIDERS, VEL, SBC2_TAIL, JTAB, JPAL, BOOST_BIT = P['riders'], P['vel'], P['tail'], P['jtab'] or tables['jtab'], P['jpal'] or tables['jpal'], P['bit']
+    BX, BY = P.get('bx', globals()['BX']), P.get('by', globals()['BY'])
     V = lambda o: f'{o}(s1)'
     S = ['bsnap:', f'lui t0, {H(SNAPR)}', f'lw t1, {L(SNAPR)}(t0)', 'lui t2, 0x8005', 'bnez t1, bsn9', 'lw t3, 0x7420(t2)',
          'addiu t4, zero, 1', 'bne t3, t4, bsn9', 'lw t3, 0x745c(t2)', 'nop', 'bne t3, t4, bsn9', 'lw t3, 0x7458(t2)', 'nop',
@@ -164,13 +167,13 @@ def main_code(tables, P=None):
           'bg3:', 'andi t5, t2, 2', 'beqz t5, bhist', 'nop', 'bnez t1, bhist', 'nop',
           f'lw t4, {V(METER)}', 'nop', 'blez t4, bhist', 'nop', f'addiu t4, t4, -{COST}', 'bgez t4, bb1', 'nop', 'move t4, zero',
           'bb1:', f'sw t4, {V(METER)}', f'addiu t5, zero, {TRAILF + 1}', f'sw t5, {V(BFR)}',
-          # speed of this frame ~ max(|d|) + (the two others) / 4; below CAP, the velocity (racer + VEL) grows by 1/32
+          # speed of this frame ~ max(|d|) + (the two others) / 4; below CAP, the velocity (racer + VEL) grows by 1/8 (v70)
           'sra t5, s5, 31', 'xor t6, s5, t5', 'subu t6, t6, t5', 'sra t5, s6, 31', 'xor t7, s6, t5', 'subu t7, t7, t5',
           'sra t5, s7, 31', 'xor t8, s7, t5', 'subu t8, t8, t5', 'addu t9, t6, t7', 'addu t9, t9, t8', 'move t5, t6',
           'slt at, t5, t7', 'beqz at, bv1', 'nop', 'move t5, t7', 'bv1:', 'slt at, t5, t8', 'beqz at, bv2', 'nop', 'move t5, t8',
           'bv2:', 'subu t9, t9, t5', 'sra t9, t9, 2', 'addu t5, t5, t9', f'slti at, t5, {CAP}', 'beqz at, bhist', 'nop',
-          f'lw t6, {VEL}(s0)', f'lw t7, {VEL + 4}(s0)', f'lw t8, {VEL + 8}(s0)', 'sra t5, t6, 5', 'addu t6, t6, t5',
-          'sra t5, t7, 5', 'addu t7, t7, t5', 'sra t5, t8, 5', 'addu t8, t8, t5',
+          f'lw t6, {VEL}(s0)', f'lw t7, {VEL + 4}(s0)', f'lw t8, {VEL + 8}(s0)', 'sra t5, t6, 3', 'addu t6, t6, t5',
+          'sra t5, t7, 3', 'addu t7, t7, t5', 'sra t5, t8, 3', 'addu t8, t8, t5',
           f'sw t6, {VEL}(s0)', f'sw t7, {VEL + 4}(s0)', f'sw t8, {VEL + 8}(s0)']
     # history: shift, the position now at HIST
     S += ['bhist:', *la('t0', VARS + HIST + 12 * (NH - 1)), *la('t1', VARS + HIST),
@@ -284,7 +287,8 @@ def main_code(tables, P=None):
           'jal btp', 'nop', 'lw ra, 0x44(sp)', 'nop', 'jr ra', 'nop']
     # bcol -> v0: the colour of the jacket worn (g_rider, g_jacket 0..5), tables in SBC2 (the boost is in the competition
     # only, where Jicchi / Nick / Kelly are not playable: their rows are for later)
-    S += ['bcol:', 'lui t1, 0x8005', 'lh v0, 0x7408(t1)', 'lh t2, 0x740c(t1)', 'nop',
+    S += ['bcol:', 'lui t1, 0x8005', 'lh v0, 0x7408(t1)', 'lh t2, 0x740c(t1)', f'lui t3, {H(ALIAS)}', f'lw t3, {L(ALIAS)}(t3)', 'nop',
+          'beqz t3, bco1', 'nop', 'addiu v0, t3, 9', 'bco1:',
           'sll t1, v0, 1', 'addu t1, t1, v0', 'sll t1, t1, 1', 'addu t1, t1, t2', *la('t2', JTAB), 'addu t1, t1, t2',
           'lbu t1, 0(t1)', *la('t2', JPAL), 'sll t1, t1, 2', 'addu t1, t1, t2', 'lw v0, 0(t1)', 'jr ra', 'nop']
     return S
