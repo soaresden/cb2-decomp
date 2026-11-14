@@ -25,8 +25,9 @@ CALL, ENTRY = 0x8001228C, 0x8005AEAC
 FLUSH = 0x8003CB2C
 FLAGS = 0x80057438
 SRC, SRC_END = 0x80083C00, 0x800846A8            # the block in MODE_SEL (end of its 83rd sector)
-FILE_END = SRC_END - OVL                         # MODE_SEL padded to 83 sectors first (same addresses with or without the progress page)
-HEAP_WORD, HEAP = 0x800100B4, 0x800846A8
+SCREEN = (SRC_END, SRC_END + 0x800)             # one more sector: the REMIX screen's code and data (remix/options.py)
+FILE_END = SCREEN[1] - OVL                       # MODE_SEL padded to 84 sectors (same addresses with or without the progress page)
+HEAP_WORD, HEAP = 0x800100B4, SCREEN[1]
 BITS = {'special': 8, 'hardmirror': 9, 'riders': 10, 'outfits': 11, 'max': 12, 'bam': 13, 'progress': 14, 'skipq': 15, 'crew': 16}
 MAX_BIT = BITS['max']
 

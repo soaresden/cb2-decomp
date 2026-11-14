@@ -1,21 +1,27 @@
-# In-game options (mod `options`, v26..v28): on the mode select screen, hold R1 to show the REMIX OPTIONS panel; while R1
-# is held, L1 moves the cursor (the list of 18 lines scrolls, 10 shown) and R2 switches the line on or off: rear view
-# (mod rear), live half-pipe marks (hplive), unlock announcements (news), air control (air), Boarder Cross ramming
-# (ramming), widescreen, race radar line and ranking (radar), every other mod (remix/toggles.py), UNLOCK EVERYTHING.
+# In-game REMIX screen (mod `options`, v26..v37): on the mode select screen, a REMIX entry under the OPTIONS sign (Down
+# from OPTIONS, Up back, X opens it): a black screen in the game's style, title REMIX, three tabs (TABS: RACE, RIDERS,
+# GAME; Left / Right), Up / Down picks a line, X switches it (UNLOCK EVERYTHING: a warning, then X again), Triangle or
+# Circle goes back. (v26..v36: a panel shown while R1 was held.)
 #
 # The switches are bits of the word 0x80057438 (bit set = off; line i = bit i), in the progress block that
 # the game saves on the memory card but never reads (see docs/progression.md; INIT zeroes it): they follow the save.
-#   - radar tests bit 64 (the line) and bit 128 (the ranking panel);
+#   - radar tests bit 64 (the line), bit 128 (the ranking panel), bit 17 (falls as a number);
 #   - rear, hplive, news test their bit themselves;
 #   - air and ramming are switched where their code lives in the exe (always in memory): every frame of the mode
 #     select screen, the words of PATCH get their "on" or "off" value (air: three branches of the exe routines md / ax /
 #     rm made unconditional, as if no d-pad, no charge, no remap; ramming: the entry of kc becomes a jump to the game's
 #     own collision response). A word is only written when it holds one of its two values (mod absent: untouched);
 #     after a write, FlushCache.
-# MODE_SEL: the TV function (func_80064200, every frame, s4 = its OT table, s1 = frame buffer index) calls
-# func_80028BDC (GetClut) at 0x800643E4: that call goes through opt (dead functions of MODE_SEL), which reads the pad
-# (0x800832BA), applies the switches, and draws the panel with the game's text routine (func_80012CA0, menu font)
-# into a private primitive buffer (0x801F8000 + 0x2000 per frame buffer: about 400 letters of 20 bytes; 0x801F0000..0x801FF000 is free on that screen), on a dark box (TILE).
+# MODE_SEL:
+#   - input: the mode select's pad routine (func_8005CCE4, called at 0x8005CB94) goes through `pw`: the game's pad words
+#     (0x800832BA..0x800832C5), then, while the mode select screen is drawn (`alive`, set by opt every frame), the REMIX
+#     entry (game cursor 0x80070B2C on OPTIONS = 5, Down) and the screen; while they have the input, the game's pad
+#     words are cleared (its cursor stays on OPTIONS, the game's own OPTIONS screen is not affected).
+#   - drawing: the TV function (func_80064200, every frame, s4 = its OT table, s1 = frame buffer index) calls
+#     func_80028BDC (GetClut) at 0x800643E4: that call goes through opt, which applies the switches, installs the
+#     switches' block (toggles.py), and draws the REMIX label or the screen with the game's text routine
+#     (func_80012CA0, menu font) into a private primitive buffer (0x801F8000 + 0x2000 per frame buffer), on a black TILE.
+#   - code and data: MODE_SEL's 84th sector (toggles.SCREEN) and dead functions of MODE_SEL and the exe (CAVES).
 import struct
 from asm import asm
 
@@ -30,7 +36,9 @@ CAVES = [(0x800654A8, 0x8006562C), (0x8006F680, 0x8006F71C), (0x8006F7C4, 0x8006
          (0x80031180, 0x8003120C), (0x8003BD98, 0x8003BE10), (0x80040AA4, 0x80040B0C),     # exe: dead functions kept for this mod
          (0x8001829C, 0x80018320), (0x8003EAC4, 0x8003EB30), (0x800123C8, 0x80012448),   # (0x8003EB30.. : snowtod)     # (see crew.CAVES)
          (0x80083844, 0x80083C00)]    # end of MODE_SEL's 82nd sector (after the progress page; padded when it is absent)
-DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data
+DATA = (0x8005C8B0, 0x8005C968)        # after crewrank's data (code since v37)
+import toggles
+SCR_DATA = toggles.SCREEN[0]           # the screen's data: start of MODE_SEL's 84th sector
 X0, X1, Y0, DY = -150, 70, -64, 13
 LINES = ['REAR VIEW (CIRCLE)', 'LIVE HALF-PIPE MARKS', 'UNLOCK NEWS', 'AIR CONTROL', 'BOARDER CROSS RAMMING', 'WIDESCREEN 16:9',
          'RACE RADAR LINE', 'RACE RANKING',
@@ -66,61 +74,113 @@ def H(a): return (a + 0x8000) >> 16
 def L(a): return a - (H(a) << 16)
 
 
+# the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
+TABS = [('RACE', [0, 6, 7, 17, 1, 3, 4, 13]),
+        ('RIDERS', [10, 16, 11, 12, 8]),
+        ('GAME', [9, 15, 14, 2, 5, 18])]
+UP, RIGHT, DOWN, LEFT, TRI, CIRC, CROSS = 0x1000, 0x2000, 0x4000, 0x8000, 0x10, 0x20, 0x40
+PADV = 0x800832BA                      # MODE_SEL's pad words (held, ...: 0x800832BA..0x800832C5), set by func_8005CCE4
+PAD_CALL, PAD_FN = 0x8005CB94, 0x8005CCE4
+CURSOR, OPTIONS_ITEM = 0x80070B2C, 5   # the mode select cursor (COMPETITION 0 .. BOARD PARK 4, OPTIONS 5)
+LABEL_XY = (78, 92)                    # "REMIX" under the OPTIONS sign
+HELP = 'X ON/OFF   L R TAB   TRIANGLE BACK'
+
+
 def data():
     d = bytearray(); lab = {}
-    def put(n, b): lab[n] = DATA[0] + len(d); d.extend(b); d.extend(bytes((-len(d)) % 4))
-    put('prev', bytes(4)); put('cur', bytes(4)); put('conf', bytes(4))
-    put('rgbt', bytes([255, 170, 70, 32])); put('rgbn', bytes([150, 140, 100, 32])); put('rgbon', bytes([90, 230, 120, 32])); put('rgboff', bytes([110, 110, 120, 32]))
-    put('title', TITLE.encode() + b'\0'); put('on', b'ON\0'); put('off', b'OFF\0')
-    assert DATA[0] + len(d) <= DATA[1], hex(DATA[0] + len(d))
+    def put(n, b): lab[n] = SCR_DATA + len(d); d.extend(b); d.extend(bytes((-len(d)) % 4))
+    for n in ('prev', 'sel', 'open', 'tab', 'item', 'conf', 'alive'): put(n, bytes(4))
+    put('rgbt', bytes([255, 200, 40, 32])); put('rgbn', bytes([90, 100, 120, 32])); put('rgbs', bytes([90, 210, 255, 32]))
+    put('rgbon', bytes([90, 230, 120, 32])); put('rgboff', bytes([110, 110, 120, 32])); put('rgbh', bytes([150, 150, 150, 32]))
+    put('title', b'REMIX\0'); put('on', b'ON\0'); put('off', b'OFF\0'); put('help', HELP.encode() + b'\0')
+    for i, (name, _) in enumerate(TABS): put('t%d' % i, name.encode() + b'\0')
+    put('cnts', bytes(len(l) for _, l in TABS))
+    put('tabl', b''.join(bytes(l) + bytes(8 - len(l)) for _, l in TABS))
+    for i, t in enumerate(LINES): put('l%d' % i, t.encode() + b'\0')
+    for i, t in enumerate(WARN): put('w%d' % i, t.encode() + b'\0')
+    put('ltab', b''.join(struct.pack('<I', lab['l%d' % i]) for i in range(len(LINES))))
+    put('ttab', b''.join(struct.pack('<I', lab['t%d' % i]) for i in range(len(TABS))))
+    put('ptab', b''.join(struct.pack('<4I', a, on, off, bit) for a, on, off, bit in PATCH))
     return bytes(d), lab
 
 
 def routines(D):
     la = lambda r, a: [f'lui {r}, {H(a)}', f'addiu {r}, {r}, {L(a)}']
-    n = len(LINES)
-    S = ['opt:', 'addiu sp, sp, -0x50', 'sw ra, 0x4c(sp)', 'sw s5, 0x40(sp)', 'sw s6, 0x44(sp)', 'sw s7, 0x48(sp)',
-         f'jal {HOOK_FN}', 'nop', 'sw v0, 0x34(sp)', 'jal oap', 'nop', 'jal tins', 'nop',
-         f'lui t0, {H(PAD)}', f'lhu t1, {L(PAD)}(t0)', f'lui t2, {H(D["prev"])}', f'lw t3, {L(D["prev"])}(t2)', f'sw t1, {L(D["prev"])}(t2)',
-         f'andi t0, t1, {R1}', 'bnez t0, op1', 'nop', 'j out', 'nop',
-         'op1:', 'nor t4, t3, zero', 'and t4, t4, t1', f'lw t5, {L(D["cur"])}(t2)', f'andi t0, t4, {L1}', 'beqz t0, op2', 'addiu t5, t5, 1',
-         f'slti t0, t5, {n}', 'bnez t0, op3', 'nop', 'move t5, zero', 'op3:', f'sw t5, {L(D["cur"])}(t2)', f'sw zero, {L(D["conf"])}(t2)',
-         'op2:', f'lw t5, {L(D["cur"])}(t2)', f'lui t0, {H(FLAGS)}', f'lw t6, {L(FLAGS)}(t0)', f'andi t7, t4, {R2}', 'beqz t7, op4', 'addiu t7, zero, 1',
-         f'addiu t8, zero, {UNLOCK_LINE}', 'bne t5, t8, op5', 'nop', 'j ounl', 'nop', 'op5:',
-         'sllv t7, t7, t5', 'xor t6, t6, t7', f'sw t6, {L(FLAGS)}(t0)',
-         'op4:', 'sw t6, 0x38(sp)', 'sw t5, 0x24(sp)', 'j odr', 'nop']
-    # odr: the panel
-    S += ['odr:', 'sll v1, s1, 2', 'addu v1, v1, s1', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw s5, 4(v1)', 'sll v0, s1, 13',
-          f'lui s6, {H(PRIMS)}', 'addu s6, s6, v0', f'addiu s6, s6, {L(PRIMS)}',
-          f'addiu t4, zero, {X0}', f'addiu t5, zero, {Y0}', *la('t6', D['title']), *la('t7', D['rgbt']), 'jal drw', 'nop',
-          'lw s7, 0x24(sp)', 'nop', f'addiu s7, s7, -{VIS // 2}', 'bgez s7, ol0', 'nop', 'move s7, zero',
-          'ol0:', f'slti t0, s7, {len(LINES) - VIS + 1}', 'bnez t0, ol2', 'nop', f'addiu s7, zero, {len(LINES) - VIS}',
-          'ol2:', 'sw s7, 0x3c(sp)',
-          'ol:', 'sw s7, 0x30(sp)', 'sll t0, s7, 2', *la('t1', D['tab']), 'addu t1, t1, t0', 'lw t6, 0(t1)', f'addiu t4, zero, {X0 + 8}',
-          'lw t5, 0x3c(sp)', 'nop', 'subu t5, s7, t5', f'addiu t0, zero, {DY}', 'mult t5, t0', 'mflo t5', f'addiu t5, t5, {Y0 + DY}', 'sw t5, 0x28(sp)',
-          *la('t7', D['rgbn']), 'lw t0, 0x24(sp)', 'nop', 'bne t0, s7, ol1', 'nop', *la('t7', D['rgbt']),
-          'ol1:', 'jal drw', 'nop', 'j ost', 'nop']
-    S += ['ost:', 'lw s7, 0x30(sp)', 'lw t0, 0x38(sp)', f'lui t1, {INV >> 16:#x}', f'ori t1, t1, {INV & 0xffff:#x}', 'xor t0, t0, t1', 'srlv t0, t0, s7', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']),
-          'beqz t0, os', 'nop', *la('t6', D['off']), *la('t7', D['rgboff']),
-          'os:', f'addiu t4, zero, {X1}', 'lw t5, 0x28(sp)', 'jal drw', 'nop',
-          'lw s7, 0x30(sp)', 'lw t1, 0x3c(sp)', 'addiu s7, s7, 1', f'addiu t1, t1, {VIS}', 'slt t0, s7, t1', 'beqz t0, os9', 'nop', 'j ol', 'nop', 'os9:', 'j owr', 'nop']
-    # owr: the warning of the unlock line, while it waits for the second R2
-    wl = lambda i: [f'addiu t4, zero, {X0 + 8}', f'addiu t5, zero, {Y0 + DY * (VIS + 1 + i)}', *la('t6', D['w%d' % i]), *la('t7', D['rgbt']), 'jal drw', 'nop']
-    S += ['owr:', f'lui t0, {H(D["conf"])}', f'lw t0, {L(D["conf"])}(t0)', 'nop', 'beqz t0, owx', 'nop', *wl(0), *wl(1), 'j ow2', 'nop', 'owx:', 'j box', 'nop']
-    S += ['ow2:'] + [x for i in range(2, len(WARN)) for x in wl(i)] + ['j box', 'nop']
-    # ounl: R2 on the unlock line (t0 = H(FLAGS), t6 = flags, t2 = H(data)): first press = warning, second = unlock
-    S += ['ounl:', f'lw t8, {L(D["conf"])}(t2)', 'addiu t9, zero, 1', 'bnez t8, oun1', 'nop', f'sw t9, {L(D["conf"])}(t2)', 'j op4', 'nop',
-          'oun1:', f'sw zero, {L(D["conf"])}(t2)', 'lui t8, 0x8005']
+    lw = lambda r, k: [f'lui {r}, {H(D[k])}', f'lw {r}, {L(D[k])}({r})', 'nop']
+    sw = lambda r, k, t='at': [f'lui {t}, {H(D[k])}', f'sw {r}, {L(D[k])}({t})']
+    NT = len(TABS)
+    # pw: in place of the mode select's pad routine: the game's pad words, then (only while the mode select screen is
+    # drawn: alive) the REMIX entry and screen; while they have the input, the game's pad words are cleared
+    S = ['pw:', 'addiu sp, sp, -0x20', 'sw ra, 0x18(sp)', f'jal {PAD_FN}', 'nop',
+         *lw('t0', 'alive'), 'blez t0, pw9', 'addiu t0, t0, -1', *sw('t0', 'alive'),
+         f'lui t1, {H(PADV)}', f'lhu t1, {L(PADV)}(t1)', *lw('t2', 'prev'), *sw('t1', 'prev'), 'nor t2, t2, zero', 'and t2, t2, t1',
+         *lw('t3', 'open'), 'bnez t3, pwo', 'nop', *lw('t3', 'sel'), 'bnez t3, pws', 'nop',
+         f'lui t4, {H(CURSOR)}', f'lw t4, {L(CURSOR)}(t4)', f'addiu t5, zero, {OPTIONS_ITEM}', 'bne t4, t5, pw9', f'andi t5, t2, {DOWN}',
+         'beqz t5, pw9', 'addiu t5, zero, 1', *sw('t5', 'sel'), 'j pwz', 'nop',
+         'pws:', f'andi t5, t2, {UP}', 'beqz t5, ps1', 'nop', *sw('zero', 'sel'), 'j pwz', 'nop',
+         'ps1:', f'andi t5, t2, {CROSS}', 'beqz t5, pwz', 'addiu t5, zero, 1', *sw('t5', 'open'), *sw('zero', 'tab'), *sw('zero', 'item'),
+         *sw('zero', 'conf'), 'j pwz', 'nop',
+         'pwo:', f'andi t5, t2, {TRI | CIRC}', 'beqz t5, po1', 'nop', *sw('zero', 'open'), *sw('zero', 'conf'), 'j pwz', 'nop',
+         'po1:', *lw('t6', 'tab'), *lw('t7', 'item'),
+         f'andi t5, t2, {LEFT}', 'beqz t5, po2', 'nop', 'addiu t6, t6, -1', 'bgez t6, po1b', 'nop', f'addiu t6, zero, {NT - 1}',
+         'po1b:', 'move t7, zero', *sw('zero', 'conf'),
+         'po2:', f'andi t5, t2, {RIGHT}', 'beqz t5, po3', 'nop', 'addiu t6, t6, 1', f'slti t5, t6, {NT}', 'bnez t5, po2b', 'nop', 'move t6, zero',
+         'po2b:', 'move t7, zero', *sw('zero', 'conf'),
+         'po3:', *la('t8', D['cnts']), 'addu t8, t8, t6', 'lbu t8, 0(t8)',
+         f'andi t5, t2, {UP}', 'beqz t5, po4', 'nop', 'addiu t7, t7, -1', 'bgez t7, po3b', 'nop', 'addiu t7, t8, -1',
+         'po3b:', *sw('zero', 'conf'),
+         'po4:', f'andi t5, t2, {DOWN}', 'beqz t5, po5', 'nop', 'addiu t7, t7, 1', 'slt t5, t7, t8', 'bnez t5, po4b', 'nop', 'move t7, zero',
+         'po4b:', *sw('zero', 'conf'),
+         'po5:', *sw('t6', 'tab'), *sw('t7', 'item'), f'andi t5, t2, {CROSS}', 'beqz t5, pwz', 'nop',
+         'sll t5, t6, 3', 'addu t5, t5, t7', *la('t8', D['tabl']), 'addu t8, t8, t5', 'lbu t5, 0(t8)',
+         f'lui t0, {H(FLAGS)}', f'lw t9, {L(FLAGS)}(t0)', f'addiu t8, zero, {UNLOCK_LINE}', 'bne t5, t8, po6', 'nop', 'j ounl', 'nop',
+         'po6:', 'addiu t8, zero, 1', 'sllv t8, t8, t5', 'xor t9, t9, t8', f'sw t9, {L(FLAGS)}(t0)',
+         'pwz:', f'lui t1, {H(PADV)}'] + [f'sh zero, {L(PADV) + k}(t1)' for k in range(0, 12, 2)] + \
+        ['pw9:', 'lw ra, 0x18(sp)', 'nop', 'jr ra', 'addiu sp, sp, 0x20']
+    # ounl: X on UNLOCK EVERYTHING (t0 = H(FLAGS), t9 = flags): first press = warning, second = unlock
+    S += ['ounl:', *lw('t8', 'conf'), 'bnez t8, oun1', 'addiu t8, zero, 1', *sw('t8', 'conf'), 'j pwz', 'nop',
+          'oun1:', *sw('zero', 'conf'), 'lui t8, 0x8005']
     for o, v, k in UNLOCK:
-        S += ([f'lhu t9, {o}(t8)', 'nop', f'ori t9, t9, {v}'] if k == 'o' else [f'addiu t9, zero, {v}']) + [f'sh t9, {o}(t8)']
-    S += [f'lui t8, {(1 << UNLOCK_LINE) >> 16:#x}', 'or t6, t6, t8', f'sw t6, {L(FLAGS)}(t0)', 'j op4', 'nop']
-    yb = Y0 + DY * (VIS + 1 + len(WARN))
+        S += ([f'lhu t7, {o}(t8)', 'nop', f'ori t7, t7, {v}'] if k == 'o' else [f'addiu t7, zero, {v}']) + [f'sh t7, {o}(t8)']
+    S += [f'lui t8, {(1 << UNLOCK_LINE) >> 16:#x}', 'or t9, t9, t8', f'lui t0, {H(FLAGS)}', f'sw t9, {L(FLAGS)}(t0)', 'j pwz', 'nop']
+    # opt (the TV function's GetClut call, every frame of the mode select screen): switches applied, the switches'
+    # block installed, then the REMIX label (or the screen)
+    S += ['opt:', 'addiu sp, sp, -0x50', 'sw ra, 0x4c(sp)', 'sw s5, 0x40(sp)', 'sw s6, 0x44(sp)', 'sw s7, 0x48(sp)',
+          f'jal {HOOK_FN}', 'nop', 'sw v0, 0x34(sp)', 'jal oap', 'nop', 'jal tins', 'nop',
+          'addiu t0, zero, 2', *sw('t0', 'alive'),
+          'sll v1, s1, 2', 'addu v1, v1, s1', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw s5, 4(v1)', 'sll v0, s1, 13',
+          f'lui s6, {H(PRIMS)}', 'addu s6, s6, v0', f'addiu s6, s6, {L(PRIMS)}',
+          *lw('t0', 'open'), 'beqz t0, opl', 'nop', 'j drs', 'nop', 'opl:',
+          *la('t7', D['rgbn']), *lw('t0', 'sel'), 'beqz t0, dl1', 'nop', *la('t7', D['rgbs']),
+          'dl1:', f'addiu t4, zero, {LABEL_XY[0]}', f'addiu t5, zero, {LABEL_XY[1]}', *la('t6', D['title']), 'jal drw', 'nop', 'j out', 'nop']
+    # drs: the screen
+    S += ['drs:', 'addiu t4, zero, -140', 'addiu t5, zero, -104', *la('t6', D['title']), *la('t7', D['rgbt']), 'jal drw', 'nop',
+          'move s7, zero',
+          'dt1:', 'sw s7, 0x30(sp)', 'sll t0, s7, 2', *la('t1', D['ttab']), 'addu t1, t1, t0', 'lw t6, 0(t1)',
+          'addiu t0, zero, 88', 'mult s7, t0', 'mflo t4', 'addiu t4, t4, -132', 'addiu t5, zero, -80',
+          *la('t7', D['rgbh']), *lw('t0', 'tab'), 'bne t0, s7, dt2', 'nop', *la('t7', D['rgbt']),
+          'dt2:', 'jal drw', 'nop', 'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', f'slti t0, s7, {NT}', 'bnez t0, dt1', 'nop',
+          'move s7, zero', 'j di1', 'nop']
+    S += ['di1:', *lw('t0', 'tab'), *la('t1', D['cnts']), 'addu t1, t1, t0', 'lbu t1, 0(t1)', 'nop', 'slt t2, s7, t1', 'bnez t2, dic', 'nop', 'j dh', 'nop', 'dic:',
+          'sw s7, 0x30(sp)', 'sll t0, t0, 3', 'addu t0, t0, s7', *la('t1', D['tabl']), 'addu t1, t1, t0', 'lbu t3, 0(t1)', 'nop', 'sw t3, 0x24(sp)',
+          'sll t0, t3, 2', *la('t1', D['ltab']), 'addu t1, t1, t0', 'lw t6, 0(t1)',
+          'addiu t0, zero, 14', 'mult s7, t0', 'mflo t5', 'addiu t5, t5, -56', 'sw t5, 0x28(sp)', 'addiu t4, zero, -132',
+          *la('t7', D['rgbn']), *lw('t0', 'item'), 'bne t0, s7, di2', 'nop', *la('t7', D['rgbs']),
+          'di2:', 'jal drw', 'nop',
+          'lw t3, 0x24(sp)', f'lui t1, {H(FLAGS)}', f'lw t0, {L(FLAGS)}(t1)', f'lui t1, {INV >> 16:#x}', f'ori t1, t1, {INV & 0xffff:#x}',
+          'xor t0, t0, t1', 'srlv t0, t0, t3', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']), 'beqz t0, di3', 'nop',
+          *la('t6', D['off']), *la('t7', D['rgboff']),
+          'di3:', 'addiu t4, zero, 104', 'lw t5, 0x28(sp)', 'jal drw', 'nop',
+          'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', 'j di1', 'nop']
+    wl = lambda i: ['addiu t4, zero, -132', f'addiu t5, zero, {64 + 12 * i}', *la('t6', D['w%d' % i]), *la('t7', D['rgbt']), 'jal drw', 'nop']
+    S += ['dh:', *lw('t0', 'conf'), 'beqz t0, dh1', 'nop'] + [x for i in range(len(WARN)) for x in wl(i)] + \
+         ['dh1:', 'addiu t4, zero, -132', 'addiu t5, zero, 102', *la('t6', D['help']), *la('t7', D['rgbh']), 'jal drw', 'nop', 'j box', 'nop']
     S += ['drw:', 'sw ra, 0x2c(sp)', 'sw t4, 0x10(sp)', 'sw t5, 0x14(sp)', 'sw t6, 0x18(sp)', 'sw t7, 0x1c(sp)', 'sw zero, 0x20(sp)',
           'move a0, s5', 'move a1, s6', f'lui a2, {H(FONT)}', f'addiu a2, a2, {L(FONT)}', f'jal {TEXT}', f'addiu a3, zero, {CLUT}',
           'lw ra, 0x2c(sp)', 'move s6, v0', 'jr ra', 'nop']
+    # box: the black background of the screen (TILE 320 x 240), linked last = drawn first
     S += ['box:', 'lw t0, 0(s5)', 'lui t1, 0x300', 'lui t2, 0xff', 'ori t2, t2, 0xffff', 'and t3, t0, t2', 'or t3, t3, t1', 'sw t3, 0(s6)',
-          'lui t3, 0x6030', 'ori t3, t3, 0x1810', 'sw t3, 4(s6)', f'lui t3, {(Y0 - 6) & 0xffff:#x}', f'ori t3, t3, {(X0 - 10) & 0xffff:#x}', 'sw t3, 8(s6)',
-          f'lui t3, {yb + 4 - (Y0 - 6)}', f'ori t3, t3, {X1 + 50 - (X0 - 10)}', 'sw t3, 12(s6)',
+          'lui t3, 0x6000', 'sw t3, 4(s6)', 'lui t3, 0xff88', 'ori t3, t3, 0xff60', 'sw t3, 8(s6)', 'lui t3, 240', 'ori t3, t3, 320', 'sw t3, 12(s6)',
           'lui t1, 0xff00', 'and t0, t0, t1', 'and t3, s6, t2', 'or t0, t0, t3', 'j out', 'sw t0, 0(s5)']
     S += ['out:', 'lw v0, 0x34(sp)', 'lw ra, 0x4c(sp)', 'lw s5, 0x40(sp)', 'lw s6, 0x44(sp)', 'lw s7, 0x48(sp)', 'jr ra', 'addiu sp, sp, 0x50']
     # oap: apply the switches to the PATCH words (table ptab: address, on, off, bit), FlushCache after a write
@@ -134,7 +194,7 @@ def routines(D):
     return S
 
 
-TOP = {'opt', 'odr', 'ost', 'drw', 'box', 'out', 'oap', 'owr', 'ow2', 'ounl', 'tins'}
+TOP = {'pw', 'ounl', 'opt', 'drs', 'di1', 'dh', 'drw', 'box', 'out', 'oap', 'tins'}
 
 
 def place(S, tables, extra=()):
@@ -179,17 +239,16 @@ def place(S, tables, extra=()):
 
 
 def build():
+    """data at the start of the screen's sector (toggles.SCREEN), the code in the rest of it and the other caves"""
     d, D = data()
-    ptab = b''.join(struct.pack('<4I', a, on, off, bit) for a, on, off, bit in PATCH)
-    strs = [('l%d' % i, t) for i, t in enumerate(LINES)] + [('w%d' % i, t) for i, t in enumerate(WARN)]
-    blobs = lambda tabaddr: [('tab', b''.join(struct.pack('<I', tabaddr['l%d' % i]) for i in range(len(LINES)))), ('ptab', ptab)] + \
-        [(k, t.encode() + bytes(4 - len(t) % 4)) for k, t in strs]
-    D2 = dict(D); D2.update({k: 0 for k in ['tab', 'ptab'] + [k for k, _ in strs]})      # first pass: where the tables land
-    extra = [(DATA[0] + (len(d) + 3) // 4 * 4, DATA[1])]       # what the data block leaves
-    _, lab = place(routines(D2), blobs(D2), extra)
-    D2.update({k: lab[k] for k in ['tab', 'ptab'] + [k for k, _ in strs]})
-    words, lab = place(routines(D2), blobs(D2), extra)
-    assert all(lab[k] == D2[k] for k in ['tab', 'ptab'] + [k for k, _ in strs])
+    end = (SCR_DATA + len(d) + 3) // 4 * 4
+    caves = CAVES + [(end, toggles.SCREEN[1]), DATA]
+    global_caves = CAVES[:]
+    CAVES[:] = caves
+    try:
+        words, lab = place(routines(D), [], ())
+    finally:
+        CAVES[:] = global_caves
     return words, lab, d
 
 
@@ -198,9 +257,11 @@ def ops(disc, pkg=None):
     ms = disc.read_file('/MODE_SEL.BIN'); ex = disc.read_file('/SCES_009.92')
     where = lambda a: ('/MODE_SEL.BIN', ms, OVL) if a >= OVL else ('/SCES_009.92', ex, 0x8000F800)
     assert struct.unpack_from('<I', ms, HOOK - OVL)[0] == J(3, HOOK_FN)
+    assert struct.unpack_from('<I', ms, PAD_CALL - OVL)[0] == J(3, PAD_FN)
     c, l, d = build()
-    P = [(a, x) for a, x in c] + [(DATA[0] + i, struct.unpack_from('<I', d, i)[0]) for i in range(0, len(d), 4)] + [(HOOK, J(3, l['opt']))]
-    import toggles
+    d = d + bytes((-len(d)) % 4)
+    P = [(a, x) for a, x in c] + [(SCR_DATA + i, struct.unpack_from('<I', d, i)[0]) for i in range(0, len(d), 4)] + \
+        [(HOOK, J(3, l['opt'])), (PAD_CALL, J(3, l['pw']))]
     out = toggles.ops(pkg) if pkg is not None else [['padto', '/MODE_SEL.BIN', toggles.FILE_END]]   # padto first
     for a, x in P:
         f, b, base = where(a); o = a - base

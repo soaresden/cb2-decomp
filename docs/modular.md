@@ -259,6 +259,15 @@ Code : `remix/hplive.py` (HP.BIN seulement).
 
 ## Options dans le jeu (`options`, v26)
 
+v37 : le panneau (R1 maintenu) devient un écran REMIX, dans le style de l'écran OPTIONS du jeu : entrée « REMIX » sous
+le panneau OPTIONS de l'écran des modes (Bas depuis OPTIONS = curseur 5 du jeu, 0x80070B2C ; Haut pour revenir ; X
+ouvre), fond noir, titre en haut à gauche, trois onglets RACE / RIDERS / GAME (Gauche / Droite), Haut / Bas, X bascule,
+Triangle ou Rond revient. L'entrée de la manette : la routine de MODE_SEL `func_8005CCE4` (appelée en 0x8005CB94) passe
+par `pw`, qui garde les mots de la manette (0x800832BA..C5) et les vide tant que REMIX a la main (le menu du jeu ne
+bouge pas). `pw` n'agit que si l'écran des modes est dessiné (compteur `alive` remis à 2 par `opt` à chaque image) :
+l'écran OPTIONS du jeu n'est pas touché. MODE_SEL grandit d'un secteur (84, toggles.SCREEN : données et code de
+l'écran ; son tas commence 0x800 plus loin).
+
 Code : `remix/options.py` (MODE_SEL + six fonctions mortes de l'exe réservées) ; tests dans `rear.py`, `hplive.py`,
 `news.py`.
 
