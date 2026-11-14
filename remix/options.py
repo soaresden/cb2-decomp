@@ -45,18 +45,18 @@ LINES = ['REAR VIEW (O)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', '
          # the other mods (remix/toggles.py: bits 8..16, in the order of toggles.BITS)
          'SPECIAL BOARDS ALWAYS', 'NEW HARD+MIRROR CUP', 'BOSS GRAY SNOWMAN IN COMP', 'HIDDEN OUTFITS FOR GIRLS', 'CAN MAX RIDERS AND BOARD',
          'BIG AIR MASTER KEYS SHOWN',
-         'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY PLAYABLE',
+         'PROGRESS PAGE (SELECT)', 'SKIP QUALIFYING (SELECT)', 'JICCHI NICK KELLY PARK ICONS',   # v65: + the letters
          'FALLS AS A NUMBER',                   # bit 17 (radar.py: one ball and x13 instead of the row of balls)
          'UNLOCK EVERYTHING',                   # line i = bit i of the flags word (bit set = off)
          'SSX STYLE BOOST',                    # bit 19 (remix/boost.py, with the mod radar)
          'RETRY ROUND (3 PER CUP)',            # bit 20 (remix/boost.py: RETRY on GAME OVER replays the Boarder Cross)
-         'PARK ICONS JICCHI NICK KELLY',
+         'PARK ICONS JICCHI NICK KELLY',     # (v61..v64; v65: bit 16 does both, this line is in no tab)
          # v64: per game mode values of the switches found in several modes (bits 22..30; COMP keeps bit 3 for AIR
          # CONTROL): REAR VIEW for COMP, FREE, AIR, PIPE, PARK, AIR CONTROL for FREE, AIR, PIPE, PARK. On the mode
          # select screen `pmd` copies the REAR VIEW of the mode under the cursor into bit 0 (read by the mod rear in the
          # race) and gives `oap` the AIR CONTROL of that mode
          'REAR VIEW (O)', 'REAR VIEW (O)', 'REAR VIEW (O)', 'REAR VIEW (O)', 'REAR VIEW (O)',
-         'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL']         # bit 21 (remix/bpletters.py: the letters that unlock Jicchi, Nick, Kelly)
+         'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL']
 UNLOCK_LINE = 18                                # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
 INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
 VIS = 10                               # lines shown at a time: the list scrolls with the cursor
@@ -89,8 +89,8 @@ TABS = [('COMP', [22, 19, 20, 15, 6, 7, 17, 3, 4, 9, 10]),        # v63: one tab
         ('FREE', [23, 27]),                                        # (v64: REAR VIEW / AIR CONTROL with their own bit
         ('AIR', [13, 24, 28]),                                     # in each mode)
         ('PIPE', [1, 25, 29]),
-        ('PARK', [21, 26, 30]),
-        ('GAME', [16, 11, 12, 8, 14, 2, 5, 18])]
+        ('PARK', [16, 26, 30]),
+        ('GAME', [11, 12, 8, 14, 2, 5, 18])]
 # mode select cursor (0 COMP, 1 BIG AIR, 2 HALFPIPE, 3 FREE STYLE, 4 BOARD PARK, else as FREE) -> (REAR VIEW, AIR CONTROL) bits
 PMT = [(22, 3), (24, 28), (25, 29), (23, 27), (26, 30), (23, 27), (23, 27), (23, 27)]
 TAB_X0, TAB_DX = -148, 52                # the tabs' names (menu font)
@@ -104,6 +104,8 @@ LABEL_XY = (78, 92)                    # "REMIX" under the OPTIONS sign (menu fo
 # y 64) every frame and drawn as a SPRT (+ DR_TPAGE); the label is dim, and pulses when the cursor is on it
 LOGO_SIZE, LOGO_VRAM, LOGO_CLUT = 16, (448, 0), (448, 64)
 LOGO_XY, LOGO_TITLE_XY = (76, 80), (-152, -116)
+PG_XY = (74, 106)                      # v65: PROGRESS (menu font) under the logo: Down from REMIX, X shows the progress page
+PG_HOOK, PG_OLD, PG_BIT = 0x800643B4, 0x0C00B88A, 14     # mod progress: its hook (jal func_8002E228 when absent), its switch
 LOADIMAGE = 0x80029B7C
 
 
@@ -160,6 +162,7 @@ def data():
     assert all(lab['l%d' % i] >> 16 == 0x8008 for i in range(len(LINES)))
     put('ltab', b''.join(struct.pack('<H', lab['l%d' % i] & 0xffff) for i in range(len(LINES))))   # v63: halfwords (0x8008....)
     put('ttab', b''.join(struct.pack('<I', lab['t%d' % i]) for i in range(len(TABS))))
+    put('prg', b'PROGRESS\0'); put('pg', bytes(4))
     put('pmt', bytes(b for p in PMT for b in p)); put('fx', bytes(4))
     put('ptab', b''.join(struct.pack('<4I', a, on, off, bit) for a, on, off, bit in PATCH))
     data.side = bytes(d2)
@@ -176,10 +179,17 @@ def routines(D):
     S = ['pw:', 'addiu sp, sp, -0x20', 'sw ra, 0x18(sp)', f'jal {PAD_FN}', 'nop',
          *lw('t0', 'alive'), 'blez t0, pw9', 'addiu t0, t0, -1', *sw('t0', 'alive'),
          f'lui t1, {H(PADV)}', f'lhu t1, {L(PADV)}(t1)', *lw('t2', 'prev'), *sw('t1', 'prev'), 'nor t2, t2, zero', 'and t2, t2, t1',
+         # v65: PROGRESS under REMIX (sel 2): X shows the in-game progress page (mod progress: SELECT held) until
+         # Triangle / Circle / X
+         *lw('t3', 'pg'), 'beqz t3, pwa', f'andi t5, t2, {TRI | CIRC | CROSS}', 'beqz t5, pwz', 'nop', *sw('zero', 'pg'), 'j pwz', 'nop', 'pwa:',
          *lw('t3', 'open'), 'bnez t3, pwo', 'nop', *lw('t3', 'sel'), 'bnez t3, pws', 'nop',
          f'lui t4, {H(CURSOR)}', f'lw t4, {L(CURSOR)}(t4)', f'addiu t5, zero, {OPTIONS_ITEM}', 'bne t4, t5, pw9', f'andi t5, t2, {DOWN}',
          'beqz t5, pw9', 'addiu t5, zero, 1', *sw('t5', 'sel'), 'j pwz', 'nop',
-         'pws:', f'andi t5, t2, {UP}', 'beqz t5, ps1', 'nop', *sw('zero', 'sel'), 'j pwz', 'nop',
+         'pws:', 'addiu t4, zero, 2', 'beq t3, t4, pwp', 'nop',
+         f'andi t5, t2, {UP}', 'beqz t5, ps0', 'nop', *sw('zero', 'sel'), 'j pwz', 'nop',
+         'ps0:', f'andi t5, t2, {DOWN}', 'beqz t5, ps1', 'nop', 'jal pga', 'nop', 'beqz v0, pwz', 'addiu t5, zero, 2', *sw('t5', 'sel'), 'j pwz', 'nop',
+         'pwp:', f'andi t5, t2, {UP}', 'beqz t5, pp1', 'addiu t5, zero, 1', *sw('t5', 'sel'), 'j pwz', 'nop',
+         'pp1:', f'andi t5, t2, {CROSS}', 'beqz t5, pwz', 'addiu t5, zero, 1', *sw('t5', 'pg'), 'j pwz', 'nop',
          'ps1:', f'andi t5, t2, {CROSS}', 'beqz t5, pwz', 'addiu t5, zero, 1', *sw('t5', 'open'), *sw('zero', 'tab'), *sw('zero', 'item'),
          *sw('zero', 'conf'), 'j pwz', 'nop',
          'pwo:', f'andi t5, t2, {TRI | CIRC}', 'beqz t5, po1', 'nop', *sw('zero', 'open'), *sw('zero', 'conf'), 'j pwz', 'nop',
@@ -198,7 +208,8 @@ def routines(D):
          f'lui t0, {H(FLAGS)}', f'lw t9, {L(FLAGS)}(t0)', f'addiu t8, zero, {UNLOCK_LINE}', 'bne t5, t8, po6', 'nop', 'j ounl', 'nop',
          'po6:', 'addiu t8, zero, 1', 'sllv t8, t8, t5', 'xor t9, t9, t8', f'sw t9, {L(FLAGS)}(t0)',
          'pwz:', f'lui t1, {H(PADV)}'] + [f'sh zero, {L(PADV) + k}(t1)' for k in range(0, 12, 2)] + \
-        ['pw9:', 'lw ra, 0x18(sp)', 'nop', 'jr ra', 'addiu sp, sp, 0x20']
+        [*lw('t0', 'pg'), 'beqz t0, pw9', 'addiu t0, zero, 0x100', f'lui t1, {H(PADV)}', f'sh t0, {L(PADV)}(t1)',
+         'pw9:', 'lw ra, 0x18(sp)', 'nop', 'jr ra', 'addiu sp, sp, 0x20']
     # ounl: X on UNLOCK EVERYTHING (t0 = H(FLAGS), t9 = flags): first press = warning, second = unlock
     S += ['ounl:', *lw('t8', 'conf'), 'bnez t8, oun1', 'addiu t8, zero, 1', *sw('t8', 'conf'), 'j pwz', 'nop',
           'oun1:', *sw('zero', 'conf'), 'lui t8, 0x8005']
@@ -217,7 +228,16 @@ def routines(D):
           *lw('t1', 'blink'), 'addiu t1, t1, 1', *sw('t1', 'blink'),
           'lui t7, 0x60', 'ori t7, t7, 0x6060', *lw('t0', 'sel'), 'beqz t0, dl1', 'andi t1, t1, 16',
           'lui t7, 0x80', 'beqz t1, dl1', 'ori t7, t7, 0x8080', 'lui t7, 0xb0', 'ori t7, t7, 0xb0b0',
-          'dl1:', f'addiu t4, zero, {LOGO_XY[0]}', f'addiu t5, zero, {LOGO_XY[1]}', 'jal dlogo', 'nop', 'j out', 'nop']
+          'dl1:', f'addiu t4, zero, {LOGO_XY[0]}', f'addiu t5, zero, {LOGO_XY[1]}', 'jal dlogo', 'nop', 'jal dpg', 'nop', 'j out', 'nop']
+    # pga: v0 = 1 if the in-game progress page is there (mod progress: its hook in MODE_SEL; its switch on)
+    S += ['pga:', f'lui v1, {H(PG_HOOK)}', f'lw v1, {L(PG_HOOK)}(v1)', f'lui at, {PG_OLD >> 16:#x}', f'ori at, at, {PG_OLD & 0xffff:#x}',
+          'beq v1, at, pga0', f'lui v1, {H(FLAGS)}', f'lw v1, {L(FLAGS)}(v1)', 'nop', f'andi v1, v1, {1 << PG_BIT:#x}', 'bnez v1, pga0', 'nop',
+          'jr ra', 'addiu v0, zero, 1', 'pga0:', 'jr ra', 'move v0, zero']
+    # dpg: the PROGRESS label under the REMIX logo (bright when chosen; hidden while the page is shown)
+    S += ['dpg:', 'sw ra, 0x38(sp)', 'jal pga', 'nop', 'beqz v0, dp9', 'nop', *lw('t0', 'pg'), 'bnez t0, dp9', 'nop',
+          *la('t7', D['rgbh']), *lw('t0', 'sel'), 'addiu t1, zero, 2', 'bne t0, t1, dp1', 'nop', *la('t7', D['rgbs']),
+          'dp1:', *la('t6', D['prg']), f'addiu t4, zero, {PG_XY[0]}', f'addiu t5, zero, {PG_XY[1]}', 'jal drw', 'nop',
+          'dp9:', 'lw ra, 0x38(sp)', 'nop', 'jr ra', 'nop']
     # dlogo: the logo at (t4, t5), modulation t7 (0x808080 = as is): sent to VRAM, SPRT + DR_TPAGE linked into s5
     W, Hh, _, _ = logo()
     TP = 0xE1000400 | (LOGO_VRAM[0] >> 6) | ((LOGO_VRAM[1] >> 8) << 4)
@@ -287,7 +307,7 @@ def routines(D):
     return S
 
 
-TOP = {'pw', 'ounl', 'opt', 'pmd', 'drs', 'di1', 'di4', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk', 'dtri'}
+TOP = {'pw', 'ounl', 'opt', 'pmd', 'pga', 'dpg', 'drs', 'di1', 'di4', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk', 'dtri'}
 
 
 def place(S, tables, extra=()):

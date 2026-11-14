@@ -56,7 +56,8 @@ POS = [(-19660, 14543 - UP, -54500, 550, R),        # R: behind the gate of sect
 SND_PICK, SND_DONE = 0x13, 0x12                   # sounds of BP's bank: 0x13 a short high ding (0.6 s, ~2 kHz), 0x12
                                                   # louder (0x15, 0x16: silent; measured in the emulator)
 HUD_X, HUD_Y, HUD_S, HUD_DX = -148, -100, 9, 18
-OPT_BIT = 1 << 21                                 # REMIX screen switch (set = off)
+OPT_BIT = 1 << 16                                 # REMIX screen switch (set = off): v65 the riders' own line, JICCHI NICK
+                                                  # KELLY PARK ICONS (v61..v64: a line of its own, bit 21)
 TEXT = 0x80086F14                                 # BP: text (OT entry, primitives, string, x, y (stack)) -> primitives
 FONT_MODE = 0xE1000415                            # DR_MODE: texture page x 320, y 256, 4 bits (as func_8008687C's caller)
 OV_FRAMES = 300

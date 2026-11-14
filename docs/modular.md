@@ -644,3 +644,9 @@ les mots de l'exe). Vérifié : FREE coupé → bit 0 posé et mot 0x8004FA44 à
 valeurs « on » sur les autres modes ; onglets FREE OFF / OFF, les autres ON.
 Site : la page Progression lit le mot 0x80057438 (déblocage des lettres, bit 31, et les réglages de l'écran REMIX
 par onglet). Sauvegarde de coupe après chaque round : déjà en place depuis la v51 (`boost.SAVE_SITE`).
+
+v65 : **Jicchi / Nick / Kelly : un seul réglage**, dans l'onglet PARK : JICCHI NICK KELLY PARK ICONS (bit 16 : les
+riders et les lettres du Board Park ensemble ; `bpletters.OPT_BIT` passe de 21 à 16). **Entrée PROGRESS** sur l'écran
+des modes, sous le logo REMIX (police du menu) : Bas depuis REMIX la choisit (si le mod progress est là : son hook
+0x800643B4 n'est plus `jal func_8002E228`, et son interrupteur 14 est actif), X affiche la page de progression (`pw`
+met SELECT dans les mots de manette du jeu tant que `pg` vaut 1), Triangle / Rond / X la ferme. Vérifié.
