@@ -741,3 +741,12 @@ Kelly → violet (peau, cheveux, visage et planche gardés). Une règle = des te
 Vérifié : WEAR des trois (bascule bleu ↔ violet, jaune ↔ vert, bleu ↔ rouge), Free Style (Kelly violette, Jicchi vert,
 barres de boost assorties), 2 joueurs (Kelly tenue 1 + Nick tenue 2 rouge), Boss (tatoué ↔ noir) et Cindy (ses tenues
 cachées) inchangés.
+
+v79 : **tenues cachées de Cindy / Irin : plus de plantage au chargement** (mods outfits + options). L'aperçu des tenues
+cachées sur l'écran WEAR (wearprev) copiait les TIM du menu à 0x801F2000 / 0x801F7000, là où le mod options garde le
+bloc des interrupteurs (toggles : copié à 0x801F2000 sur l'écran des modes, `tap` appelé à chaque changement de scène).
+Après un aperçu de tenue cachée, la scène suivante sautait dans l'image : exception « instruction réservée » (CAUSE 0x28,
+EPC 0x801F202C, relevés dans l'état de l'émulateur), BIOS en boucle, écran « Now Loading » figé — dans tous les modes,
+avec n'importe quelle tenue cachée vue en aperçu. Les copies vont maintenant à 0x801DB000 / 0x801E0000 (après MENU_SAVE
+de crew ; 0x801DA800..0x801E8000 vérifié intact dans les menus avec un motif). Vérifié : Irin en tenue cachée en Board
+Park et en Free Style, Cindy en tenue cachée en Free Style.

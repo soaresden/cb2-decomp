@@ -3,7 +3,11 @@ import struct
 from asm import asm
 import outfits
 BASE=0x8007d18c                     # old end of MAIN_SEL (= old heap start)
-BUF=(0x801f2000,0x801f7000)         # copies of the upper / lower TIM (free RAM below the menu stack)
+BUF=(0x801db000,0x801e0000)         # copies of the upper / lower TIM (18968 / 14872 bytes)
+# v79: they were at 0x801f2000 / 0x801f7000, over the in-game switches' block (remix/toggles.py, copied to 0x801F2000
+# on the mode select screen and called at every scene change): after a hidden outfit's preview, the next scene
+# (the race) jumped into the TIM and crashed (Cindy / Irin in a hidden outfit with the mod options). Now after crew's
+# MENU_SAVE (0x801D2000..0x801DA404); 0x801DA800..0x801E8000 checked untouched through the menus.
 TBL=(0x8007c488,0x8007c4b8)
 def hl(a): h=(a+0x8000)>>16; return h,a-(h<<16)
 def block():
