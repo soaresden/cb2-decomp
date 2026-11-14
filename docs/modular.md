@@ -462,3 +462,12 @@ Les libellés TYPE-1…SPECIAL sont des images 4 bits 64 × 16 (VRAM 320..383 ×
 ombre orange à gauche, contour sombre, Noto Sans Black Italic) est calculé à la construction avec les indices de cette
 palette, écrit dans MAIN_SEL.FBD en VRAM (1000, 360) (place libre), et `msp` saute à `mspl`, qui chaîne le même
 POLY_FT4 que le jeu (table d'ordre *(a0 + 0x14 × D_8005AE7C + 4) + 0x34, comme func_8005CC78).
+
+v51 : **couleur du boost selon la tenue portée** : `bcol` lit `g_rider` (0x80057408) et `g_jacket` (0x8005740C) et
+prend la couleur dominante de cette veste dans une table rider × veste (6) relevée dans l'émulateur sur l'écran
+BOARDWEAR (tenues cachées de Cindy et Irin : vestes 3..5, l'écolière d'Irin en bleu ; vestes sombres en gris acier pour
+que la traînée se voie), rangée dans SBC2 après `rtr` (0x8007C760 : index d'octets, 0x8007C7B0 : palette).
+**Sauvegarde après chaque round** : l'écran de résultats du Boarder Cross n'ajoutait la ligne SAVE (sauvegarde de la
+coupe en cours, reprise par LOAD dans le menu Compétition, `func_8008601C`) qu'après les rounds 3 et 6 (SBC2
+0x8008262C `beq v1, 2` / `5`) : un `b` la propose après chaque round. **Écran REMIX** : le X de l'aide est dessiné en
+bleu (deux barres de deux POLY_F3, table `crx` après `tri`).

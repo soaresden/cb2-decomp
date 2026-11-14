@@ -109,7 +109,7 @@ def logo():
     px = np.zeros((h, W), np.uint8); px[:, :w] = idx
     pix = bytes((px[:, 0::2] | (px[:, 1::2] << 4)).astype(np.uint8).flatten())
     return W, h, pix, cl
-HELP = 'X ON/OFF       TAB     BACK'          # drawn signs in the gaps (dtri; the menu font has none): Left / Right arrows, Triangle
+HELP = '  ON/OFF       TAB     BACK'          # drawn signs in the gaps (dtri; the menu font has none): Left / Right arrows, Triangle
 TRI_X, TRI_Y = -132 + 21 * 8 + 2, 102          # the Triangle's left edge and top (8 pixels a letter)
 ARROW_X = -132 + 11 * 8 + 1                    # the Left arrow (Right: + 12)
 
@@ -129,6 +129,10 @@ def data():
                                    0x2050D080, xy(X + 5, Y - 1), xy(X - 1, Y + 11), xy(X + 11, Y + 11),
                                    G, xy(A, Y + 5), xy(A + 8, Y), xy(A + 8, Y + 10),
                                    G, xy(A + 20, Y + 5), xy(A + 12, Y), xy(A + 12, Y + 10)))
+    # the Cross button: a blue X in the first gap of HELP (two bars, each two triangles)
+    x0, B = -132 + 1, 0x20FF9664
+    put('crx', struct.pack('<16I', B, xy(x0, Y), xy(x0 + 2, Y), xy(x0 + 9, Y + 9), B, xy(x0, Y), xy(x0 + 9, Y + 9), xy(x0 + 7, Y + 9),
+                                   B, xy(x0 + 7, Y), xy(x0 + 9, Y), xy(x0 + 2, Y + 9), B, xy(x0 + 7, Y), xy(x0 + 2, Y + 9), xy(x0, Y + 9)))
     put('on', b'ON\0'); put('off', b'OFF\0'); put('help', HELP.encode() + b'\0')
     for i, (name, _) in enumerate(TABS): put('t%d' % i, name.encode() + b'\0')
     put('cnts', bytes(len(l) for _, l in TABS))
@@ -231,7 +235,7 @@ def routines(D):
          ['dh1:', 'addiu t4, zero, -132', 'addiu t5, zero, 102', *la('t6', D['help']), *la('t7', D['rgbh']), 'jal drw', 'nop',
           'jal dtri', 'nop', 'j box', 'nop']
     # dtri: the Triangle button (outline in the PlayStation's green: a black POLY_F3 inside a green one; table tri)
-    S += ['dtri:', 'move t9, ra', *la('t8', D['tri']), 'addiu t7, t8, 64',
+    S += ['dtri:', 'move t9, ra', *la('t8', D['tri']), 'addiu t7, t8, 128',
           'dtr1:', 'lui t0, 0x400', 'sw t0, 0(s6)', 'lw t0, 0(t8)', 'lw t1, 4(t8)', 'lw t2, 8(t8)', 'lw t3, 12(t8)',
           'sw t0, 4(s6)', 'sw t1, 8(s6)', 'sw t2, 12(s6)', 'sw t3, 16(s6)', 'move a0, s6', 'jal dlnk', 'addiu s6, s6, 20',
           'addiu t8, t8, 16', 'bne t8, t7, dtr1', 'nop', 'jr t9', 'nop']

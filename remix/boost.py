@@ -43,6 +43,8 @@ RETRY_BIT, RETRIES = 20, 3
 COMP, COMP_END = 0x80057458, 0x800579A4      # round, stage, ..., the roster (8 x 0xA8): what a RETRY of the game resets
 SNAP = 0x801F2AB0                             # its copy at the start of the Boarder Cross (free RAM in every scene)
 SNAPR, TRIES = 0x801F3FE8, 0x801F3FEC         # snapshot taken (cleared at each start of SBC1); retries used this cup
+SAVE_SITE = 0x8008262C        # results of a Boarder Cross: "beq v1 (round), 2" (or 5): the menu gets its SAVE line only
+                              # after rounds 3 and 6 -> always ("b"): the cup can be saved (and LOADed) after every round
 EXIT_SITE, EXIT_BACK, BX_AGAIN = 0x8005B084, 0x8005B08C, 0x8005B1A0   # sbc2_entry: exit code -> s0; reload the BX
 RIDERS, G_RIDER, PAD = 0x8009B9A8, 0x80057408, 0x8004FBF0
 WS, PRIMS = 0x80058E20, 0x80058E0C
@@ -52,9 +54,24 @@ NH, ZMIN = 8, 60
 TRAIL_ENT, BAR_ENT = 12, 4
 BX, BY, BW, BH = -140, -54, 80, 6          # the bar (HUD coordinates: centre of the screen = 0, 0)
 TPAGE = 0xE100041C                         # half-and-half blending (as radar's)
-# trail colours by g_rider (0x00BBGGRR), the jacket's: Yaggi pink, Jin orange, Cindy red, Irin light blue, Boss gold,
-# Gray silver, Snowman red (his scarf), (other)
-COLS = [0xB469FF, 0x148CFF, 0x3C28E6, 0xFFBE5A, 0x00C8FF, 0xE6D2C8, 0x281EE6, 0xFFFFFF]
+# trail colours: the dominant colour of the jacket worn (read in the emulator on the BOARDWEAR screen), by rider
+# (g_rider 0..9; Jicchi, Nick, Kelly = 10..12, crew.ALIASV) and jacket (g_jacket, 0..5; the hidden outfits of Cindy and
+# Irin are 3..5, Irin's schoolgirl one in blue); dark jackets in steel grey, so that the trail shows
+ALIAS = 0x8001FBC4                          # crew.ALIASV (crew.DATA)
+_C = dict(pink=(255, 105, 180), gold=(255, 200, 30), sky=(120, 195, 245), orange=(255, 140, 20), yellow=(250, 225, 30),
+          camo=(80, 140, 60), red=(230, 40, 60), peri=(140, 140, 250), green=(60, 190, 70), steel=(150, 155, 175),
+          cyan=(70, 200, 245), brown=(170, 115, 60), teal=(90, 210, 200), navy=(50, 90, 230), blue=(40, 120, 220),
+          silver=(205, 210, 225), ice=(130, 175, 240))
+JACKETS = [['pink', 'gold', 'sky'], ['orange', 'yellow', 'camo'], ['red', 'peri', 'green', 'steel', 'cyan', 'brown'],
+           ['teal', 'pink', 'gold', 'navy', 'blue', 'pink'],
+           ['gold'], ['silver'], ['red'],                              # g_rider 4..6: Boss, Gray, Snowman (one outfit)
+           ['gold'], ['silver'], ['red'],                              # 7..9 (not used)
+           ['yellow'], ['blue'], ['ice', 'peri', 'green', 'steel', 'steel', 'steel']]   # Jicchi, Nick, Kelly
+JNAMES = sorted(_C)
+JPAL_WORDS = [(_C[n][2] << 16) | (_C[n][1] << 8) | _C[n][0] for n in JNAMES]
+JTAB_BYTES = bytes(JNAMES.index(j[min(k, len(j) - 1)]) for j in JACKETS for k in range(6))
+JTAB, JPAL = 0x8007C760, 0x8007C7B0          # SBC2, after btr / rtr (radar's data function, to 0x8007C81C)
+assert len(JTAB_BYTES) <= JPAL - JTAB and JPAL + 4 * len(JPAL_WORDS) <= 0x8007C81C
 WTAB = [max(8, 48 - 14 * i) for i in range(NH + 1)]   # half width of the ribbon at history point i (world units)
 import math
 DIRS = [(round(128 * math.cos(math.radians(a))), round(-128 * math.sin(math.radians(a)))) for a in (-15, 10, 35, 60, 82, 98, 120, 145, 170, 195)]
@@ -157,8 +174,7 @@ def main_code(tables):
           f'addiu s4, zero, {TRAIL_ENT}', *la('a0', VARS + HIST), *la('a1', VARS + CA), 'jal bproj', 'nop',
           *la('a1', VARS + CA), 'jal bscr', 'move a2, zero', 'sw t0, 0x68(sp)', f'addiu t1, t1, -{STREAK_UP}', 'sw t1, 0x6c(sp)',
           # colours: main (rider's) and core (half way to white), semi-transparent POLY_F4 (0x2A)
-          f'lui t0, {H(G_RIDER)}', f'lh t0, {L(G_RIDER)}(t0)', 'nop', 'andi t0, t0, 7', 'sll t0, t0, 2', *la('t1', tables['cols']),
-          'addu t1, t1, t0', 'lw t0, 0(t1)', 'lui t2, 0x2a00', 'or t1, t0, t2', 'sw t1, 0x60(sp)',
+          'jal bcol', 'nop', 'move t0, v0', 'lui t2, 0x2a00', 'or t1, t0, t2', 'sw t1, 0x60(sp)',
           'lui t3, 0x00fe', 'ori t3, t3, 0xfefe', 'and t0, t0, t3', 'srl t0, t0, 1', 'lui t3, 0x2a7f', 'ori t3, t3, 0x7f7f', 'addu t0, t0, t3', 'sw t0, 0x64(sp)',
           'move s5, zero',
           'btl:', 'addiu t0, s5, 1', f'lw t1, {V(HN)}', 'nop', 'slt at, t0, t1', 'beqz at, btr8', 'nop',
@@ -239,14 +255,18 @@ def main_code(tables):
           'bp1:', 'blez s6, bp2', 'nop', f'addiu a1, s5, {BX}', 'andi a1, a1, 0xffff', f'lui t0, {BY & 0xffff:#x}', 'or a1, a1, t0',
           f'lui a2, {BH}', 'or a2, a2, s6', *li('a3', 0x62FFFFFF), 'jal btile', 'nop',
           'bp2:', 'blez s5, bp5', 'nop',
-          f'lui t0, {H(G_RIDER)}', f'lh t0, {L(G_RIDER)}(t0)', 'nop', 'andi t0, t0, 7', 'sll t0, t0, 2', *la('t1', tables['cols']),
-          'addu t1, t1, t0', 'lw a3, 0(t1)', f'lw t0, {V(FRM)}', f'lw t1, {V(FLASH)}', 'andi t2, t0, 2', 'andi t1, t1, 2', 'bnez t1, bp3', 'nop',
+          'jal bcol', 'nop', 'move a3, v0', f'lw t0, {V(FRM)}', f'lw t1, {V(FLASH)}', 'andi t2, t0, 2', 'andi t1, t1, 2', 'bnez t1, bp3', 'nop',
           f'lw t1, {V(METER)}', f'addiu t3, zero, {MAX}', 'bne t1, t3, bp4', 'nop', 'beqz t2, bp4', 'nop',
           'bp3:', *li('a3', 0xFFFFFF),
           'bp4:', 'lui t0, 0x6000', 'or a3, a3, t0', *li('a1', xy(BX, BY)), f'lui a2, {BH}', 'or a2, a2, s5', 'jal btile', 'nop',
           'bp5:', *li('a1', xy(BX - 1, BY - 1)), *li('a2', xy(BW + 2, BH + 2)), *li('a3', 0x60000000), 'jal btile', 'nop',
           *li('a1', xy(BX - 2, BY - 2)), *li('a2', xy(BW + 4, BH + 4)), *li('a3', 0x60C0C0C0), 'jal btile', 'nop',
           'jal btp', 'nop', 'lw ra, 0x44(sp)', 'nop', 'jr ra', 'nop']
+    # bcol -> v0: the colour of the jacket worn (g_rider, g_jacket 0..5), tables in SBC2 (the boost is in the competition
+    # only, where Jicchi / Nick / Kelly are not playable: their rows are for later)
+    S += ['bcol:', 'lui t1, 0x8005', 'lh v0, 0x7408(t1)', 'lh t2, 0x740c(t1)', 'nop',
+          'sll t1, v0, 1', 'addu t1, t1, v0', 'sll t1, t1, 1', 'addu t1, t1, t2', *la('t2', JTAB), 'addu t1, t1, t2',
+          'lbu t1, 0(t1)', *la('t2', JPAL), 'sll t1, t1, 2', 'addu t1, t1, t2', 'lw v0, 0(t1)', 'jr ra', 'nop']
     return S
 
 
@@ -255,11 +275,11 @@ def image():
     def build(tables):
         c, l = asm(main_code(tables), BASE + 4)
         return c, l
-    c, l = build({'cols': 0, 'wtab': 0, 'dirs': 0})
+    c, l = build({'wtab': 0, 'dirs': 0})
     t0 = c[-1][0] + 4
-    tables = {'cols': t0, 'wtab': t0 + 4 * len(COLS), 'dirs': t0 + 4 * len(COLS) + 4 * len(WTAB)}
+    tables = {'wtab': t0, 'dirs': t0 + 4 * len(WTAB)}
     c, l = build(tables)
-    words = [MAGIC] + [w for _, w in c] + COLS + WTAB + [(dx & 0xffff) | ((dy & 0xffff) << 16) for dx, dy in DIRS]
+    words = [MAGIC] + [w for _, w in c] + WTAB + [(dx & 0xffff) | ((dy & 0xffff) << 16) for dx, dy in DIRS]
     assert BASE + 4 * len(words) <= BASE_END and VARS + VARS_LEN <= 0x801F3FF0
     return words, l
 
@@ -314,8 +334,12 @@ def ops(disc):
     c1, l1 = sbc1_code(img)
     c2, l2 = sbc2_code(l['bsnap'], l['rrest'])
     assert w2(EXIT_SITE) == 0x00408021 and w2(EXIT_SITE + 4) == 0x2A020005 and w2(BX_AGAIN) == J(3, 0x8005B220)
-    assert c2[-1][0] < 0x8007C81C
+    assert c2[-1][0] < JTAB
+    tb = JTAB_BYTES + bytes(-len(JTAB_BYTES) % 4)
+    c2 += [(JTAB + i, struct.unpack_from('<I', tb, i)[0]) for i in range(0, len(tb), 4)] + [(JPAL + 4 * i, w) for i, w in enumerate(JPAL_WORDS)]
     out = [['w', '/SBC1.BIN', a - OVL, w1(a), x] for a, x in c1 + [(SBC1_SITE, J(3, l1['bins']))]]
+    assert w2(SAVE_SITE) == 0x10620004 and w2(SAVE_SITE + 0x14) == 0x24040001
+    c2 = c2 + [(SAVE_SITE, 0x10000004)]
     out += [['w', '/SBC2.BIN', a - OVL, w2(a), x] for a, x in c2 + [(SBC2_SITE, J(3, l2['btr'])),
                                                                       (EXIT_SITE, J(2, l2['rtr'])), (EXIT_SITE + 4, 0x00408021)]]
     return out
