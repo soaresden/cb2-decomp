@@ -68,3 +68,14 @@ l'épreuve, le 2e essai reste « non joué » (-1) et le Boarder Cross se charge
 (son test de START n'a pas été trouvé : les tests 0x800 de `func_8005BFB8` changés en 0x900 n'y font rien).
 Vérifié : SELECT + START → mode 1, 2e essai à -1 ; START seul → 2e essai joué ; SELECT sur « 1st STAGE » → toujours
 le Boarder Cross directement.
+
+## EXIT après une manche gagnée (v74)
+
+Le menu de fin de manche (NEXT ROUND / GEAR SELECT / SAVE) est dessiné par `func_80085AFC` de SBC2 à partir d'une
+table de sprites (10 octets : uv, largeur, hauteur, CLUT, tpage ; copiée de D_8008E9A8), y = 0x60 + 0x18 × i ; le
+contexte du menu (sp + 0x130 de `func_800824C0`, passé à `func_80082854`) a le mode en + 0, le drapeau SAVE en + 0x34
+(2 ou 3 lignes), le curseur en + 0x38 et le résultat en + 0x3C (0 NEXT ROUND, 1 GEAR SELECT, 3 RETRY, -1 EXIT). Le
+menu du GAME OVER (`func_80085804`, RETRY / EXIT) rend -1 pour EXIT. Le Remix (boost.py `exit_ops`) dessine en 4e ligne
+le sprite EXIT du GAME OVER (`exd`, sur la sortie de la boucle des lignes, 0x80085D3C), laisse le curseur descendre
+d'une ligne de plus (0x80083310 : drapeau + 2) et, X sur EXIT (`exs`, sur le chemin « pas SAVE » 0x80083390), rend -1 :
+retour au titre, comme le EXIT du GAME OVER. Vérifié dans l'émulateur (manche gagnée : CPU à 60 s de handicap).

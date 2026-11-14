@@ -375,7 +375,7 @@ def ops(disc):
     c2 = c2 + [(SAVE_SITE, 0x10000004)]
     out += [['w', '/SBC2.BIN', a - OVL, w2(a), x] for a, x in c2 + [(SBC2_SITE, J(3, l2['btr'])),
                                                                       (EXIT_SITE, J(2, l2['rtr'])), (EXIT_SITE + 4, 0x00408021)]]
-    return out + free_ops(disc)
+    return out + free_ops(disc) + exit_ops(disc)
 
 
 def free_ops(disc):
@@ -397,3 +397,36 @@ def free_ops(disc):
 if __name__ == '__main__':
     img, l = image(); c1, _ = sbc1_code(img)
     print('image', len(img) * 4, 'bytes; last word', hex(c1[-1][0]), 'labels', {k: hex(v) for k, v in l.items() if k in ('bmain', 'btrail', 'bbarf')})
+
+
+# v74: EXIT under SAVE on the won round's menu (NEXT ROUND / GEAR SELECT / SAVE: SBC2 func_80085AFC draws them from a
+# table of sprites (10 bytes: uv, w, h, clut, tpage), at y 0x60 + 0x18 i, cursor in + 0x38 of the menu's context, the
+# SAVE flag in + 0x34 (always 1 with SAVE_SITE)). EXIT is the GAME OVER menu's sprite (func_80085804's table): drawn
+# 4th by `exd` (on the loop's exit, 0x80085D3C), the cursor may go one further (0x80083310: flag + 2), and X on it
+# (`exs`, on the "not SAVE" path) gives the menu's result -1, the GAME OVER's EXIT: back to the title.
+EX_CAVE, EX_CAVE_END = 0x80070D08, 0x80070E9C             # dead function of SBC2
+EX_DRAW_SITE, EX_BOUND, EX_SEL_SITE, EX_BACK = 0x80085D3C, 0x80083310, 0x80083390, 0x80083548
+EX_SPR = (0x9088, 40, 16, 0x747B, 22)                      # EXIT (GAME OVER menu)
+EX_X, EX_Y = 144, 0x60 + 0x18 * 3
+SPRITE_FN, TPAGE_FN = 0x800129C0, 0x80012BDC
+
+
+def exit_ops(disc):
+    s2 = disc.read_file('/SBC2.BIN'); w2 = lambda a: struct.unpack_from('<I', s2, a - OVL)[0]
+    assert w2(EX_DRAW_SITE) == 0x02C02021 and w2(EX_BOUND) == 0x24420001 and w2(EX_SEL_SITE) == 0x24020001
+    assert w2(EX_SEL_SITE + 4) == J(2, EX_BACK) and w2(EX_SEL_SITE + 8) == 0xAE62003C
+    spr = EX_CAVE_END - 12
+    S = ['exd:', 'addiu sp, sp, -0x28', 'sw ra, 0x20(sp)', 'addiu at, zero, 3', 'bne s5, at, ex9', 'nop',
+         'lw t0, 0x38(fp)', 'addiu t1, zero, 0x60', 'bne t0, at, ex1', 'nop', 'lbu t1, 0xc0(sp)',      # caller's 0x98
+         'ex1:', 'sw t1, 0x14(sp)', *la('t2', spr), 'sw t2, 0x10(sp)', 'move a0, s6', 'move a1, s2',
+         f'addiu a2, zero, {EX_X}', f'jal {SPRITE_FN:#x}', f'addiu a3, zero, {EX_Y}',
+         'move a0, s6', 'move a1, v0', *la('t2', spr), f'jal {TPAGE_FN:#x}', 'lhu a2, 8(t2)', 'move s2, v0',
+         'ex9:', 'lw ra, 0x20(sp)', 'addiu sp, sp, 0x28', 'move a0, s6', 'jr ra', 'move a1, s2',
+         # exs: X on the menu, not SAVE: v1 = cursor (1 = GEAR SELECT, 3 = EXIT)
+         'exs:', 'addiu v0, zero, 1', 'addiu at, zero, 3', 'bne v1, at, es1', 'nop', 'addiu v0, zero, -1',
+         'es1:', f'j {EX_BACK:#x}', 'sw v0, 0x3c(s3)']
+    c, l = asm(S, EX_CAVE); assert c[-1][0] < spr
+    blob = struct.pack('<HHHHH', *EX_SPR) + bytes(2)
+    c += [(spr + i, struct.unpack_from('<I', blob, i)[0]) for i in range(0, 12, 4)]
+    c += [(EX_DRAW_SITE, J(3, l['exd'])), (EX_BOUND, 0x24420002), (EX_SEL_SITE, J(2, l['exs'])), (EX_SEL_SITE + 4, 0)]
+    return [['w', '/SBC2.BIN', a - OVL, w2(a), x] for a, x in c]

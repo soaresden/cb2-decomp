@@ -700,3 +700,6 @@ compteur D_8009B954 vaut -1 pendant l'essai (PRACTICE) et passe à 0 au « GO!! 
 en 0x800749D8 quand le niveau D_8009CF10 vaut 0) ; Pause → Restart pendant l'essai le relance. STOP (bamstop) en
 session : TIME passe à 1'00"040, YOUR GRADE IS…, puis le classement TRICK MASTER avec 1'00"040 (vérifié, niveau 114
 → GRAY).
+
+v74 : « GRAY IN n » du Big Air Master revient en haut à droite sous le nom de la note, 16 pixels plus haut (y -76)
+qu'en v53..v72 (il mordait sur les noms de figures) ; EXIT sous SAVE après une manche gagnée (voir competition.md).
