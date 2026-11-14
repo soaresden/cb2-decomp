@@ -110,6 +110,7 @@ ENT3, IDX3, ALIAS2 = DATA + 0xB4, DATA + 0xCC, DATA + 0xD4   # 2 players: player
 TEN = DATA + 0xD8; MAX_FLAG = 0x8002957C                        # a stat of 10 (MAX on the WEAR screen); mod max's on/off flag
 # voices: the base rider's, played higher or lower (SPU pitch, 0x5CE = the game's own): Jicchi -1.5, Nick -4, Kelly +3 semitones
 PLAY = 0x80015D18; VOICE_CH, VOICE_PITCH = 0x100000, 0x5CE
+VOICE_SITES = {'/FREE.BIN': 0x8007EBA4, '/TM.BIN': 0x8007E420, '/HP.BIN': 0x8007DCE8, '/BP.BIN': 0x8007C700, '/OMT.BIN': 0x8007CD70, '/COMB.BIN': 0x8007E51C}
 VOICE_SEMI = [-1.5, -4, 3]
 BASE = [0, 1, 2]
 MODES = (1 << 2) | (1 << 3) | (1 << 5) | (1 << 6) | (1 << 7) | (1 << 8)   # Free Style (1P, 2P), Big Air, Big Air Master, Halfpipe, Board Park
@@ -227,14 +228,13 @@ def routines(race_regs):
     # play function of the exe (a0 pitch, a1 SPU voice bit, a2 sample, a3 volume): the rider's voice in a race
     # (voice 20, pitch 0x5CE) with an alias -> its own pitch. Replaces "lui v0 / lhu v0" at the entry. Not aval: its
     # 'unlock' test reads MAIN_SEL, gone in a race.
-    S += ['vp:', f'lui at, {VOICE_CH >> 16:#x}', 'bne a1, at, vp9', f'addiu at, zero, {VOICE_PITCH}', 'bne a0, at, vp9',
-          'lui at, 0x8006', 'lw at, -0x5158(at)', 'nop', 'addiu at, at, -8', 'bnez at, vp9',
-          # alias chosen (the BOARDER screen already checked it was won), for this base rider, in an allowed mode
-          f'lui at, {H(ALIASV)}', f'lw t0, {L(ALIASV)}(at)', 'nop', 'beqz t0, vp9', f'lui at, {H(BASEV)}', 'addu at, at, t0',
-          f'lbu t1, {L(BASEV)}(at)', 'lui at, 0x8005', 'lh t2, 0x7408(at)', 'lw t3, 0x7420(at)', 'bne t1, t2, vp9',
-          f'lui at, {H(MODESV)}', f'lw at, {L(MODESV)}(at)', 'nop', 'srlv at, at, t3', 'andi at, at, 1', 'beqz at, vp9',
-          'sll t3, t0, 1', f'lui at, {H(VPITCH - 2)}', 'addu at, at, t3', f'lhu a0, {L(VPITCH - 2)}(at)',
-          'vp9:', 'lui v0, 0x8005', 'lhu v0, 0x08a8(v0)', f'j {PLAY + 8}', 'nop']
+    # apitch -> v0: the pitch of the rider's voice channel (each race overlay stores 0x5CE in its voice block at its
+    # start: VOICE_SITES) -- the alias's pitch when it is the chosen rider in an allowed mode (v55; until v54 `vp` changed
+    # voice 20 of the exe's sound function: the crowd and the noises, not the rider)
+    S += ['apitch:', f'lui t0, {H(ALIASV)}', f'lw t0, {L(ALIASV)}(t0)', f'addiu v0, zero, {VOICE_PITCH}', 'beqz t0, ap9',
+          f'lui t1, {H(BASEV)}', 'addu t1, t1, t0', f'lbu t1, {L(BASEV)}(t1)', 'lui t2, 0x8005', 'lh t3, 0x7408(t2)', 'lw t4, 0x7420(t2)',
+          'bne t1, t3, ap9', f'lui t5, {H(MODESV)}', f'lw t5, {L(MODESV)}(t5)', 'nop', 'srlv t5, t5, t4', 'andi t5, t5, 1', 'beqz t5, ap9',
+          'sll t3, t0, 1', f'lui t6, {H(VPITCH - 2)}', 'addu t6, t6, t3', f'lhu v0, {L(VPITCH - 2)}(t6)', 'ap9:', 'jr ra', 'nop']
     S += ['ccom:', 'sh v0, 0x7408(at)', f'lui at, {H(ACUR)}', f'lw t9, {L(ACUR)}(at)', 'bnez s6, cc2', f'lui at, {H(ALIASV)}', f'j {CCOM + 8}',
           f'sw t9, {L(ALIASV)}(at)', 'cc2:', f'lui at, {H(ALIAS2)}', f'j {CCOM + 8}', f'sw t9, {L(ALIAS2)}(at)']
     # race parameters: replaces "sll v0, R, 4" (delay slot: lui v1, hi); the next instruction (at ra) is addiu v1, v1, lo
@@ -390,7 +390,7 @@ def place(S):
 
 
 # block starts for place(); nx and mdq are not fallen into (an unconditional jump comes before them)
-TOP = {'aval', 'amode', 'setcur', 'navH2', 'fwH2', 'nwH2', 'rpv', 'rpg', 'msb', 'navH', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'acomp', 'fwx', 'nwx', 'vp', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
+TOP = {'aval', 'amode', 'setcur', 'navH2', 'fwH2', 'nwH2', 'rpv', 'rpg', 'msb', 'navH', 'fwH', 'nwH', 'ld24', 'mreq', 'munsh', 'mshow', 'mdl', 'mdq', 'mpoll', 'wup', 'strip', 'stl', 'stp', 'acomp', 'fwx', 'nwx', 'apitch', 'cinit', 'ccom'} | {f'bar_{r}_{x}' for _, r, x in BARS} | {f'rp_{r}' for r in ('s0', 's1', 's2', 's3', 's4', 's5', 's6', 's7')}
 
 
 # ---------------------------------------------------------------------------------------------------- disc layout
@@ -470,8 +470,9 @@ def patches(fs_read, placed):
     for f, a in RACE.items(): P.append((f, a - 12, J(3, lb['rpv' if f == '/VS.BIN' else 'rp_' + race_regs[f]])))
     for a in MDL_SITES: assert w_ms(a) == J(3, FN_MDL), hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb['mdl'])))
     for a in WEAR_UPLOADS: assert w_ms(a) == J(3, UPLOAD), hex(a); P.append(('/MAIN_SEL.BIN', a, J(3, lb['wup'])))
-    assert w_ex(PLAY) == 0x3c028005 and w_ex(PLAY + 4) == 0x944208a8          # lui v0, 0x8005 / lhu v0, 0x8a8(v0)
-    P += [('/SCES_009.92', PLAY, J(2, lb['vp'])), ('/SCES_009.92', PLAY + 4, 0)]
+    for f, a in VOICE_SITES.items():            # addiu v0, zero, 0x5CE -> jal apitch (sw v0 to the voice block follows)
+        d = fs_read(f); assert struct.unpack_from('<I', d, a - OVL)[0] == 0x240205CE, (f, hex(a))
+        P.append((f, a, J(3, lb['apitch'])))
     return P
 
 

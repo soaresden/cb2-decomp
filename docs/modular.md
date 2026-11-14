@@ -147,7 +147,8 @@ en fait de Jicchi / Nick / Kelly. Modes autorisés (0x80057420) : 2 Free Style, 
   et `amode` passent par elle, donc tant que le jeu n'est pas fini les trois alias restent gris dans la rangée de
   têtes et le curseur les saute. Avec `unlock` (mot 0x2403007F en 0x80063EA8), ils sont disponibles d'office.
   L'annonce (CONGRATULATIONS) est faite par le mod `news`.
-- Voix : celles du rider de base, jouées plus graves ou plus aiguës. La fonction de son de l'exe `func_80015D18`
+- Voix : celles du rider de base, jouées plus graves ou plus aiguës (v55 : voir plus bas, la voix SPU du rider ; ce
+  qui suit décrit l'ancien crochet, retiré). La fonction de son de l'exe `func_80015D18`
   (a0 hauteur, a1 voix SPU, a2 échantillon, a3 volume) passe par `vp` : en course (overlay 8), pour la voix 20
   (0x100000) à la hauteur normale 0x5CE, avec un alias pour ce rider de base dans un mode permis, la hauteur devient
   celle de l'alias (Jicchi −1,5, Nick −4, Kelly +3 demi-tons : 1363, 1179, 1767). Pas `aval` ici : son test du mod
@@ -495,3 +496,11 @@ Kelly passe le lecteur en mode données (func_80013C94), ce qui arrêtait la mus
 (mesuré dans l'émulateur : volume 6500 → 0) ; `mpoll` la relance à la fin du chargement comme l'entrée de MAIN_SEL
 (func_800171B4(3, 2)) : le volume reste à ~6700. Pour la place : `crew` reçoit deux fonctions mortes de l'exe que le mod
 options gardait sans s'en servir (0x8001829C, 0x80031180), et `place` de crew essaie toutes les répartitions.
+
+v55 : **voix de Jicchi, Nick et Kelly** : jusqu'à la v54, `vp` changeait la hauteur de la voix 20 de la fonction son de
+l'exe (0x80015D18) : c'est la voix des bruits et de la foule (échantillon 0x21…), pas celle du rider. La voix du rider
+est jouée par chaque overlay de course sur sa propre voix SPU (0x400000), avec une hauteur rangée dans son bloc de voix
+au début de la course (`addiu v0, zero, 0x5CE` puis `sw` : FREE 0x8007EBA4, TM 0x8007E420, HP 0x8007DCE8, BP 0x8007C700,
+OMT 0x8007CD70, COMB 0x8007E51C). Ces mots deviennent `jal apitch`, qui rend la hauteur de l'alias quand il est le rider
+choisi dans un mode permis (sinon 0x5CE) ; le crochet de 0x80015D18 est retiré (la foule retrouve sa hauteur). Vérifié
+dans l'émulateur : Nick en Free Style 1179, Kelly en half-pipe 1767.
