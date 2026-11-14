@@ -686,3 +686,10 @@ tables de vestes). **Chutes en chiffres en Free Style** (`radar.free_fall_ops`) 
 de FREE (0x8006D2C8), routines de texte du HUD de FREE trouvées par leur code (0x800942E4 / 0x80094670, police
 D_800A3FB8), code coupé en quatre petites fonctions mortes ; la ligne FALLS AS A NUMBER (bit 17) est aussi dans
 l'onglet FREE. Vérifié : une bille + « x3 » ; replay sans barre.
+
+v72 : **musique du menu qui ne redémarre plus sur Jicchi / Nick / Kelly** : la lecture de leur modèle 3D sur le CD
+coupait la musique (CD audio), relancée depuis le début (`MUSIC(3, 2)`, v54). Maintenant `mreq` appelle la pause des
+courses du jeu (func_800173F0 : position courante gardée en D_800509CC, CdlGetlocP) avant la lecture, et `mpoll`
+remet le mode « report » (CdControl(CdlSetmode, 4)) puis la reprise du jeu (func_800174F8 : CdlPlay depuis la
+position). Mesuré : plus de redémarrage (le niveau ne repart pas sur l'intro) ; il reste un silence d'environ 0,3 s
+pendant la lecture.

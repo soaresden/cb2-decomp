@@ -110,7 +110,7 @@ NMENU = 5
 # copy of func_8001C748's clearing loop
 ENTG = 0x8001C1A0; ENTG_END = 0x8001C1C0
 MENU_SHOWN = 0x4D575253                                 # 'SRWM' + k in MENU_SAVE: alias k's texture is in VRAM
-MODELS = 0x8007C4E8; FN_MDL = 0x80064A08; MUSIC = 0x800171B4; MDL_SITES = [0x800602E8, 0x80061580]
+MODELS = 0x8007C4E8; FN_MDL = 0x80064A08; MUSIC = 0x800171B4; MUS_PAUSE, MUS_RESUME, CDCTL = 0x800173F0, 0x800174F8, 0x80040B7C; MDL_SITES = [0x800602E8, 0x80061580]
 UPLOAD = 0x8005DB60; WEAR_UPLOADS = [0x80064100, 0x80064124]
 LOADIMAGE = 0x80029B7C; STOREIMAGE = 0x80029BE0; DRAWSYNC = 0x800298B8; QPOLL = 0x80013CE0
 CDMODE = 0x80013C94       # CdControl(CdlSetmode, 0xA0): data reading, as the game's own loads do
@@ -282,7 +282,7 @@ def routines(race_regs):
     # mreq(a0 = k): load the model of alias k into MENU_BUF (CD queue), unless already asked
     S += ['mreq:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'move s0, a0',
           f'lui at, {H(PENDING)}', f'lw t0, {L(PENDING)}(at)', 'nop', 'beq t0, s0, mr9', 'nop', f'sw s0, {L(PENDING)}(at)',
-          f'lui at, {H(MM)}', f'sw zero, {L(MM)}(at)', f'jal {CDMODE}', 'nop',
+          f'lui at, {H(MM)}', f'sw zero, {L(MM)}(at)', f'jal {MUS_PAUSE:#x}', 'nop', f'jal {CDMODE}', 'nop',   # v72: the music paused at its place
           'sll t0, s0, 1', f'lui at, {H(IDX2 - 2)}', 'addu at, at, t0', f'lh a0, {L(IDX2 - 2)}(at)',
           f'lui a1, {H(MENU_BUF)}', f'addiu a1, a1, {L(MENU_BUF)}', f'lui a2, {H(DUMMY)}', f'addiu a2, a2, {L(DUMMY)}',
           f'jal {ENQ}', 'addiu a3, zero, 1',
@@ -320,14 +320,16 @@ def routines(race_regs):
           'md9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw s1, 0x18(sp)', 'lw s2, 0x1c(sp)', 'jr ra', 'addiu sp, sp, 0x28']
     # mpoll(): every frame of the BOARDER screen while a model is being loaded (keeps a0-a3)
     S += ['mpoll:', f'lui at, {H(PENDING)}', f'lw t0, {L(PENDING)}(at)', 'nop', 'bnez t0, mp1', 'nop', 'jr ra', 'nop',
-          'mp1:', 'addiu sp, sp, -0x28', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'sw a0, 0x18(sp)', 'sw a1, 0x1c(sp)', 'sw a2, 0x20(sp)', 'sw a3, 0x24(sp)', 'move s0, t0',
+          'mp1:', 'addiu sp, sp, -0x30', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'sw a0, 0x18(sp)', 'sw a1, 0x1c(sp)', 'sw a2, 0x20(sp)', 'sw a3, 0x24(sp)', 'move s0, t0',
           f'jal {QPOLL}', 'nop', f'lui at, {H(MM)}', f'lw t0, {L(MM)}(at)', f'lui t1, {H(MENU_MAGIC)}', f'addiu t1, t1, {L(MENU_MAGIC)}', 'addu t1, t1, s0', 'bne t0, t1, mp9',
           f'lui at, {H(PENDING)}', f'sw zero, {L(PENDING)}(at)',
-          # the read stopped the menu's CD music (data mode): it starts again, as MAIN_SEL's entry starts it (v54)
-          'addiu a0, zero, 3', f'jal {MUSIC}', 'addiu a1, zero, 2',
+          # the read stopped the menu's CD music (data mode): v72 it goes on where it was (the game's own pause / resume
+          # of the races: func_800173F0 keeps the position, func_800174F8 plays from it), after the report mode again
+          'addiu t0, zero, 4', 'sb t0, 0x28(sp)', 'addiu a0, zero, 0xe', 'addiu a1, sp, 0x28', f'jal {CDCTL:#x}', 'move a2, zero',
+          f'jal {MUS_RESUME:#x}', 'nop',
           f'lui at, {H(ACUR)}', f'lw t0, {L(ACUR)}(at)', 'nop', 'bne t0, s0, mp9', f'lui at, {H(BASEV)}',
           'addu at, at, s0', 'jal mdl', f'lbu a0, {L(BASEV)}(at)',
-          'mp9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw a0, 0x18(sp)', 'lw a1, 0x1c(sp)', 'lw a2, 0x20(sp)', 'lw a3, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x28']
+          'mp9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw a0, 0x18(sp)', 'lw a1, 0x1c(sp)', 'lw a2, 0x20(sp)', 'lw a3, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x30']
     # strip(a0 = primitive buffer, a1 = rider under the cursor, a2 = the name tag's primitive) -> v0 = buffer after the
     # 10 heads (POLY_FT4 written here, linked right after the name tag: drawn over the screen like it)
     S += ['strip:', 'addiu sp, sp, -0x48', 'sw ra, 0x40(sp)', 'sw s0, 0x20(sp)', 'sw s1, 0x24(sp)', 'sw s2, 0x28(sp)', 'sw s3, 0x2c(sp)',
