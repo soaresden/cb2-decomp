@@ -626,3 +626,10 @@ et ramassé en test (code v61 injecté dans un état du parking). E passe sur la
 (dessus 47483 à z −96400, rayon y 500 : la neige est 660 plus bas), I sur le tronc près de son bout (dessus 126933 à
 z −246100, rayon y 400) : on ne les prend qu'en glissant dessus. M reste en haut du 2e grand saut, R derrière la porte.
 (Monter sur un rail n'a pas pu être automatisé : le pilote le longe.)
+
+v63 : **écran REMIX par mode de jeu** (`remix/options.py`) : six onglets COMP, FREE, AIR, PIPE, PARK, GAME au lieu de
+RACE / RIDERS / GAME ; chaque onglet de mode liste les options qui jouent dans ce mode (vue arrière, contrôle aérien
+dans plusieurs : c'est le même bit, partagé), GAME les réglages de tout le jeu. Les réglages restent dans le mot
+sauvegardé 0x80057438 (un seul mot libre dans la sauvegarde : pas de valeurs séparées par mode).
+- Place : MODE_SEL passe à 85 secteurs (`toggles.SCREEN` = 0x1000 octets, le tas du menu démarre 0x800 plus loin ;
+  vérifié : Board Park et une course Free Style démarrent) ; pointeurs des lignes en demi-mots.

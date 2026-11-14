@@ -79,9 +79,13 @@ def L(a): return a - (H(a) << 16)
 
 
 # the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
-TABS = [('RACE', [0, 19, 20, 6, 7, 17, 1, 3, 4, 13]),
-        ('RIDERS', [10, 16, 21, 11, 12, 8]),
-        ('GAME', [9, 15, 14, 2, 5, 18])]
+TABS = [('COMP', [0, 19, 20, 15, 6, 7, 17, 3, 4, 9, 10]),          # v63: one tab per game mode (a switch can be in several:
+        ('FREE', [0, 3]),                                          # it is the same bit), then the game-wide ones
+        ('AIR', [13, 0, 3]),
+        ('PIPE', [1, 3]),
+        ('PARK', [21, 0, 3]),
+        ('GAME', [16, 11, 12, 8, 14, 2, 5, 18])]
+TAB_X0, TAB_DX = -148, 52                # the tabs' names (menu font)
 UP, RIGHT, DOWN, LEFT, TRI, CIRC, CROSS = 0x1000, 0x2000, 0x4000, 0x8000, 0x10, 0x20, 0x40
 PADV = 0x800832BA                      # MODE_SEL's pad words (held, ...: 0x800832BA..0x800832C5), set by func_8005CCE4
 PAD_CALL, PAD_FN = 0x8005CB94, 0x8005CCE4
@@ -145,7 +149,8 @@ def data():
     put('tabl', b''.join(bytes(l) + bytes(16 - len(l)) for _, l in TABS))
     for i, t in enumerate(LINES): put('l%d' % i, t.encode() + b'\0')
     for i, t in enumerate(WARN): put('w%d' % i, t.encode() + b'\0')
-    put('ltab', b''.join(struct.pack('<I', lab['l%d' % i]) for i in range(len(LINES))))
+    assert all(lab['l%d' % i] >> 16 == 0x8008 for i in range(len(LINES)))
+    put('ltab', b''.join(struct.pack('<H', lab['l%d' % i] & 0xffff) for i in range(len(LINES))))   # v63: halfwords (0x8008....)
     put('ttab', b''.join(struct.pack('<I', lab['t%d' % i]) for i in range(len(TABS))))
     put('ptab', b''.join(struct.pack('<4I', a, on, off, bit) for a, on, off, bit in PATCH))
     data.side = bytes(d2)
@@ -223,13 +228,13 @@ def routines(D):
     S += ['drs:', f'addiu t4, zero, {LOGO_TITLE_XY[0]}', f'addiu t5, zero, {LOGO_TITLE_XY[1]}', 'lui t7, 0x80', 'ori t7, t7, 0x8080', 'jal dlogo', 'nop',
           'move s7, zero',
           'dt1:', 'sw s7, 0x30(sp)', 'sll t0, s7, 2', *la('t1', D['ttab']), 'addu t1, t1, t0', 'lw t6, 0(t1)',
-          'addiu t0, zero, 88', 'mult s7, t0', 'mflo t4', 'addiu t4, t4, -132', 'addiu t5, zero, -80',
+          f'addiu t0, zero, {TAB_DX}', 'mult s7, t0', 'mflo t4', f'addiu t4, t4, {TAB_X0}', 'addiu t5, zero, -80',
           *la('t7', D['rgbh']), *lw('t0', 'tab'), 'bne t0, s7, dt2', 'nop', *la('t7', D['rgbt']),
           'dt2:', 'jal drw', 'nop', 'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', f'slti t0, s7, {NT}', 'bnez t0, dt1', 'nop',
           'move s7, zero', 'j di1', 'nop']
     S += ['di1:', *lw('t0', 'tab'), *la('t1', D['cnts']), 'addu t1, t1, t0', 'lbu t1, 0(t1)', 'nop', 'slt t2, s7, t1', 'bnez t2, dic', 'nop', 'j dh', 'nop', 'dic:',
           'sw s7, 0x30(sp)', 'sll t0, t0, 4', 'addu t0, t0, s7', *la('t1', D['tabl']), 'addu t1, t1, t0', 'lbu t3, 0(t1)', 'nop', 'sw t3, 0x24(sp)',
-          'sll t0, t3, 2', *la('t1', D['ltab']), 'addu t1, t1, t0', 'lw t6, 0(t1)',
+          'sll t0, t3, 1', *la('t1', D['ltab']), 'addu t1, t1, t0', 'lhu t6, 0(t1)', 'lui t1, 0x8008', 'or t6, t6, t1',
           'addiu t0, zero, 14', 'mult s7, t0', 'mflo t5', 'addiu t5, t5, -56', 'sw t5, 0x28(sp)', 'addiu t4, zero, -132',
           *la('t7', D['rgbn']), *lw('t0', 'item'), 'bne t0, s7, di2', 'nop', *la('t7', D['rgbs']),
           'di2:', 'jal drw', 'nop',
