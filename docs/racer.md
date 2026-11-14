@@ -130,6 +130,9 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
   coordonnées, PMD, objet, base, numéro), racine en rider + 0x1D4. Hiérarchie de Snowman (Free Style) :
   racine → 12 → 9 → 13 → 8 → {14 → 7 → 15 → 5 → 16 → 6, 17 → 10, 18 → 11}.
   `snw` remet ces 14 parents à chaque image (les os humains 19..28 restent, inutilisés, sous ceux de Snowman).
+  Hauteur : la mise en place de TOD_SM met l'os 12 à 119 sous la racine ; le Free Style le met à 219 (100 plus bas,
+  jamais animé : même valeur à chaque image dans les deux modes). Sans ça, Snowman flottait 100 unités au-dessus de
+  son ombre en Compétition : `snw` remet aussi 219 (v30).
   Piège : `lbu a0` suivi tout de suite de `beqz a0` lisait l'ancien a0 (délai de chargement) → l'os 12 restait
   sous un os humain → boucle dans la hiérarchie, récursion sans fin, mémoire écrasée.
 - SBC1 (1re étape, épreuves de figures) a le même problème : riders D_80090DF0, conversions 0x80083DC0 / 0x8008A4E0,

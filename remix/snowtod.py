@@ -19,7 +19,8 @@
 #          entries, GsCOORDINATE2 at +4, id at +0x14) got their parents from the human TOD's setup motion (motion 0:
 #          "create" and "parent" packets for ids 5..0x1C), so TOD_SM's bones 12..18 moved human bones and the 7 pieces
 #          flew apart, huge, around the camera. Each object/bone 5..18 gets its parent of Free Style (super, +0x48),
-#          bone 12 the rider's root (rider + 0x1D4). The human bones 19..28 stay, unused, under Snowman's.
+#          bone 12 the rider's root (rider + 0x1D4), and bone 12 is put 100 lower (ROOT_Y, as Free Style does: without it he
+#          floated above his shadow). The human bones 19..28 stay, unused, under Snowman's.
 import struct
 from asm import asm
 
@@ -47,6 +48,9 @@ assert len(MAP) == 100
 # Snowman's hierarchy, as Free Style builds it: objects 5..11, bones 12..18 (id, parent id; 0 = the rider's root)
 HIER = [(5, 15), (6, 16), (7, 14), (8, 13), (9, 12), (10, 17), (11, 18),
         (12, 0), (13, 9), (14, 8), (15, 7), (16, 5), (17, 8), (18, 8)]
+# his base bone: TOD_SM's setup puts it 119 below the rider's root (y down); Free Style has it 100 lower, on the snow
+# (never animated: the same in every frame of both modes). In the competition he floated 100 units above his shadow.
+ROOT_BONE, ROOT_Y = 12, 219
 
 
 def H(a): return (a + 0x8000) >> 16
@@ -86,7 +90,9 @@ def sbc_code(name):
          'lui t6, HIEH', 'addiu t6, t6, HIEL', f'addiu t7, t6, {2 * len(HIER)}',
          'sh1:', 'jal fnd', 'lbu a0, 0(t6)', 'move a1, v0', 'lbu a0, 1(t6)', 'nop', 'beqz a0, sh2', 'move v0, t9', 'jal fnd', 'nop',
          'sh2:', 'beqz a1, sh3', 'nop', 'beqz v0, sh3', 'nop', 'sw v0, 0x48(a1)',
-         'sh3:', 'addiu t6, t6, 2', 'bne t6, t7, sh1', 'nop', 'j sn9', 'nop',
+         'sh3:', 'addiu t6, t6, 2', 'bne t6, t7, sh1', 'nop',
+         # his base bone as low as in Free Style (his feet on the snow)
+         'jal fnd', f'addiu a0, zero, {ROOT_BONE}', 'beqz v0, sn9', f'addiu t0, zero, {ROOT_Y}', 'sw t0, 0x1c(v0)', 'j sn9', 'nop',
          # coordinate of the object/bone a0 in the rider's object list (t8), 0 if none
          'fnd:', 'move t1, t8',
          'fn1:', 'lw t2, 0x14(t1)', 'addiu at, zero, -1', 'beq t2, at, fn9', 'move v0, zero', 'bne t2, a0, fn1', 'addiu t1, t1, 0x18',
