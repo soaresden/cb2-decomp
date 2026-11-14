@@ -1,7 +1,18 @@
 # R-E-M-I-X letters in the Board Park (part of the mod `crew`, v60), as the S-K-A-T-E letters of Tony Hawk's: five
-# letters float along the course (on the snow, and at the top of the two big jumps and in the bowl); riding through a
-# letter collects it; the five in one run unlock Jicchi, Nick and Kelly for good (bit 31 of the saved word 0x80057438,
-# which crew's `acomp` reads instead of the 100 % of the progress page).
+# letters spin along the course; riding through a letter collects it (a sound); the five in one run unlock Jicchi, Nick
+# and Kelly for good (bit 31 of the saved word 0x80057438, which crew's `acomp` reads instead of the 100 % of the
+# progress page). Each new run (back at the top) the letters are there again; the unlock happens once.
+# v61: R hidden behind a slalom gate, E and M at the top of the two big jumps, I at the end of the log slide (left lane
+# of the tree island), X on the roof of the first truck of the car park (the trucks, logs and rails of the course are
+# walls for the game: it is taken riding along the truck, as close as possible). At the start of a run (and when the
+# five are taken), an overlay says the goal and the status, LOCKED (red) or UNLOCKED (green), with the game's own text
+# routine of BP (func_80086F14, its ASCII font is in VRAM: x 320, y 256, palette 992, 460). The REMIX screen's switch
+# 21 (PARK ICONS JICCHI NICK KELLY, tab RIDERS) turns the letters off.
+#
+# The course (DATA/CRS/CRS_BS.DAT, part 1 "CJ"): 234 sections of 0x38 bytes: position (x, y, z: world units, as the
+# racers'), links, two index lists, then the TMD objects (1-based, part 0) of the section: track, scenery, objects
+# (rails, logs, trucks...), terrain; their vertices are relative to the section's position. The rider's y is the
+# height of the track + terrain triangles (checked against a recorded run): the positions below come from them.
 #
 # BP.BIN: the main loop calls func_80074344 (an empty function) every frame at 0x8005C31C (as HP's, which hplive uses):
 # it goes through `rlx` (two dead functions of BP, 0x8006EA48..0x8006EE54), which calls it, then:
@@ -23,7 +34,7 @@ OVL = 0x8005AEA8
 HOOK, HOOK_FN = 0x8005C31C, 0x80074344
 CODE, CODE_END = 0x8006EA48, 0x8006EE54          # dead functions of BP.BIN (no call, jump or pointer to any of their words)
 DATA_CAVES = [(0x8008ECAC, 0x8008EFF0), (0x80093FDC, 0x8009414C), (0x80070A64, 0x80070BC8)]
-TAB, TAB_END = 0x8007CF1C, 0x8007D02C
+TAB, TAB_END = 0x8007CED4, 0x8007D084             # three dead functions in a row
 RACERS, WS, WST, PRIMS, FRAME = 0x8009FE24, 0x80058E20, 0x80058E34, 0x80058E0C, 0x800A001C
 FLAGS, DONE_BIT = 0x80057438, 0x80000000          # saved word (mod options' switches use bits 0..20)
 LOADIMAGE, SOUND = 0x80029B7C, 0x80015BFC
@@ -33,11 +44,24 @@ VX, VY, CX, CY = 384, 0, 448, 192                 # VRAM: images, palette
 TPAGE = VX // 64
 CLUT = (CX >> 4) | (CY << 6)
 R, FAR, SZ, ZMIN, JUMP = 450, 14000, 220, 100, 3000
-UP = 150                                          # letters this much above the recorded position (the rider's feet)
-# from a run recorded in the emulator (positions of the rider, `bp_traj`): on the snow at the start, the top of the
-# first jump, on the snow, the top of the second jump, in the bowl at the end
-POS = [(-22977, 12085, -45325), (-69382, 39531, -82123), (-89030, 46727, -88421), (-94384, 55986, -119112), (-88362, 68445, -149616)]
+UP = 150                                          # a letter's centre this much above the ground (or the rider's feet)
+# (x, y of the centre, z, radius on x / z, radius on y): taken when the rider is within both
+POS = [(-19660, 14543 - UP, -54500, 550, R),        # R: behind the gate of section 21 (its panels: x -20138..-19190, z -53920)
+       (-69382, 39531 - UP, -82123, R, 900),      # E: top of the first big jump (a recorded run; 1100 above the snow)
+       (-94384, 55986 - UP, -119112, R, 900),     # M: top of the second big jump
+       (-140650, 127494 - UP, -247000, R, R),     # I: just past the end of the log slide (object 584, section 137)
+       (-83310, 154616 - SZ - 10, -300800, 900, 2300)]   # X: on the roof of the first truck (objects 611..613; y 154616,
+                                                 # x -83807..-82812, the snow 156410 under it): along its side
+SND_PICK, SND_DONE = 0x13, 0x12                   # sounds of BP's bank: 0x13 a short high ding (0.6 s, ~2 kHz), 0x12
+                                                  # louder (0x15, 0x16: silent; measured in the emulator)
 HUD_X, HUD_Y, HUD_S, HUD_DX = -148, -100, 9, 18
+OPT_BIT = 1 << 21                                 # REMIX screen switch (set = off)
+TEXT = 0x80086F14                                 # BP: text (OT entry, primitives, string, x, y (stack)) -> primitives
+FONT_MODE = 0xE1000415                            # DR_MODE: texture page x 320, y 256, 4 bits (as func_8008687C's caller)
+OV_FRAMES = 300
+OV_LINES = [('GRAB THE LETTERS R E M I X', 48, 0x40B0D0), ('TO UNLOCK JICCHI NICK KELLY', 62, 0x808080),
+            ('STATUS: LOCKED', 80, 0x2020D0), ('STATUS: UNLOCKED', 80, 0x20D020)]     # colour: 0xBBGGRR
+OV_AT, OV_END = 0x800931BC, 0x800932C8            # another dead function of BP
 
 
 def H(a): return ((a + 0x8000) >> 16) & 0xffff
@@ -77,14 +101,23 @@ def layout():
     A['img3'] = DATA_CAVES[1][0]; assert A['img3'] + n <= DATA_CAVES[1][1]
     A['img4'] = DATA_CAVES[2][0]; assert A['img4'] + n <= DATA_CAVES[2][1]
     t = TAB
-    for name, size in (('lpos', 60), ('rects', 48), ('ptrs', 24), ('vars', 24)): A[name] = t; t += size
-    assert t <= TAB_END
+    for name, size in (('lpos', 80), ('rects', 48), ('ptrs', 24), ('vars', 32), ('cos', 64), ('ovt', 48)): A[name] = t; t += size
+    for k, (txt, _, _) in enumerate(OV_LINES): A[f'str{k}'] = t; t += (len(txt) + 4) & ~3
+    assert t <= TAB_END, hex(t)
     return A, imgs, clut
 
 
-MASK, LX, LY, LZ, OLD, DONE = 0, 4, 8, 12, 16, 20     # vars
-PROJ_AT, PROJ_END = 0x8006AB74, 0x8006AC78        # two more dead functions of BP
+MASK, LX, LY, LZ, OLD, DONE, ANG, OVT = 0, 4, 8, 12, 16, 20, 24, 28     # vars
+PROJ_AT, PROJ_END = 0x8006AA7C, 0x8006AC78        # five more dead functions of BP, in a row
 QUAD_AT, QUAD_END = 0x800943B8, 0x80094480
+
+
+def LOADS(A):
+    # rli: the five images and the palette to VRAM (LoadImage)
+    return ['rli:', 'addiu sp, sp, -0x20', 'sw ra, 0x1c(sp)', 'sw s1, 0x18(sp)', 'move s1, zero',
+            'rl1:', 'sll t0, s1, 3', *la('a0', A['rects']), 'addu a0, a0, t0', 'sll t0, s1, 2', *la('a1', A['ptrs']), 'addu a1, a1, t0',
+            f'jal {LOADIMAGE:#x}', 'lw a1, 0(a1)', 'addiu s1, s1, 1', 'slti at, s1, 6', 'bnez at, rl1', 'nop',
+            'lw ra, 0x1c(sp)', 'lw s1, 0x18(sp)', 'jr ra', 'addiu sp, sp, 0x20']
 
 
 def PROJ():
@@ -99,8 +132,9 @@ def PROJ():
 
 
 def QUAD():
-    # rq: a0 = x, a1 = y (screen, from its centre), a2 = half size, a3 = letter, t9 = code + colour; s4 = OT entry, s5 = prims
-    return ['rq:', 'subu t0, a0, a2', 'addu t1, a0, a2', 'subu t2, a1, a2', 'addu t3, a1, a2', 'andi t0, t0, 0xffff', 'andi t1, t1, 0xffff',
+    # rq: a0 = x, a1 = y (screen, from its centre), a2 = half height, v1 = half width (< 0: mirrored), a3 = letter,
+    # t9 = code + colour; s4 = OT entry, s5 = prims
+    return ['rq:', 'subu t0, a0, v1', 'addu t1, a0, v1', 'subu t2, a1, a2', 'addu t3, a1, a2', 'andi t0, t0, 0xffff', 'andi t1, t1, 0xffff',
             'sll t2, t2, 16', 'sll t3, t3, 16', 'sll t4, a3, 3', 'sll t5, a3, 4', 'addu t4, t4, t5',      # u = 24 letter
             'sw t9, 4(s5)', 'or t5, t2, t0', 'sw t5, 8(s5)', 'or t5, t2, t1', 'sw t5, 0x10(s5)', 'or t5, t3, t0', 'sw t5, 0x18(s5)', 'or t5, t3, t1', 'sw t5, 0x20(s5)',
             f'lui t5, {CLUT}', 'or t5, t5, t4', 'sw t5, 0xc(s5)', f'lui t5, {TPAGE}', f'addiu t6, t4, {LW - 1}', 'or t5, t5, t6', 'sw t5, 0x14(s5)',
@@ -114,20 +148,21 @@ def code(A):
     S = ['rlx:', 'addiu sp, sp, -0x58', 'sw ra, 0x50(sp)', 'sw s0, 0x30(sp)', 'sw s1, 0x34(sp)', 'sw s2, 0x38(sp)', 'sw s3, 0x3c(sp)',
          'sw s4, 0x40(sp)', 'sw s5, 0x44(sp)', 'sw s6, 0x48(sp)', 'sw s7, 0x4c(sp)',
          f'jal {HOOK_FN:#x}', 'nop', 'sw v0, 0x2c(sp)',
+         f'lui t0, {H(FLAGS)}', f'lw t0, {L(FLAGS)}(t0)', f'lui at, {OPT_BIT >> 16:#x}', 'and t0, t0, at', 'bnez t0, rx9', 'nop',
          f'lui t0, {H(RACERS)}', f'lw s0, {L(RACERS)}(t0)', 'nop', 'beqz s0, rx9', 'nop', *la('s7', V),
          # images and palette to VRAM
-         'move s1, zero',
-         'rl1:', 'sll t0, s1, 3', *la('a0', A['rects']), 'addu a0, a0, t0', 'sll t0, s1, 2', *la('a1', A['ptrs']), 'addu a1, a1, t0',
-         f'jal {LOADIMAGE:#x}', 'lw a1, 0(a1)', 'addiu s1, s1, 1', 'slti at, s1, 6', 'bnez at, rl1', 'nop',
+         'jal rli', 'nop',
          # new run: the position jumped
          'lw t0, 0x2c(s0)', 'lw t1, 0x30(s0)', 'lw t2, 0x34(s0)', f'lw t3, {LX}(s7)', f'lw t4, {LY}(s7)', f'lw t5, {LZ}(s7)',
          f'sw t0, {LX}(s7)', f'sw t1, {LY}(s7)', f'sw t2, {LZ}(s7)', 'subu t3, t0, t3', 'subu t4, t1, t4', 'subu t5, t2, t5']
     for r in ('t3', 't4', 't5'):
         S += [f'bgez {r}, ra_{r}', 'nop', f'subu {r}, zero, {r}', f'ra_{r}:', f'slti at, {r}, {JUMP}', 'beqz at, rnew', 'nop']
     S += ['j rgo', 'nop', 'rnew:', f'sw zero, {MASK}(s7)', f'sw zero, {OLD}(s7)', f'sw zero, {DONE}(s7)',
+          f'addiu t0, zero, {OV_FRAMES}', f'sw t0, {OVT}(s7)',
           # OT entry, primitives, camera H
           'rgo:', f'lui t0, {H(FRAME)}', f'lw t0, {L(FRAME)}(t0)', 'nop', 'lw s4, 4(t0)', f'lui t0, {H(PRIMS)}', f'lw s5, {L(PRIMS)}(t0)',
           'addiu s4, s4, 0xc', 'lw t0, 0x6d8(s0)', 'nop', 'lh s6, 0xa(t0)',
+          f'lw t0, {ANG}(s7)', 'nop', 'addiu t0, t0, 1', f'sw t0, {ANG}(s7)',
           # the letters in the world
           'move s2, zero', *la('s3', A['lpos']),
           'rlp:', f'lw t9, {MASK}(s7)', 'addiu t8, zero, 1', 'sllv t8, t8, s2', 'and t7, t9, t8', 'bnez t7, rln', 'nop',
@@ -135,47 +170,74 @@ def code(A):
           'subu t0, t0, t3', 'subu t1, t1, t4', 'subu t2, t2, t5', 'move t3, t0', 'move t4, t1', 'move t5, t2']
     for r in ('t3', 't4', 't5'):
         S += [f'bgez {r}, rb_{r}', 'nop', f'subu {r}, zero, {r}', f'rb_{r}:']
-    S += [f'slti at, t3, {R}', 'beqz at, rfar', f'slti at, t4, {R}', 'beqz at, rfar', f'slti at, t5, {R}', 'beqz at, rfar', 'nop',
+    S += ['lh a3, 12(s3)', 'lh v1, 14(s3)', 'slt at, t3, a3', 'beqz at, rfar', 'slt at, t4, v1', 'beqz at, rfar', 'slt at, t5, a3', 'beqz at, rfar', 'nop',
           # taken
-          'or t9, t9, t8', f'sw t9, {MASK}(s7)', 'addiu a0, zero, 3', f'jal {SOUND:#x}', 'addiu a1, zero, 0x7f', 'j rln', 'nop',
+          'or t9, t9, t8', f'sw t9, {MASK}(s7)', f'addiu a0, zero, {SND_PICK}', f'jal {SOUND:#x}', 'addiu a1, zero, 0x7f', 'j rln', 'nop',
           'rfar:', f'slti at, t3, {FAR}', 'beqz at, rln', f'slti at, t4, {FAR}', 'beqz at, rln', f'slti at, t5, {FAR}', 'beqz at, rln', 'nop',
           'jal rproj', 'nop', f'slti at, t2, {ZMIN}', 'bnez at, rln', 'nop',
           # half size SZ H / z, at least 2
           f'addiu t3, zero, {SZ}', 'mult t3, s6', 'mflo t3', 'nop', 'nop', 'div t3, t2', 'mflo a2', 'nop', 'nop',
           'slti at, a2, 2', 'beqz at, rsz', 'nop', 'addiu a2, zero, 2', 'rsz:',
+          f'lw t3, {ANG}(s7)', 'sll t4, s2, 3', 'addu t3, t3, t4', 'andi t3, t3, 0x3e', *la('t4', A['cos']), 'addu t4, t4, t3', 'lh t4, 0(t4)', 'nop',
+          'mult a2, t4', 'mflo v1', 'sra v1, v1, 12',
           'move a0, t0', 'move a1, t1', 'move a3, s2', 'lui t9, 0x2c80', 'jal rq', 'ori t9, t9, 0x8080',
-          'rln:', 'addiu s2, s2, 1', 'slti at, s2, 5', 'bnez at, rlp', 'addiu s3, s3, 12',
+          'rln:', 'addiu s2, s2, 1', 'slti at, s2, 5', 'bnez at, rlp', 'addiu s3, s3, 16',
           # all five: unlock (saved word), the row blinks
           f'lw t0, {MASK}(s7)', f'lw t1, {OLD}(s7)', f'sw t0, {OLD}(s7)', 'addiu t2, zero, 31', 'bne t0, t2, rhud', 'nop', 'beq t1, t2, rhud', 'nop',
           f'lui t3, {H(FLAGS)}', f'lw t4, {L(FLAGS)}(t3)', f'lui t5, {DONE_BIT >> 16:#x}', 'or t4, t4, t5', f'sw t4, {L(FLAGS)}(t3)',
-          'addiu t4, zero, 200', f'sw t4, {DONE}(s7)',
+          'addiu t4, zero, 200', f'sw t4, {DONE}(s7)', f'addiu t4, zero, {OV_FRAMES}', f'sw t4, {OVT}(s7)',
           # the banner of the mod news back in the menu: JICCHI NICK KELLY UNLOCKED (its MASK, bit 0x10000)
           f'lui t3, {H(NEWS_MASK)}', f'lw t4, {L(NEWS_MASK)}(t3)', 'lui t5, 1', 'or t4, t4, t5', f'sw t4, {L(NEWS_MASK)}(t3)',
-          'addiu a0, zero, 3', f'jal {SOUND:#x}', 'addiu a1, zero, 0x7f',
+          f'addiu a0, zero, {SND_DONE}', f'jal {SOUND:#x}', 'addiu a1, zero, 0x7f',
           # the row at the top left
           'rhud:', f'lw t0, {DONE}(s7)', 'nop', 'blez t0, rh0', 'addiu t0, t0, -1', f'sw t0, {DONE}(s7)', 'rh0:', 'move s2, zero',
           'rhl:', f'lw t9, {MASK}(s7)', 'addiu t8, zero, 1', 'sllv t8, t8, s2', 'and t7, t9, t8', 'lui t9, 0x2c28', 'beqz t7, rh1', 'ori t9, t9, 0x2828',
           'lui t9, 0x2c80', 'ori t9, t9, 0x8080', f'lw t0, {DONE}(s7)', 'nop', 'andi t0, t0, 8', 'beqz t0, rh1', 'nop', 'lui t9, 0x2cff', 'ori t9, t9, 0xffff',
           'rh1:', f'addiu t0, zero, {HUD_DX}', 'mult t0, s2', 'mflo a0', f'addiu a0, a0, {HUD_X}', f'addiu a1, zero, {HUD_Y}', f'addiu a2, zero, {HUD_S}',
-          'jal rq', 'move a3, s2', 'addiu s2, s2, 1', 'slti at, s2, 5', 'bnez at, rhl', 'nop',
+          'move v1, a2', 'jal rq', 'move a3, s2', 'addiu s2, s2, 1', 'slti at, s2, 5', 'bnez at, rhl', 'nop',
+          'jal rov', 'nop',
           f'lui t0, {H(PRIMS)}', f'sw s5, {L(PRIMS)}(t0)',
           'rx9:', 'lw v0, 0x2c(sp)', 'lw ra, 0x50(sp)', 'lw s0, 0x30(sp)', 'lw s1, 0x34(sp)', 'lw s2, 0x38(sp)', 'lw s3, 0x3c(sp)',
           'lw s4, 0x40(sp)', 'lw s5, 0x44(sp)', 'lw s6, 0x48(sp)', 'lw s7, 0x4c(sp)', 'jr ra', 'addiu sp, sp, 0x58']
-    P, lp = asm(PROJ(), PROJ_AT); assert P[-1][0] < PROJ_END, hex(P[-1][0])
+    P, lp = asm(PROJ() + LOADS(A), PROJ_AT); assert P[-1][0] < PROJ_END, hex(P[-1][0])
     Q, lq = asm(QUAD(), QUAD_AT); assert Q[-1][0] < QUAD_END, hex(Q[-1][0])
-    c, lb = asm(S, CODE, {**lp, **lq})
+    O, lo = asm(OVER(A), OV_AT); assert O[-1][0] < OV_END, hex(O[-1][0])
+    c, lb = asm(S, CODE, {**lp, **lq, **lo})
     assert c[-1][0] < CODE_END, hex(c[-1][0])
-    return c + P + Q, {**lb, **lp, **lq}
+    return c + P + Q + O, {**lb, **lp, **lq, **lo}
+
+
+def OVER(A):
+    # rov: the overlay (goal, status) while the timer OVT runs: three lines (the third: LOCKED or UNLOCKED, bit 31 of
+    # the saved word), each drawn by the game's text routine, then its sprites (0x14 bytes each) coloured, then the font's
+    # texture page (DR_MODE, linked last: drawn first); s4 = OT entry, s5 = prims, s7 = vars
+    T = A['ovt']
+    return ['rov:', 'addiu sp, sp, -0x30', 'sw ra, 0x2c(sp)', 'sw s0, 0x28(sp)', 'sw s1, 0x24(sp)',
+            f'lw t0, {OVT}(s7)', 'nop', 'blez t0, ro9', 'addiu t0, t0, -1', f'sw t0, {OVT}(s7)', *la('s0', T), 'addiu s1, zero, 3',
+            'ro1:', 'addiu at, zero, 1', 'bne s1, at, ro2', f'lui t0, {H(FLAGS)}', f'lw t0, {L(FLAGS)}(t0)', 'nop', 'bgez t0, ro2', 'nop',
+            'addiu s0, s0, 12',
+            'ro2:', 'move a0, s4', 'move a1, s5', 'lw a2, 0(s0)', 'lh a3, 4(s0)', 'lh t0, 6(s0)', f'jal {TEXT:#x}', 'sw t0, 0x10(sp)',
+            'lw t1, 8(s0)', 'move t0, s5',
+            'ro3:', 'sltu at, t0, v0', 'beqz at, ro4', 'srl t2, t1, 8', 'sb t1, 4(t0)', 'sb t2, 5(t0)', 'srl t2, t1, 16', 'sb t2, 6(t0)',
+            'j ro3', 'addiu t0, t0, 0x14',
+            'ro4:', 'move s5, v0', 'addiu s0, s0, 12', 'addiu s1, s1, -1', 'bnez s1, ro1', 'nop',
+            'lw t0, 0(s4)', 'lui t2, 0xff', 'ori t2, t2, 0xffff', 'and t1, t0, t2', 'lui t3, 0x100', 'or t1, t1, t3', 'sw t1, 0(s5)',
+            f'lui t1, {FONT_MODE >> 16:#x}', f'ori t1, t1, {FONT_MODE & 0xffff:#x}', 'sw t1, 4(s5)',
+            'lui t3, 0xff00', 'and t0, t0, t3', 'and t1, s5, t2', 'or t0, t0, t1', 'sw t0, 0(s4)', 'addiu s5, s5, 8',
+            'ro9:', 'lw ra, 0x2c(sp)', 'lw s0, 0x28(sp)', 'lw s1, 0x24(sp)', 'jr ra', 'addiu sp, sp, 0x30']
 
 
 def data(A, imgs, clut):
     """{address: bytes}"""
     D = {A[f'img{k}']: imgs[k] for k in range(5)}
     D[A['clut']] = struct.pack('<16H', *clut)
-    D[A['lpos']] = b''.join(struct.pack('<3i', x, y - UP, z) for x, y, z in POS)
+    D[A['lpos']] = b''.join(struct.pack('<3i2h', x, y, z, rxz, ry) for x, y, z, rxz, ry in POS)
+    D[A['cos']] = struct.pack('<32h', *[int(round(4096 * np.cos(2 * np.pi * k / 32))) for k in range(32)])
+    D[A['ovt']] = b''.join(struct.pack('<I2hI', A[f'str{k}'], (320 - 8 * len(t)) // 2, y, c) for k, (t, y, c) in enumerate(OV_LINES))
+    for k, (t, _, _) in enumerate(OV_LINES): D[A[f'str{k}']] = t.encode() + b'\0'
     D[A['rects']] = b''.join(struct.pack('<4h', VX + LW // 4 * k, VY, LW // 4, LH) for k in range(5)) + struct.pack('<4h', CX, CY, 16, 1)
     D[A['ptrs']] = struct.pack('<6I', *[A[f'img{k}'] for k in range(5)], A['clut'])
-    D[A['vars']] = bytes(24)
+    D[A['vars']] = bytes(32)
     return D
 
 

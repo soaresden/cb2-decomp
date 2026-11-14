@@ -49,7 +49,8 @@ LINES = ['REAR VIEW (O)', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLOCK SCREEN', '
          'FALLS AS A NUMBER',                   # bit 17 (radar.py: one ball and x13 instead of the row of balls)
          'UNLOCK EVERYTHING',                   # line i = bit i of the flags word (bit set = off)
          'SSX STYLE BOOST',                    # bit 19 (remix/boost.py, with the mod radar)
-         'RETRY ROUND (3 PER CUP)']            # bit 20 (remix/boost.py: RETRY on GAME OVER replays the Boarder Cross)
+         'RETRY ROUND (3 PER CUP)',            # bit 20 (remix/boost.py: RETRY on GAME OVER replays the Boarder Cross)
+         'PARK ICONS JICCHI NICK KELLY']         # bit 21 (remix/bpletters.py: the letters that unlock Jicchi, Nick, Kelly)
 UNLOCK_LINE = 18                                # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
 INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
 VIS = 10                               # lines shown at a time: the list scrolls with the cursor
@@ -79,7 +80,7 @@ def L(a): return a - (H(a) << 16)
 
 # the REMIX screen: three tabs of switches (line numbers = bits), in the game's style (black, title at the top left)
 TABS = [('RACE', [0, 19, 20, 6, 7, 17, 1, 3, 4, 13]),
-        ('RIDERS', [10, 16, 11, 12, 8]),
+        ('RIDERS', [10, 16, 21, 11, 12, 8]),
         ('GAME', [9, 15, 14, 2, 5, 18])]
 UP, RIGHT, DOWN, LEFT, TRI, CIRC, CROSS = 0x1000, 0x2000, 0x4000, 0x8000, 0x10, 0x20, 0x40
 PADV = 0x800832BA                      # MODE_SEL's pad words (held, ...: 0x800832BA..0x800832C5), set by func_8005CCE4
@@ -114,9 +115,14 @@ TRI_X, TRI_Y = -132 + 21 * 8 + 2, 102          # the Triangle's left edge and to
 ARROW_X = -132 + 11 * 8 + 1                    # the Left arrow (Right: + 12)
 
 
+DATA_SIDE = {'tri', 'crx', 'lclut'}    # v61: in DATA (start), the rest of DATA stays a code cave
+
+
 def data():
-    d = bytearray(); lab = {}
-    def put(n, b): lab[n] = SCR_DATA + len(d); d.extend(b); d.extend(bytes((-len(d)) % 4))
+    d = bytearray(); lab = {}; d2 = bytearray()
+    def put(n, b):
+        if n in DATA_SIDE: lab[n] = DATA[0] + len(d2); d2.extend(b); d2.extend(bytes((-len(d2)) % 4)); return
+        lab[n] = SCR_DATA + len(d); d.extend(b); d.extend(bytes((-len(d)) % 4))
     for n in ('prev', 'sel', 'open', 'tab', 'item', 'conf', 'alive'): put(n, bytes(4))
     put('rgbt', bytes([255, 200, 40, 32])); put('rgbn', bytes([90, 100, 120, 32])); put('rgbs', bytes([90, 210, 255, 32]))
     put('rgbon', bytes([90, 230, 120, 32])); put('rgboff', bytes([110, 110, 120, 32])); put('rgbh', bytes([150, 150, 150, 32]))
@@ -142,6 +148,7 @@ def data():
     put('ltab', b''.join(struct.pack('<I', lab['l%d' % i]) for i in range(len(LINES))))
     put('ttab', b''.join(struct.pack('<I', lab['t%d' % i]) for i in range(len(TABS))))
     put('ptab', b''.join(struct.pack('<4I', a, on, off, bit) for a, on, off, bit in PATCH))
+    data.side = bytes(d2)
     return bytes(d), lab
 
 
@@ -226,6 +233,7 @@ def routines(D):
           'addiu t0, zero, 14', 'mult s7, t0', 'mflo t5', 'addiu t5, t5, -56', 'sw t5, 0x28(sp)', 'addiu t4, zero, -132',
           *la('t7', D['rgbn']), *lw('t0', 'item'), 'bne t0, s7, di2', 'nop', *la('t7', D['rgbs']),
           'di2:', 'jal drw', 'nop',
+          'j di4', 'nop', 'di4:',            # v61: two blocks (room in the caves)
           'lw t3, 0x24(sp)', f'lui t1, {H(FLAGS)}', f'lw t0, {L(FLAGS)}(t1)', f'lui t1, {INV >> 16:#x}', f'ori t1, t1, {INV & 0xffff:#x}',
           'xor t0, t0, t1', 'srlv t0, t0, t3', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']), 'beqz t0, di3', 'nop',
           *la('t6', D['off']), *la('t7', D['rgboff']),
@@ -259,7 +267,7 @@ def routines(D):
     return S
 
 
-TOP = {'pw', 'ounl', 'opt', 'drs', 'di1', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk', 'dtri'}
+TOP = {'pw', 'ounl', 'opt', 'drs', 'di1', 'di4', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk', 'dtri'}
 
 
 def place(S, tables, extra=()):
@@ -272,10 +280,25 @@ def place(S, tables, extra=()):
     size = lambda b: 4 * sum(1 for l in b if not l.endswith(':'))
     caves = [[lo, lo, hi, []] for lo, hi in CAVES]
     tcaves = [[lo, lo, hi, []] for lo, hi in extra]          # for the tables only
-    for b in sorted(blocks, key=lambda b: -size(b)):
+    order = sorted(blocks, key=lambda b: -size(b))
+    ok = True
+    for b in order:
         fit = [c for c in caves if c[1] + size(b) <= c[2]]
-        assert fit, 'plus de place pour ' + b[0]
+        if not fit: ok = False; break
         c = min(fit, key=lambda c: c[2] - c[1]); c[3].append(b); c[1] += size(b)
+    if not ok:                     # best fit failed: search (blocks largest first, each in a cave with room)
+        caves = [[lo, lo, hi, []] for lo, hi in CAVES]
+        def dfs(k):
+            if k == len(order): return True
+            seen = set()
+            for c in sorted(caves, key=lambda c: c[2] - c[1]):
+                room = c[2] - c[1]
+                if size(order[k]) > room or room in seen: continue
+                seen.add(room); c[3].append(order[k]); c[1] += size(order[k])
+                if dfs(k + 1): return True
+                c[3].pop(); c[1] -= size(order[k])
+            return False
+        assert dfs(0), 'plus de place pour le code'
     tab_at = {}
     for name, t in tables:
         fit = [c for c in caves + tcaves if c[1] + len(t) <= c[2]]
@@ -307,7 +330,7 @@ def build():
     """data at the start of the screen's sector (toggles.SCREEN), the code in the rest of it and the other caves"""
     d, D = data()
     end = (SCR_DATA + len(d) + 3) // 4 * 4
-    caves = CAVES + [(end, toggles.SCREEN[1]), DATA]
+    caves = CAVES + [(end, toggles.SCREEN[1]), (DATA[0] + len(data.side), DATA[1])]
     global_caves = CAVES[:]
     CAVES[:] = caves
     try:
@@ -326,6 +349,7 @@ def ops(disc, pkg=None):
     c, l, d = build()
     d = d + bytes((-len(d)) % 4)
     P = [(a, x) for a, x in c] + [(SCR_DATA + i, struct.unpack_from('<I', d, i)[0]) for i in range(0, len(d), 4)] + \
+        [(DATA[0] + i, struct.unpack_from('<I', data.side, i)[0]) for i in range(0, len(data.side), 4)] + \
         [(HOOK, J(3, l['opt'])), (PAD_CALL, J(3, l['pw']))]
     out = toggles.ops(pkg) if pkg is not None else [['padto', '/MODE_SEL.BIN', toggles.FILE_END]]   # padto first
     for a, x in P:

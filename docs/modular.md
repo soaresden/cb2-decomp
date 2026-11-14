@@ -595,3 +595,26 @@ flottent dans le Board Park.
   CONGRATULATIONS + GAME COMPLETED seulement ; UNLOCK EVERYTHING (options) pose aussi le bit 31.
 - Vérifié dans l'émulateur : les cinq prises dans l'ordre, bit posé, bandeau au hub, Jicchi choisissable ; sans les
   lettres (progression à 100 %), les trois restent gris ; RESTART remet les lettres à zéro.
+
+v61 : **lettres R-E-M-I-X refaites** (`remix/bpletters.py`).
+- Parcours décodé (DATA/CRS/CRS_BS.DAT, partie 1 « CJ ») : 234 sections de 0x38 octets (position monde x, y, z comme
+  les riders ; liens ; deux listes d'index ; objets TMD 1-based de la partie 0 : piste, décor, objets, terrain ; sommets
+  relatifs à la section). La hauteur du rider = celle des triangles piste + terrain (vérifié sur une descente
+  enregistrée, à l'unité près). Objets repérés : portes de slalom (sections 12..28), glissière métallique (52, 53),
+  tronc (130..137, voie gauche de l'îlot d'arbres), demi-tube en bois (142..150, voie droite), parking avec deux
+  semi-remorques, bus et taxis (186..201). Les camions, troncs et rails sont des murs pour le jeu (on les longe).
+- Lettres : R derrière la porte de la section 21, E / M en haut des deux grands sauts, I juste après le bout du tronc,
+  X sur le toit du premier camion (prise en le longeant : rayon 900 en x / z, 2300 en y). Rayons par lettre (table de
+  16 octets : x, y, z, rayon x / z, rayon y).
+- Les lettres tournent (demi-largeur = demi-taille × cos, 32 pas, phase par lettre ; largeur négative = image miroir).
+- Écran d'objectifs 300 images au départ de chaque descente et quand les cinq sont prises : GRAB THE LETTERS R E M I X /
+  TO UNLOCK JICCHI NICK KELLY / STATUS: LOCKED (rouge) ou UNLOCKED (vert), avec la routine de texte de BP
+  (func_80086F14 : OT, prims, chaîne, x, y en pile ; SPRT 8 × 12 de la police ASCII en VRAM x 320, y 256, palette
+  992, 460), sprites recolorés, puis un DR_MODE (0xE1000415) lié en dernier. Code `rov` en 0x800931BC, `rli`
+  (LoadImage) avec `rproj` en 0x8006AA7C ; tables 0x8007CED4..0x8007D084 (trois fonctions mortes de suite).
+- Sons (mesurés en différence de deux descentes identiques dans l'émulateur) : 0x13 à chaque lettre (court, aigu),
+  0x12 pour les cinq ; 0x11, 0x15, 0x16 ne s'entendent pas.
+- Écran REMIX, onglet RIDERS : interrupteur 21 PARK ICONS JICCHI NICK KELLY (bit posé = lettres absentes). Place : le bloc
+  `di1` coupé en deux, les tables tri / crx / lclut déplacées au début de DATA.
+- Vérifié : les cinq prises (lettres posées sur la trajectoire du pilote automatique), bit 31, UNLOCKED en vert,
+  rangée allumée ; positions réelles calculées sur la géométrie du parcours.
