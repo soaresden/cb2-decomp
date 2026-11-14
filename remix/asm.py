@@ -1,7 +1,9 @@
 # tiny MIPS assembler for the few ops we need
 R={n:i for i,n in enumerate('zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7 t8 t9 k0 k1 gp sp fp ra'.split())}
 def r(x): return R[x.strip().lstrip('$')]
-def I(op,rs,rt,imm): return (op<<26)|(r(rs)<<21)|(r(rt)<<16)|(imm&0xffff)
+def I(op,rs,rt,imm):
+    assert -0x8000<=imm<=0xffff,'immediate out of range: %d'%imm   # v78: a wrapped immediate went unnoticed
+    return (op<<26)|(r(rs)<<21)|(r(rt)<<16)|(imm&0xffff)
 def Rr(fn,rs,rt,rd,sh=0): return (r(rs)<<21)|(r(rt)<<16)|(r(rd)<<11)|(sh<<6)|fn
 def asm(lines,org,syms=None):
     labels=dict(syms or {}); pc=org; prog=[]

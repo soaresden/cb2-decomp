@@ -31,14 +31,14 @@ CG_ON = False
 CG_MODES = (1 << 2) | (1 << 5) | (1 << 7) | (1 << 8) if CG_ON else 0   # modes with it (one player)
 PREV = 0x800640AC                         # func_800640AC: addiu sp, sp, -0x1830 / sw s4, 0x1828(sp)
 TEX_SITES = {0x8001D55C: (4, 's4', 'ld24'), 0x8001D644: (0xE, 's4', 'ld24'), 0x8001D938: (4, 's2', 'ld20')}   # (jacket offset, menu struct)
-TOP = {'bossk', 'ensd', 'ensu', 'ensr', 'ensp', 'btc_ld24', 'btc_ld20'} | {f'bt{a:x}' for a in TEX_SITES}
+TOP = {'bossk', 'ensa', 'ensd', 'ensu', 'ensr', 'ensp', 'btc_ld24', 'btc_ld20'} | {f'bt{a:x}' for a in TEX_SITES}
 
 
 def H(a): return ((a + 0x8000) >> 16) & 0xffff
 def L(a): return a - (((a + 0x8000) >> 16) << 16)
 
 
-def routines(mm, magic, menu_save, shown):
+def routines(mm, magic, menu_save, shown, acur):
     """asm lines placed with crew's routines (crew's labels aval, mdl, ld24, ld20 by name); mm: the menu model's
     magic word (model k in MENU_BUF: magic + k), menu_save: crew's MENU_SAVE (shown + k: model k's texture in VRAM)"""
     # bossk(a0 = rider, a1 = alias cursor): crew's aval, or a menu model of an outfit (s0 = a0): 4 for Boss in black
@@ -51,14 +51,19 @@ def routines(mm, magic, menu_save, shown):
          'bne t1, t2, bk9', 'move v0, t0',
          f'lui at, {H(BOUT)}', f'lw t1, {L(BOUT)}(at)', 'nop', 'beq t1, t3, bk9', 'nop', 'move v0, zero',
          'bk9:', 'jr ra', 'nop',
-         # ensd / ensu: Boss (rider 4 at s3) -> the ensemble path, else the replaced load
-         'ensd:', 'lhu t0, 0(s3)', 'addiu t1, zero, 4', 'bne t0, t1, ed1', 'lui at, 0x8006', 'addiu ra, at, 0x1E20',
+         # ensa(t0 = rider) -> v0 = 4 for Boss, the alias (1..3, crew's ACUR) for Jicchi / Nick / Kelly (v78: their 2nd
+         # outfit), else 0; keeps a0..a3 (uses at, t1, t5..t7)
+         'ensa:', 'addiu t1, zero, 4', 'beq t0, t1, ea9', 'move v0, t1', 'move t7, ra', 'move t5, a0', 'move t6, a1', 'move a0, t0',
+         f'lui at, {H(acur)}', f'lw a1, {L(acur)}(at)', 'jal aval', 'nop', 'move ra, t7', 'move a0, t5', 'move a1, t6',
+         'ea9:', 'jr ra', 'nop',
+         # ensd / ensu: Boss (rider 4 at s3) or an alias -> the ensemble path, else the replaced load
+         'ensd:', 'move t8, ra', 'jal ensa', 'lhu t0, 0(s3)', 'move ra, t8', 'beqz v0, ed1', 'lui at, 0x8006', 'addiu ra, at, 0x1E20',
          'ed1:', 'lui v0, 0x8005', 'jr ra', 'lh v0, 0x742A(v0)',
-         'ensu:', 'lhu t0, 0(s3)', 'addiu t1, zero, 4', 'bne t0, t1, eu1', 'lui at, 0x8006', 'addiu ra, at, 0x1D14',
+         'ensu:', 'move t8, ra', 'jal ensa', 'lhu t0, 0(s3)', 'move ra, t8', 'beqz v0, eu1', 'lui at, 0x8006', 'addiu ra, at, 0x1D14',
          'eu1:', 'jr ra', 'lh v0, 0(s5)',
          # ensr (right: ra 0x80062004, left: 0x800620D4): Boss switches 0 / 1 (jacket = pants); Cindy's jacket row
          # (s4 = 0) goes over 0..6 (3..5: her hidden outfits, mod outfits; 6: her ending outfit), then the preview
-         'ensr:', 'lhu t0, 0(s3)', 'addiu t1, zero, 4', 'bne t0, t1, erc', f'lui at, {H(B314)}', 'addu at, at, s0',
+         'ensr:', 'move t8, ra', 'jal ensa', 'lhu t0, 0(s3)', 'move ra, t8', 'beqz v0, erc', f'lui at, {H(B314)}', 'addu at, at, s0',
          f'lhu t0, {L(B314)}(at)', 'nop', 'andi t0, t0, 1', 'xori t0, t0, 1', f'sh t0, {L(B314)}(at)', 'j erp', f'sh t0, {L(B314 + 2)}(at)',
          'erc:', 'addiu t1, zero, 2', 'bne t0, t1, er1', 'nop', 'bnez s4, er1', 'addu at, at, s0',
          # outfit 6 only where the race loads it (crew's ldg: Free Style, Big Air, Halfpipe, Board Park): t4 = 7 or 6 outfits
@@ -71,10 +76,15 @@ def routines(mm, magic, menu_save, shown):
          'er1:', 'jr ra', 'lh v0, 0(s5)',
          # ensp: func_800640AC's entry (a0 = cursors, a1 = rider). Boss: outfit -> BOUT, model rebuilt (crew's mdl).
          # Cindy: outfit 6 -> the same; any other while that model is shown: back to her own model first
-         'ensp:', 'sll t0, a1, 16', 'sra t0, t0, 16', 'addiu t1, zero, 4', 'beq t0, t1, ep4', 'addiu t1, zero, 2',
-         'beq t0, t1, ep2', 'nop',
+         # v78: an alias -> BOUT = 0x10 + its outfit (odd jacket = 2nd: crew's mshow / ld), model rebuilt the same way
+         'ensp:', 'sll t0, a1, 16', 'sra t0, t0, 16', 'move t8, ra', 'jal ensa', 'nop', 'move ra, t8', 'addiu t1, zero, 4',
+         'beq v0, t1, ep4', 'nop', 'bnez v0, epa', 'addiu t1, zero, 2',
+         *(['beq t0, t1, ep2', 'nop'] if CG_ON else []),
          'epn:', 'addiu sp, sp, -0x1830', f'j {PREV + 8:#x}', 'sw s4, 0x1828(sp)',
-         'ep4:', 'lh t0, 0(a0)', f'lui at, {H(BOUT)}', f'sw t0, {L(BOUT)}(at)', 'j mdl', 'addiu a0, zero, 4',
+         'epa:', 'lh t1, 0(a0)', 'nop', 'andi t1, t1, 1', 'ori t1, t1, 0x10', f'lui at, {H(BOUT)}', f'sw t1, {L(BOUT)}(at)',
+         'j mdl', 'move a0, t0',
+         'ep4:', 'lh t0, 0(a0)', f'lui at, {H(BOUT)}', f'sw t0, {L(BOUT)}(at)', 'j mdl', 'addiu a0, zero, 4']
+    if CG_ON: S += [   # Cindy's ending outfit (off since v59; v78: its code left out then)
          'ep2:', 'lh t0, 0(a0)', f'lui at, {H(BOUT)}', f'sw t0, {L(BOUT)}(at)', 'addiu t2, zero, 6', 'bne t0, t2, ep2n', 'nop',
          'j mdl', 'addiu a0, zero, 2',
          'ep2n:', f'lui at, {H(menu_save)}', f'lw t0, {L(menu_save)}(at)', f'lui t2, {H(shown + 5)}', f'addiu t2, t2, {L(shown + 5)}',

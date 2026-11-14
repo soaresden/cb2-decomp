@@ -332,9 +332,10 @@ def apply(disc, pkg, feats, log=lambda m: None):
             elif t == 'fcopy':     # ['fcopy', src, dst, [[src off, dst off, len]...]]: bytes of a file as patched so far
                 sb, db = buf(op[1]), buf(op[2])
                 for so, do, n in op[3]: db[do:do + n] = sb[so:so + n]
-            elif t in ('crewmenu', 'cgpmd', 'cgfbd'):
+            elif t in ('crewmenu', 'cgpmd', 'cgfbd', 'crewtex'):
                 if t == 'crewmenu': ch = crew_menu_chunk(orig(op[2]), orig(op[3]), op[4])
                 elif t == 'cgpmd': ch = cg_pmd(orig(op[2]), orig(op[3]), op[4])
+                elif t == 'crewtex': ch = crew_tex(orig(op[2]), orig(op[3]), orig(op[4]), op[5])
                 else: ch = cg_fbd(orig(op[2]), orig(op[3]), orig(op[4]), op[5])
                 nch = -(-len(ch) // 2048); ch += bytes(nch * 2048 - len(ch))
                 for k in range(nch):
@@ -653,8 +654,42 @@ def crew_menu_chunk(archive, fbd, p):
         su, sv, du, dv, cw, chh = p['copy']; io = p['img_off']
         for y in range(chh): chunk[io + 128 * (dv + y) + du:io + 128 * (dv + y) + du + cw] = chunk[io + 128 * (sv + y) + su:io + 128 * (sv + y) + su + cw]
 
+    if 'recolor' in p:   # 2nd outfit (v78): the palette row recoloured, at clut2_off (crew's mshow uploads one or the other)
+        for i in range(256):
+            c = struct.unpack_from('<H', chunk, p['clut_off'] + 2 * i)[0]
+            struct.pack_into('<H', chunk, p['clut2_off'] + 2 * i, recolor(c, p['recolor']))
     struct.pack_into('<I', chunk, p['magic_off'], p['magic'])
     return bytes(chunk)
+
+
+def recolor(c, rule):
+    """a 15-bit colour through a recolour rule (2nd outfits of Jicchi / Nick / Kelly, mod crew, v78): when every test
+    [a, b, c, t] gives a r + b g + c b + t > 0, each channel becomes (row . (r, g, b)) >> 4 (rows of rule['mat'], 0..31);
+    black (transparent) stays, a colour turned black becomes (1, 1, 1); bit 15 kept"""
+    if c & 0x7fff == 0: return c
+    v = (c & 31, (c >> 5) & 31, (c >> 10) & 31)
+    for a, b, cc, t in rule['test']:
+        if a * v[0] + b * v[1] + cc * v[2] + t <= 0: return c
+    n = [max(0, min(31, (m[0] * v[0] + m[1] * v[1] + m[2] * v[2]) >> 4)) for m in rule['mat']]
+    x = n[0] | (n[1] << 5) | (n[2] << 10)
+    return (c & 0x8000) | (x if x else 0x421)
+
+
+def crew_tex(enemy1, enemy2, header, p):
+    """['crewtex', lba, ENEMY1, ENEMY2, header fbd, p] (mod crew, v78): race texture of Jicchi / Nick / Kelly as
+    cpurider.texture builds it (20-byte header, 2 palette rows of the CPU rider, its 128 x 256 4-bit image), the
+    palettes of 16 colours not in p['skip'] (the board's) recoloured by p['recolor']"""
+    row, page, du = p['row'], p['page'], p['du']
+    out = bytearray(header[:20]); c0 = 20 + (row - 493) * 512; out += enemy1[c0:c0 + 1024]
+    if page == 6: src, base, w = enemy2, 0, 64
+    else: src, base, w = enemy1, 16 * 512, 192
+    for y in range(256):
+        o = base + 20 + (y * w + du // 4) * 2; out += src[o:o + 64]
+    for k in range(32):
+        if k in p['skip']: continue
+        for i in range(16):
+            o = 20 + 32 * k + 2 * i; struct.pack_into('<H', out, o, recolor(struct.unpack_from('<H', out, o)[0], p['recolor']))
+    return bytes(out)
 
 
 def icons_op(fbd, op):

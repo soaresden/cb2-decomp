@@ -720,3 +720,24 @@ mots de travail VARS / VARS2, mot de manette 0x800A2810 / 0x800A2812 (relevés d
 quatre fonctions mortes de VS). Barre sous les points de chaque moitié d'écran ; mot d'état de la course de VS
 0x8009DABC (replay) ; même interrupteur que le Free Style (bit 21). Vérifié : jauges pleines, R2 du joueur 1 seul →
 +41 % de distance pour lui seul, jauge 480 → 377 ; idem pour le joueur 2.
+
+v78 : **2e tenue pour Jicchi, Nick et Kelly** (mod crew ; `crew.RECOLOR`, `modular.recolor`, `modular.crew_tex`).
+Ils n'avaient qu'une tenue ; la 2e est la même recolorée : jaune de Jicchi → vert, bleu de Nick → rouge, bleu ciel de
+Kelly → violet (peau, cheveux, visage et planche gardés). Une règle = des tests linéaires sur la couleur 15 bits
+(a r + b g + c b + t > 0, tous vrais) puis une matrice (canal = ligne · (r, g, b) >> 4) ; le noir (transparent) reste.
+- Écran WEAR : les crochets « ensemble » du Boss (bossout.ensd / ensu / ensr / ensp) passent par `ensa`, qui rend 4
+  pour le Boss ou l'alias (crew.ACUR) de Jicchi / Nick / Kelly ; gauche / droite basculent la veste et le pantalon 0 / 1.
+  ensp écrit BOUT = 0x10 + (veste & 1) (le Boss garde 0 / 1 : bossk ne voit la tenue noire que pour BOUT = 1).
+  Avant, la flèche droite chargeait les vestes du rider de base sur le modèle de l'alias (textures mélangées).
+- Aperçu : le fichier du modèle de menu (crewmenu) porte la palette recolorée à 0xFA10 (M_CLUT2, M_SIZE 0xFC10) ;
+  mshow envoie M_CLUT ou M_CLUT2 et note k + 8 dans MENU_SAVE pour la 2e tenue (munsh et wup effacent le bit 3).
+- Courses : trois fichiers de texture de plus (['crewtex', ...] : la texture du rider CPU comme cpurider.texture, palettes
+  0..31 sauf 22 et 23, celles de la planche, recolorées), aux entrées ENTO = ENTG (0x8001C1A0 : celles de la tenue de fin
+  de Cindy, coupée depuis la v59 ; son chemin ldg est désactivé avec elle). Le chargeur ld / ldq prend ENTO + alias − 1
+  quand la veste est impaire (t9 = veste & 1, posé par les crochets bt du Boss, ceux des chargements de texture),
+  joueur 2 compris (veste 0x80057416).
+- Boost : lignes 10..12 de JACKETS = [base, 2e tenue] × 3 (vert, rouge ; Kelly en « peri », plus de place pour une couleur).
+- asm.py vérifie maintenant que les immédiats tiennent sur 16 bits : un `addiu a1, a1, -0x8410` passait tronqué.
+Vérifié : WEAR des trois (bascule bleu ↔ violet, jaune ↔ vert, bleu ↔ rouge), Free Style (Kelly violette, Jicchi vert,
+barres de boost assorties), 2 joueurs (Kelly tenue 1 + Nick tenue 2 rouge), Boss (tatoué ↔ noir) et Cindy (ses tenues
+cachées) inchangés.

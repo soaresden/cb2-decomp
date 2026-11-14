@@ -109,6 +109,7 @@ NMENU = 5
 # Cindy's ending outfit in races (remix/cgrider.py): its 2 files' entries (model, texture), 8-byte aligned, in a dead
 # copy of func_8001C748's clearing loop
 ENTG = 0x8001C1A0; ENTG_END = 0x8001C1C0
+ENTO = ENTG          # v78: the 3 entries of the 2nd outfits' race textures (Cindy's ending outfit is off: bossout.CG_ON)
 MENU_SHOWN = 0x4D575253                                 # 'SRWM' + k in MENU_SAVE: alias k's texture is in VRAM
 MODELS = 0x8007C4E8; FN_MDL = 0x80064A08; MUSIC = 0x800171B4; MUS_PAUSE, MUS_RESUME, CDCTL = 0x800173F0, 0x800174F8, 0x80040B7C; MDL_SITES = [0x800602E8, 0x80061580]
 UPLOAD = 0x8005DB60; WEAR_UPLOADS = [0x80064100, 0x80064124]
@@ -224,15 +225,17 @@ def routines(race_regs):
           'addiu t1, s1, 0x10', 'bne a2, t1, ld1', 'nop', 'j ld9', f'lh a0, {L(IDX) - 2}(at)',
           # Cindy (rider 2) in her ending outfit (hidden outfit flag, jacket 3; v58): its own model / texture files
 
-          'ld1:', 'bne a2, t7, ld9', 'nop', f'lh a0, {L(IDX) + 4}(at)',
+          # 2nd outfit (v78): t9 = jacket & 1 (bossout's bt hooks, the texture loads only) -> its recoloured texture (ENTO)
+          'ld1:', 'bne a2, t7, ld9', 'nop', 'beqz t9, ld9', f'lh a0, {L(IDX) + 4}(at)', f'addiu a0, v0, {(ENTO - G_FILES) // 8 - 1}',
           'ld9:', f'j {ENQ}', 'nop', 'ldqj:', 'j ldq', 'nop',
           # player 2 (2 players): slot 0x14 = model (its own copy, IDX3), 0x28 = texture (the same files as player 1)
           'ldq:', 'move t4, ra', 'move t5, a0', 'move t6, a1', 'lui at, 0x8005', 'lh a0, 0x7412(at)', f'lui at, {H(ALIAS2)}', f'lw a1, {L(ALIAS2)}(at)',
           'jal aval', 'nop', 'move ra, t4', 'move a0, t5', 'beqz v0, lqx', 'move a1, t6', 'sll t0, v0, 1', 'addiu at, zero, 0x14',
           'bne t8, at, ldq1', f'lui at, {H(IDX3)}', 'addu at, at, t0', 'j ld9', f'lh a0, {L(IDX3) - 2}(at)',
-          'ldq1:', f'lui at, {H(IDX)}', 'addu at, at, t0', 'j ld9', f'lh a0, {L(IDX) + 4}(at)', 'lqx:', 'j ld9', 'nop']
+          'ldq1:', f'lui at, {H(IDX)}', 'addu at, at, t0', f'lh a0, {L(IDX) + 4}(at)', 'beqz t9, lqx', 'srl t0, t0, 1',
+          f'addiu a0, t0, {(ENTO - G_FILES) // 8 - 1}', 'lqx:', 'j ld9', 'nop']
     # Cindy (rider 2) in her ending outfit (hidden outfit flag, jacket 3; v58): its own model / texture files
-    S += ['ldg:', 'lui at, 0x8005', 'lh t0, 0x7408(at)', 'lh t1, 0x742A(at)', 'lh t2, 0x740C(at)', 'addiu t0, t0, -2', 'bnez t0, lgx',
+    S += ['ldg:', 'j ld9', 'nop'] if not bossout.CG_ON else ['ldg:', 'lui at, 0x8005', 'lh t0, 0x7408(at)', 'lh t1, 0x742A(at)', 'lh t2, 0x740C(at)', 'addiu t0, t0, -2', 'bnez t0, lgx',
           'addiu t2, t2, -3', 'beqz t1, lgx', 'nop', 'bnez t2, lgx', 'addiu t1, s1, 0x10', 'bne a2, t1, lg1', 'nop',
           'j ld9', f'addiu a0, zero, {(ENTG - G_FILES) // 8}',
           'lg1:', 'bne a2, t7, lgx', 'nop', f'addiu a0, zero, {(ENTG + 8 - G_FILES) // 8}', 'lgx:', 'j ld9', 'nop']
@@ -289,23 +292,27 @@ def routines(race_regs):
           'mr9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'jr ra', 'addiu sp, sp, 0x20']
     # munsh(): the base rider's texture back in VRAM if an alias's is there
     S += ['munsh:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', f'lui at, {H(MENU_SAVE)}', f'lw s0, {L(MENU_SAVE)}(at)',
-          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'subu s0, s0, t0', 'addiu t1, s0, -1', f'sltiu t1, t1, {NMENU}', 'beqz t1, mu9', 'nop',
+          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'subu s0, s0, t0', 'addiu t1, zero, -9', 'and s0, s0, t1', 'addiu t1, s0, -1', f'sltiu t1, t1, {NMENU}', 'beqz t1, mu9', 'nop',
           f'jal {DRAWSYNC}', 'move a0, zero', *rect(RCOL, 's0'), f'lui a1, {H(MENU_SAVE + 0x404)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 0x404)}',
           *rect(RCLUT, 's0'), f'lui a1, {H(MENU_SAVE + 4)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 4)}',
           f'jal {DRAWSYNC}', 'move a0, zero', f'lui at, {H(MENU_SAVE)}', f'sw zero, {L(MENU_SAVE)}(at)',
           'mu9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'jr ra', 'addiu sp, sp, 0x20']
     # mshow(a0 = k): the base rider's texture saved, alias k's put in its place
-    S += ['mshow:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'move s0, a0', f'lui at, {H(MENU_SAVE)}', f'lw t1, {L(MENU_SAVE)}(at)',
-          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'addu t0, t0, s0', 'bne t0, t1, msa', 'nop', 'j ms9', 'nop', 'msa:',
+    # v78: s1 = k + 8 with the 2nd outfit (bossout.BOUT = 0x11, the WEAR screen's choice): its recoloured palette (M_CLUT2)
+    S += ['mshow:', 'addiu sp, sp, -0x20', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'sw s1, 0x18(sp)', 'move s0, a0',
+          f'lui at, {H(bossout.BOUT)}', f'lw t0, {L(bossout.BOUT)}(at)', 'nop', 'xori t0, t0, 0x11', 'sltiu t0, t0, 1', 'sll t0, t0, 3', 'addu s1, s0, t0',
+          f'lui at, {H(MENU_SAVE)}', f'lw t1, {L(MENU_SAVE)}(at)',
+          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'addu t0, t0, s1', 'bne t0, t1, msa', 'nop', 'j ms9', 'nop', 'msa:',
           'jal munsh', 'nop', f'jal {DRAWSYNC}', 'move a0, zero',
           *rect(RCOL, 's0'), f'lui a1, {H(MENU_SAVE + 0x404)}', f'jal {STOREIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 0x404)}',
           *rect(RCLUT, 's0'), f'lui a1, {H(MENU_SAVE + 4)}', f'jal {STOREIMAGE}', f'addiu a1, a1, {L(MENU_SAVE + 4)}',
           f'jal {DRAWSYNC}', 'move a0, zero', 'j msb', 'nop', 'msb:',
           *rect(RCOL, 's0'), f'lui a1, {H(MENU_BUF + M_IMG)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_BUF + M_IMG)}',
-          *rect(RCLUT, 's0'), f'lui a1, {H(MENU_BUF + M_CLUT)}', f'jal {LOADIMAGE}', f'addiu a1, a1, {L(MENU_BUF + M_CLUT)}',
+          *rect(RCLUT, 's0'), 'sltiu t0, s1, 8', f'lui a1, {H(MENU_BUF + M_CLUT2)}', 'beqz t0, msc', f'addiu a1, a1, {L(MENU_BUF + M_CLUT2)}',
+          f'lui a1, {H(MENU_BUF + M_CLUT)}', f'addiu a1, a1, {L(MENU_BUF + M_CLUT)}', 'msc:', f'jal {LOADIMAGE}', 'nop',
           f'jal {DRAWSYNC}', 'move a0, zero',
-          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'addu t0, t0, s0', f'lui at, {H(MENU_SAVE)}', f'sw t0, {L(MENU_SAVE)}(at)',
-          'ms9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'jr ra', 'addiu sp, sp, 0x20']
+          f'lui t0, {H(MENU_SHOWN)}', f'addiu t0, t0, {L(MENU_SHOWN)}', 'addu t0, t0, s1', f'lui at, {H(MENU_SAVE)}', f'sw t0, {L(MENU_SAVE)}(at)',
+          'ms9:', 'lw ra, 0x10(sp)', 'lw s0, 0x14(sp)', 'lw s1, 0x18(sp)', 'jr ra', 'addiu sp, sp, 0x20']
     # mdl(a0 = rider): replaces the BOARDER screen's calls to func_80064A08 (model of the rider)
     S += ['mdl:', 'addiu sp, sp, -0x28', 'sw ra, 0x10(sp)', 'sw s0, 0x14(sp)', 'sw s1, 0x18(sp)', 'sw s2, 0x1c(sp)', 'move s0, a0',
           f'lui at, {H(ACUR)}', f'lw a1, {L(ACUR)}(at)', 'jal bossk', 'nop', 'move s1, v0', 'bnez s1, mdk', 'nop', 'j md0', 'nop',
@@ -365,7 +372,7 @@ def routines(race_regs):
           'addiu s0, s0, 0x28', 'addiu s5, s5, 1', 'slti t0, s5, 10', 'beqz t0, stx', 'nop', 'j stl', 'nop', 'stx:',
           'move v0, s0',          'st9x:', 'move v0, s0', 'lw ra, 0x40(sp)', 'lw s0, 0x20(sp)', 'lw s1, 0x24(sp)', 'lw s2, 0x28(sp)', 'lw s3, 0x2c(sp)', 'lw s4, 0x30(sp)', 'lw s5, 0x34(sp)', 'jr ra', 'addiu sp, sp, 0x48']
     # wup: the WEAR screen's texture uploads are skipped while an alias's texture is shown
-    S += ['wup:', f'lui at, {H(MENU_SAVE)}', f'lw t0, {L(MENU_SAVE)}(at)', f'lui t1, {H(MENU_SHOWN)}', f'addiu t1, t1, {L(MENU_SHOWN + 1)}', 'subu t0, t0, t1',
+    S += ['wup:', f'lui at, {H(MENU_SAVE)}', f'lw t0, {L(MENU_SAVE)}(at)', f'lui t1, {H(MENU_SHOWN)}', f'addiu t1, t1, {L(MENU_SHOWN + 1)}', 'subu t0, t0, t1', 'addiu t1, zero, -9', 'and t0, t0, t1',
           f'sltiu t0, t0, {NMENU}', 'beqz t0, wu1', 'nop', 'jr ra', 'nop', 'wu1:', f'j {UPLOAD}', 'nop']
     return S
 
@@ -455,7 +462,7 @@ def patches(fs_read, placed):
         d = fs_read(f); sll = struct.unpack_from('<I', d, a - 12 - OVL)[0]
         assert sll & 0xffe0ffff == 0x00001100 and struct.unpack_from('<I', d, a - OVL)[0] == 0x00431021, f
         race_regs[f] = 'zero at v0 v1 a0 a1 a2 a3 t0 t1 t2 t3 t4 t5 t6 t7 s0 s1 s2 s3 s4 s5 s6 s7'.split()[(sll >> 16) & 31]
-    words, lb = place(routines(race_regs.values()) + bossout.routines(MENU_BUF + M_MAGIC, MENU_MAGIC, MENU_SAVE, MENU_SHOWN))
+    words, lb = place(routines(race_regs.values()) + bossout.routines(MENU_BUF + M_MAGIC, MENU_MAGIC, MENU_SAVE, MENU_SHOWN, ACUR))
     global LABELS; LABELS = lb
     P = [('/SCES_009.92', a, w) for a, w in words]
     # data
@@ -484,7 +491,8 @@ def patches(fs_read, placed):
     d2 += b''.join(struct.pack('<2h', MENU_CLUT_Y[k], MENU_CLUT_H[k]) for k in range(NMENU)) + bytes(8)
     assert len(d2) == RECT + 8 - DATA2 and DATA2 + len(d2) <= DATA2_END and (ENT2 - G_FILES) % 8 == 0
     P += [('/SCES_009.92', DATA2 + i, struct.unpack_from('<I', d2, i)[0]) for i in range(0, len(d2), 4)]
-    dg = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[14:16]) if bossout.CG_ON else b''
+    assert not bossout.CG_ON
+    dg = b''.join(msf_bcd(l) + struct.pack('<I', len(b)) for l, b in placed[14:17])    # v78: 2nd outfits' textures
     assert ENTG + len(dg) <= ENTG_END and (ENTG - G_FILES) % 8 == 0
     P += [('/SCES_009.92', ENTG + i, struct.unpack_from('<I', dg, i)[0]) for i in range(0, len(dg), 4)]
     # hooks
@@ -551,7 +559,7 @@ def ops(disc):
     """the operations of the mod, relative to the player's original disc"""
     rd = disc.read_file
     import vs2p
-    fl = files(rd); blobs = fl + [bytes(M_SIZE)] * 3 + [vs2p.to_p2(fl[2 * k]) for k in range(3)] + [bytes(M_SIZE)] * 2 + cg_files(rd); first, placed = layout(blobs)
+    fl = files(rd); blobs = fl + [bytes(M_SIZE)] * 3 + [vs2p.to_p2(fl[2 * k]) for k in range(3)] + [bytes(M_SIZE)] * 2 + cg_files(rd) + [bytes(17428)] * 3; first, placed = layout(blobs)
     out = []
     for f, a, new in patches(rd, placed):
         o = (a - EXE_BASE) if f == '/SCES_009.92' else (a - OVL)
@@ -567,6 +575,8 @@ def ops(disc):
     import bundle, cpurider
     p0 = rd(SOURCES[0]); p0a = srcs[0][0]
     for j, (lba, b) in enumerate(placed):
+        if j >= len(placed) - 3:      # v78: 2nd outfits' race textures, built by the patcher
+            out.append(['crewtex', lba, *TEX2_SRC, tex2_params(j - len(placed) + 3)]); continue
         if j == 14: out.append(['cgpmd', lba, cgrider.FS_CG, cgrider.FS_CINDY_RACE, cg_params(rd)]); continue   # Cindy's ending outfit: race model
         if j == 15: out.append(['cgfbd', lba, cgrider.FS_CG, cgrider.FS_FBD, CG_HEADER, cg_params(rd)]); continue   # and texture
         if 6 <= j < 9 or 12 <= j < 14:     # menu model: built by the patcher from the ending model and ENDING.FBD (12: Boss in black, 13: Cindy's)
@@ -600,7 +610,7 @@ ENDING_MODELS = ['/ENDING/S_CHR/ED_CHR41.DAT', '/ENDING/S_CHR/ED_CHR51.DAT', '/E
 ENDING_FBD = '/ENDING/ENDING.FBD'
 MENU_BUF = 0x801C2000; MENU_SAVE = 0x801D2000          # free RAM in the menu (left-over copy of MAIN_SEL.FBD)
 M_CLUT = 0x7600; M_IMG = 0x7A00   # palette row(s) 0x7600 (and 0x7800: 2 rows)
-M_MAGIC = 0xFA00; M_SIZE = 0xFA04
+M_MAGIC = 0xFA00; M_CLUT2 = 0xFA10; M_SIZE = 0xFC10    # v78: the 2nd outfit's palette row at M_CLUT2 (Jicchi, Nick, Kelly)
 # VRAM column of the base rider (Yaggi, Jin, Cindy; Boss: x 640, y 256, texture page 26 = 1664 >> 6 for crew_menu_chunk)
 MENU_COL = [512, 576, 640, 1664, 640]
 MENU_RECT = [(512, 0), (576, 0), (640, 0), (640, 256), (640, 0)]
@@ -647,7 +657,28 @@ def menu_params(k, dest=MENU_BUF):
     (px, py), (cx, cy) = END_TEX[k]
     return {'dest': dest, 'col': MENU_COL[k], 'cly': MENU_CLUT_Y[k], 'src': [px, py, cx, cy], 'yshift': Y_SHIFT,
             'parts': MENU_PARTS, 'idx': {str(m): v for m, v in TMD_IDX.items()}, 'clut_off': M_CLUT, 'img_off': M_IMG,
-            'magic_off': M_MAGIC, 'size': M_SIZE, 'magic': MENU_MAGIC + k + 1, **(BOSS_MENU if k == 3 else CINDY_MENU if k == 4 else {})}
+            'magic_off': M_MAGIC, 'size': M_SIZE, 'magic': MENU_MAGIC + k + 1, **(BOSS_MENU if k == 3 else CINDY_MENU if k == 4 else {}),
+            **({'recolor': RECOLOR[k], 'clut2_off': M_CLUT2} if k < 3 else {})}
+
+
+# ---------------------------------------------------------------------------------------------------- 2nd outfits (v78)
+# Jicchi, Nick and Kelly had one outfit. Their 2nd one is the same recoloured (modular.recolor: a test on the colour,
+# then a matrix): Jicchi's yellow -> green, Nick's blue -> red, Kelly's ice blue -> violet; skin, hair, the rest stay.
+#   WEAR screen: left / right switch outfit 0 / 1 like Boss's (bossout's ensemble hooks, ensa); the preview's palette
+#     is the menu model's recoloured row (M_CLUT2, built by the patcher in the same file), chosen by mshow (BOUT 0x11).
+#   races: the texture load (ld / ldq) takes the 2nd outfit's file (ENTO + alias - 1) when the jacket is odd: 3 more
+#     files, made by the patcher (['crewtex', ...], modular.crew_tex: the palettes of the board, 22 and 23, kept).
+RECOLOR = [{'test': [[-13, 16, 0, 0], [1, 0, -1, -6], [0, 1, -1, -6]], 'mat': [[5, 0, 0], [0, 15, 0], [0, 0, 9]]},   # Jicchi: yellow -> green
+           {'test': [[-1, 0, 1, -4], [0, -1, 1, -2]], 'mat': [[0, 0, 17], [0, 6, 0], [6, 0, 0]]},                      # Nick: blue -> red
+           {'test': [[-1, 0, 1, -3], [0, -1, 1, 0]], 'mat': [[0, 16, 0], [11, 0, 0], [0, 0, 16]]}]                     # Kelly: ice blue -> violet
+TEX_SKIP = [22, 23]
+TEX2_SRC = ['/DATA/CHR/ENEMY1.FBD', '/DATA/CHR/ENEMY2.FBD', '/DATA/CHR/FR/FBD/FRM1_00.FBD']
+
+
+def tex2_params(k):
+    import cpurider
+    _, page, du, row = cpurider.CPU[NAMES[k]]
+    return {'row': row, 'page': page, 'du': du, 'skip': TEX_SKIP, 'recolor': RECOLOR[k]}
 
 
 def menu_chunk(archive, fbd, k, dest=MENU_BUF):

@@ -67,7 +67,7 @@ JACKETS = [['pink', 'sky', 'gold'], ['orange', 'camo', 'yellow'], ['red', 'green
            ['teal', 'gold', 'pink', 'navy', 'blue', 'pink'],
            ['gold', 'steel'], ['silver'], ['red'],                     # g_rider 4..6: Boss (v57: black outfit 1), Gray, Snowman
            ['gold'], ['silver'], ['red'],                              # 7..9 (not used)
-           ['yellow'], ['blue'], ['ice', 'peri', 'green', 'steel', 'steel', 'steel']]   # Jicchi, Nick, Kelly
+           ['yellow', 'green'] * 3, ['blue', 'red'] * 3, ['ice', 'peri'] * 3]   # Jicchi, Nick, Kelly (v78: odd jacket = 2nd outfit; Kelly's violet: peri, no room for one more colour)
 JNAMES = sorted(_C)
 JPAL_WORDS = [(_C[n][2] << 16) | (_C[n][1] << 8) | _C[n][0] for n in JNAMES]
 JTAB_BYTES = bytes(JNAMES.index(j[min(k, len(j) - 1)]) for j in JACKETS for k in range(6))
