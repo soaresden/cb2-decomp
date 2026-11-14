@@ -87,7 +87,7 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
 0x8008F1F8, 16 octets par place : Jicchi 4, Nick 5, Kelly 6). Le second chargeur de fichiers du joueur,
 `func_8001D694` (Halfpipe, Big Air…), range la texture en +0x20 du contexte (au lieu de +0x24 pour `func_8001D1B8`).
 
-## Snowman en Compétition (enquête, v26 — pas encore corrigé)
+## Snowman en Compétition (corrigé en v29, `remix/snowtod.py`, mod `riders`)
 
 - Symptôme : en Compétition (mod `riders`), Snowman est « mal assemblé » et penché ; en Free Style il est bon.
 - Modèle : SNOW.PMD (7 objets, contre 12 pour un humain), mis par `riders` à la place 6 du paquet PLAYER.
@@ -120,8 +120,23 @@ charge leur modèle et leur texture (fichiers ajoutés) et leurs paramètres de 
     pointent dans TOD_SM selon une correspondance mouvement humain → mouvement de Snowman (MAP dans snowtod.py, lue
     dans l'émulateur). Les trois tables écrites ainsi pour le joueur : la course tourne (avec la seule première,
     erreur d'adresse en 0x8008C278 : le lecteur sortait des mouvements de Snowman, plus courts), mais les morceaux
-    de Snowman sont énormes et éparpillés autour de la caméra : SBC2 n'applique pas TOD_SM à ce modèle comme FREE
-    (échelle des paquets, numéros d'objets ou repère du modèle converti par `riders`). À comparer ensuite.
+    de Snowman sont énormes et éparpillés autour de la caméra.
+- v29 — la cause : la **hiérarchie**. Le lecteur de TOD (SBC2 `func_8008C2F8`, le même que FREE à 0x931C près) gère
+  les paquets libgs : type 8 = créer l'objet, type 3 = parent (`super` du GsCOORDINATE2, +0x48), 1 = coordonnées…
+  Le mouvement 0 de chaque TOD est une « mise en place » : TOD_SM crée 14 nœuds (objets 5..11, os 12..18) et leurs
+  parents, TOD_MANx en crée 24 (5..0x1C). Au départ de l'épreuve, le jeu joue le mouvement 0 du TOD humain : les
+  7 morceaux de Snowman se retrouvent sous des os humains, et TOD_SM anime ses os 12..18, qui sont au milieu du
+  squelette humain. Liste des nœuds du rider : pointeur en rider + 0x1E4 (entrées de 0x18 octets : attribut,
+  coordonnées, PMD, objet, base, numéro), racine en rider + 0x1D4. Hiérarchie de Snowman (Free Style) :
+  racine → 12 → 9 → 13 → 8 → {14 → 7 → 15 → 5 → 16 → 6, 17 → 10, 18 → 11}.
+  `snw` remet ces 14 parents à chaque image (les os humains 19..28 restent, inutilisés, sous ceux de Snowman).
+  Piège : `lbu a0` suivi tout de suite de `beqz a0` lisait l'ancien a0 (délai de chargement) → l'os 12 restait
+  sous un os humain → boucle dans la hiérarchie, récursion sans fin, mémoire écrasée.
+- SBC1 (1re étape, épreuves de figures) a le même problème : riders D_80090DF0, conversions 0x80083DC0 / 0x8008A4E0,
+  place libre `func_80061018` (morte), et les deux appels du lecteur de TOD `func_80089AB8` (0x80064B30, début d'un
+  mouvement, et 0x80065150, chaque image) passent par `snw` (ses arguments sur la pile restent en place). Avec le
+  seul premier appel, la hiérarchie humaine revenait. Vérifié dans l'émulateur : Big Air (1re étape) et Boarder
+  Cross (2e étape), Snowman entier, animé comme en Free Style.
 
 ## Compteur en bas à gauche (Free Style)
 

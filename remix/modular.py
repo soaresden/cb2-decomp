@@ -233,7 +233,10 @@ def generate(pal_chd, ref_chd, pal_fs, delta_gz):
     import skipq as _skq
     pkg['ops']['skipq'] = [op for op in pkg['ops']['skipq'] if not (op[0] == 'w' and op[2] + 0x8000F800 in _skq.SELECT_SITES)]
     pkg['ops']['skipq'] += _skq.select_ops(O.read_file('/SCES_009.92'))   # SELECT alone on the 1st STAGE screen
-    # snowtod (Snowman's own animations in the competition): not active yet, see remix/snowtod.py and docs/racer.md
+    # Snowman in the competition: his own animations (TOD_SM) and hierarchy (remix/snowtod.py, docs/racer.md)
+    import snowtod as _sn
+    _sk = {(op[1], op[2]) for op in _sn.ops(O)}
+    pkg['ops']['riders'] = [op for op in pkg['ops']['riders'] if not (op[0] == 'w' and (op[1], op[2]) in _sk)] + _sn.ops(O)
     import crew as _cw
     pkg['ops']['crew'] = _cw.ops(O)
     import rear as _rv

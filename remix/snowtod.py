@@ -1,4 +1,5 @@
-# Snowman in the competition (part of the mod `riders`, v27): his own animations (TOD_SM) instead of the human ones.
+# Snowman in the competition (part of the mod `riders`, v29): his own animations (TOD_SM) and his own hierarchy instead
+# of the human ones.
 #
 # The competition loads one human TOD (TOD_MANx, 100 motions) at the 1st stage, at 0x80195394, for every rider; the
 # Snowman model (7 objects) then got the first bones of a human ("badly assembled", leaning). Free Style loads TOD_SM
@@ -7,12 +8,18 @@
 #   exe: the competition loader func_8001CCE0 queues its files with func_80013BD0 (file, dest, &ptr, flags); its call at
 #        0x8001D014 goes to `tsm`, which also queues TOD_SM (file 237) into the heap (dest 0) when g_rider = 6, its
 #        address into TSM_PTR (every stage: each overlay has its own heap; ~200 KB stay free in the Boarder Cross).
-#   SBC2: the race loop's call of the bar function (0x8005F56C) goes to `snw` first: when g_rider = 6 and TOD_SM is
-#        there, it is converted once with the overlay's own routines (header: offsets -> addresses, then every motion:
-#        func_8008655C / func_8008CC7C, as FREE.BIN's func_8008F878 / func_80095F98 do for its TODs), and the player's
-#        three motion tables (D_8009B9A8[0] + 0x204: motion + 8, + 0x39C: its frame count, + 0x530: its first frame's
-#        number, as the racer init func_80064674 makes them) are written from MAP every frame. (With the first table
-#        only, the TOD player ran off the end of Snowman's shorter motions: address error at 0x8008C278.)
+#   SBC1 / SBC2 (OVLS): calls made every frame go to `snw` first (SBC2: the race loop's call of the bar function; SBC1:
+#        the calls of the TOD frame player): when g_rider = 6 and TOD_SM is there, it is converted once with the
+#        overlay's own routines (header: offsets -> addresses, then every motion, as FREE.BIN's func_8008F878 /
+#        func_80095F98 do for its TODs), then every frame:
+#        - the player's three motion tables (rider + 0x204: motion + 8, + 0x39C: its frame count, + 0x530: its first
+#          frame's number, as the racer init func_80064674 makes them) are written from MAP (with the first table only,
+#          the TOD player ran off the end of Snowman's shorter motions: address error at 0x8008C278);
+#        - Snowman's hierarchy (HIER) is put back: the rider's objects and bones (list at rider + 0x1E4: 0x18-byte
+#          entries, GsCOORDINATE2 at +4, id at +0x14) got their parents from the human TOD's setup motion (motion 0:
+#          "create" and "parent" packets for ids 5..0x1C), so TOD_SM's bones 12..18 moved human bones and the 7 pieces
+#          flew apart, huge, around the camera. Each object/bone 5..18 gets its parent of Free Style (super, +0x48),
+#          bone 12 the rider's root (rider + 0x1D4). The human bones 19..28 stay, unused, under Snowman's.
 import struct
 from asm import asm
 
@@ -22,14 +29,24 @@ TOD_SM_FILE = 237
 EXE_CAVE, EXE_CAVE_END = 0x8003EB30, 0x8003EB80          # end of the dead function func_8003EAC4 (its start: options)
 TSM_PTR = EXE_CAVE_END - 4
 G_RIDER = 0x80057408
-SBC2_SITE, BAR_FN = 0x8005F56C, 0x8006D2A4
-HDR_RELOC, MOT_RELOC = 0x8008655C, 0x8008CC7C
-RIDERS = 0x8009B9A8                                     # detailed riders: [0] = the player
-SBC2_CAVE, SBC2_CAVE_END = 0x80062DB4, 0x8006304C        # dead function func_80062DB4
+# per overlay: detailed riders ([0] = the player), the TOD conversion routines, a dead function (code + tables),
+# the call that goes through `snw` first (site -> tail)
+OVLS = {
+    # Boarder Cross: the race loop's call of the bar function
+    'SBC2': dict(riders=0x8009B9A8, hdr=0x8008655C, mot=0x8008CC7C, cave=0x80062DB4, cave_end=0x8006304C,
+                 sites=[0x8005F56C], tail=0x8006D2A4),
+    # 1st stage (tricks): the two calls of the TOD frame player func_80089AB8 (its stack arguments stay in place):
+    # func_80064ACC (the start of a motion) and the playback of every frame
+    'SBC1': dict(riders=0x80090DF0, hdr=0x80083DC0, mot=0x8008A4E0, cave=0x80061018, cave_end=0x800612B0,
+                 sites=[0x80064B30, 0x80065150], tail=0x80089AB8),
+}
 MAP = [0, 1, 2, 3, 4, 5, 6, 7, 6, 8, 9, 8, 9, 6, 7, 8, 9, 3, 4, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25,
        26, 27, 28, 29, 30, 31, 3, 3, 1, 2, 3, 4, 5, 32, 33, 32, 8, 9, 8, 9, 32, 33, 8, 9, 3, 4, 43, 44, 45, 13, 14, 15, 16, 17,
        18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 29, 28, 31, 30, 3, 3, 39, 40, 41, 42, 37, 38, 37, 38, 37, 38, 34, 35, 36, 35, 36]
 assert len(MAP) == 100
+# Snowman's hierarchy, as Free Style builds it: objects 5..11, bones 12..18 (id, parent id; 0 = the rider's root)
+HIER = [(5, 15), (6, 16), (7, 14), (8, 13), (9, 12), (10, 17), (11, 18),
+        (12, 0), (13, 9), (14, 8), (15, 7), (16, 5), (17, 8), (18, 8)]
 
 
 def H(a): return (a + 0x8000) >> 16
@@ -47,8 +64,11 @@ def exe_code():
     return c, l
 
 
-def sbc2_code():
-    S = ['snw:', 'addiu sp, sp, -0x28', 'sw ra, 0x20(sp)', 'sw s0, 0x18(sp)', 'sw s1, 0x1c(sp)', 'sw a0, 0x10(sp)', 'sw a1, 0x14(sp)',
+def sbc_code(name):
+    o = OVLS[name]
+    RIDERS, HDR_RELOC, MOT_RELOC, CAVE, CAVE_END, TAIL = o['riders'], o['hdr'], o['mot'], o['cave'], o['cave_end'], o['tail']
+    S = ['snw:', 'addiu sp, sp, -0x30', 'sw ra, 0x28(sp)', 'sw s0, 0x18(sp)', 'sw s1, 0x1c(sp)', 'sw a0, 0x10(sp)', 'sw a1, 0x14(sp)',
+         'sw a2, 0x20(sp)', 'sw a3, 0x24(sp)',
          'lui t0, 0x8005', f'lh t0, {G_RIDER & 0xffff:#x}(t0)', 'addiu t1, zero, 6', 'bne t0, t1, sn9', 'nop',
          f'lui t0, {H(TSM_PTR)}', f'lw s0, {L(TSM_PTR)}(t0)', 'nop', 'beqz s0, sn9', 'nop',
          'lhu t0, 0(s0)', 'addiu t1, zero, 0x4f54', 'bne t0, t1, sn9', 'nop',                 # "TO"
@@ -61,24 +81,41 @@ def sbc2_code():
          'sn3:', 'lbu t3, 0(t1)', 'addiu t1, t1, 1', 'sll t3, t3, 2', 'addu t3, t3, s0', 'lw t3, 4(t3)', 'nop',
          'lw t4, 4(t3)', 'lw t5, 8(t3)', 'addiu t3, t3, 8', 'lw t5, 4(t5)', 'sw t3, 0(t0)', 'sw t4, 0x198(t0)', 'sw t5, 0x32c(t0)',
          'bne t1, t2, sn3', 'addiu t0, t0, 4',
-         'sn9:', 'lw a0, 0x10(sp)', 'lw a1, 0x14(sp)', 'lw s0, 0x18(sp)', 'lw s1, 0x1c(sp)', 'lw ra, 0x20(sp)', f'j {BAR_FN}', 'addiu sp, sp, 0x28']
-    c0, _ = asm([x.replace('MAPH', '0').replace('MAPL', '0') for x in S], SBC2_CAVE)
-    mp = c0[-1][0] + 4
-    S = [x.replace('MAPH', str(H(mp))).replace('MAPL', str(L(mp))) for x in S]
-    c, l = asm(S, SBC2_CAVE)
-    m = bytes(MAP) + bytes((-len(MAP)) % 4)
+         # Snowman's hierarchy (HIER: object/bone id, its parent's id, 0 = the rider's root) in place of the human one
+         f'lui t0, {H(RIDERS)}', f'lw t0, {L(RIDERS)}(t0)', 'nop', 'lw t8, 0x1e4(t0)', 'lw t9, 0x1d4(t0)', 'beqz t8, sn9', 'nop',
+         'lui t6, HIEH', 'addiu t6, t6, HIEL', f'addiu t7, t6, {2 * len(HIER)}',
+         'sh1:', 'jal fnd', 'lbu a0, 0(t6)', 'move a1, v0', 'lbu a0, 1(t6)', 'nop', 'beqz a0, sh2', 'move v0, t9', 'jal fnd', 'nop',
+         'sh2:', 'beqz a1, sh3', 'nop', 'beqz v0, sh3', 'nop', 'sw v0, 0x48(a1)',
+         'sh3:', 'addiu t6, t6, 2', 'bne t6, t7, sh1', 'nop', 'j sn9', 'nop',
+         # coordinate of the object/bone a0 in the rider's object list (t8), 0 if none
+         'fnd:', 'move t1, t8',
+         'fn1:', 'lw t2, 0x14(t1)', 'addiu at, zero, -1', 'beq t2, at, fn9', 'move v0, zero', 'bne t2, a0, fn1', 'addiu t1, t1, 0x18',
+         'lw v0, -0x14(t1)', 'fn9:', 'jr ra', 'nop',
+         'sn9:', 'lw a0, 0x10(sp)', 'lw a1, 0x14(sp)', 'lw a2, 0x20(sp)', 'lw a3, 0x24(sp)', 'lw s0, 0x18(sp)', 'lw s1, 0x1c(sp)',
+         'lw ra, 0x28(sp)', f'j {TAIL}', 'addiu sp, sp, 0x30']
+    c0, _ = asm([x.replace('MAPH', '0').replace('MAPL', '0').replace('HIEH', '0').replace('HIEL', '0') for x in S], CAVE)
+    mp = c0[-1][0] + 4; hp = mp + len(MAP)
+    S = [x.replace('MAPH', str(H(mp))).replace('MAPL', str(L(mp))).replace('HIEH', str(H(hp))).replace('HIEL', str(L(hp))) for x in S]
+    c, l = asm(S, CAVE)
+    m = bytes(MAP) + bytes(sum(HIER, ()))
+    m += bytes((-len(m)) % 4)
     c += [(mp + i, struct.unpack_from('<I', m, i)[0]) for i in range(0, len(m), 4)]
-    assert c[-1][0] < SBC2_CAVE_END, hex(c[-1][0])
+    assert c[-1][0] < CAVE_END, hex(c[-1][0])
     return c, l
 
 
 def ops(disc):
-    exe = disc.read_file('/SCES_009.92'); sb = disc.read_file('/SBC2.BIN')
+    exe = disc.read_file('/SCES_009.92')
     we = lambda a: struct.unpack_from('<I', exe, a - EXE_BASE)[0]
-    ws = lambda a: struct.unpack_from('<I', sb, a - OVL)[0]
-    assert we(LOAD_SITE) == J(3, QUEUE) and ws(SBC2_SITE) == J(3, BAR_FN)
-    assert sb[HDR_RELOC - OVL:HDR_RELOC - OVL + 8] == bytes.fromhex('0200829003008790') and ws(MOT_RELOC + 8) == 0x24020002
-    ce, le = exe_code(); cs, ls = sbc2_code()
+    assert we(LOAD_SITE) == J(3, QUEUE)
+    ce, le = exe_code()
     out = [['w', '/SCES_009.92', a - EXE_BASE, we(a), x] for a, x in ce + [(LOAD_SITE, J(3, le['tsm'])), (TSM_PTR, 0)]]
-    out += [['w', '/SBC2.BIN', a - OVL, ws(a), x] for a, x in cs + [(SBC2_SITE, J(3, ls['snw']))]]
+    for name, o in OVLS.items():
+        f = '/' + name + '.BIN'; sb = disc.read_file(f)
+        ws = lambda a: struct.unpack_from('<I', sb, a - OVL)[0]
+        assert all(ws(a) == J(3, o['tail']) for a in o['sites']), name
+        assert sb[o['hdr'] - OVL:o['hdr'] - OVL + 8] == bytes.fromhex('0200829003008790') and ws(o['mot'] + 8) == 0x24020002, name
+        assert ws(o['cave']) == 0x27BDFFC0, name                   # the dead function's addiu sp, sp, -0x40
+        cs, ls = sbc_code(name)
+        out += [['w', f, a - OVL, ws(a), x] for a, x in cs + [(a, J(3, ls['snw'])) for a in o['sites']]]
     return out
