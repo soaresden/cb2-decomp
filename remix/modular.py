@@ -303,7 +303,8 @@ def apply(disc, pkg, feats, log=lambda m: None):
     if 'max' in feats or 'air' in feats: feats.append(INPUT)
     if INPUT in feats and 'air' not in feats: feats.append('input_noair')
     if feats and 'riders' not in feats and pkg['ops'].get(BRAND): feats.append(BRAND)
-    if 'sign' in feats and 'riders' in feats and 'sign_r' in pkg['ops']: feats[feats.index('sign')] = 'sign_r'   # v83: the moved title files
+    feats = [f for f in feats if f not in ('sign', 'sign_r')]
+    if feats and pkg['ops'].get('sign'): feats.append('sign_r' if 'riders' in feats else 'sign')   # v84: the title's signature, with any mod
     files = {}; recs = {}; secs = {}
     origs = {}
     def orig(p):
@@ -775,7 +776,8 @@ B32 = '0123456789ABCDEFGHJKMNPQRSTVWXYZ'
 IDS = ['unlock', 'special', 'hardmirror', 'riders', 'outfits', 'max', 'air', 'ramming', 'bam', 'progress', 'lift', 'skipq', 'crew', 'rear',
        'news', 'hplive', 'options', 'radar', 'sign']
 assert sorted(IDS) == sorted(f[0] for f in FEATURES)
-RETIRED = {'lift'}                       # kept in IDS so that old codes still decode; no longer offered
+RETIRED = {'lift', 'sign'}               # kept in IDS so that old codes still decode; no longer offered (v84: the signature
+                                         # is always drawn, switched in the game: REMIX screen, GAME)
 SHOWN = [f for f in IDS if f not in RETIRED]
 
 def encode_config(mods, us_music=False, skins=()):

@@ -783,3 +783,16 @@ calculé au moment de construire le paquet, sans aucun pixel du jeu. Deux jeux d
 `sign` ('bs' sur CB2T1E / CB2T2E à leur place, après ceux de BRAND) et `sign_r` (les secteurs entiers des copies
 déplacées par `riders`, qui portent déjà le mot : copies du disque du joueur + les nouveaux pixels) ; apply() (Python et
 JS) prend `sign_r` à la place de `sign` quand `riders` est coché. Vérifié dans l'émulateur avec et sans `riders`.
+
+v84 : **signature réglable dans le jeu, plus sur le site**. `sign` n'est plus une case du patcheur (gardé dans IDS comme
+retiré, les anciens codes restent valides) : la signature est dessinée avec n'importe quel mod (comme le mot REMIX ;
+`sign` ou `sign_r` selon `riders`). Nouvelle ligne de l'écran REMIX, onglet GAME : SIGNATURE ON TITLE SCREEN (active au
+départ). Aucun bit libre dans 0x80057438 : la ligne 32 est le bit 15 du masque des riders 0x80057440 (sauvegardé,
+remis à 0 par une nouvelle partie ; le jeu et les mods ne testent que ses bits 0..9), à 1 = coupé ; l'affichage et la
+bascule de l'écran REMIX le traitent à part (di4 / po6). L'écran titre est affiché par MODE_SEL à partir de copies des
+images en mémoire (emplacements de scène 0x801FFFA4 / 0x801FFFA8, renvoyées en VRAM chaque fois que le titre revient,
+relevé dans l'émulateur) : à chaque image de l'écran des modes, `sgn` en retire les 9 lignes de la signature (128
+pixels, remplacées par le fond) quand le réglage est coupé, après les avoir copiées à 0x801E4000 (marque 0x801E7FE0), et
+les remet quand il est réactivé. Au démarrage le titre vient avant le chargement de la sauvegarde : il est toujours
+signé. MODE_SEL grandit d'un secteur (86, `toggles.SCREEN` 0x1800 ; voices.RESERVE = 96). Vérifié : réglage coupé puis
+Triangle → titre sans signature ; réactivé → signature revenue.

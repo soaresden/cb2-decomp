@@ -57,7 +57,9 @@ LINES = ['BIG AIR MASTER JUMP AT MAX', 'LIVE HALF-PIPE MARKS', 'NOTICE WITH UNLO
          # select screen `pmd` copies the REAR VIEW of the mode under the cursor into bit 0 (read by the mod rear in the
          # race) and gives `oap` the AIR CONTROL of that mode
          'REAR VIEW (O)', 'REAR VIEW (O)', 'REAR VIEW (O)', 'REAR VIEW (O)', 'REAR VIEW (O)',
-         'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL']
+         'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL', 'AIR CONTROL',
+         '-',                                   # bit 31: the R-E-M-I-X letters taken (remix/bpletters.py), no line
+         'SIGNATURE ON TITLE SCREEN']           # v84: line 32 = bit 15 of 0x80057440 (see SIGN_*)
 UNLOCK_LINE = 18                                # an action, not a switch: R2 shows the warning, R2 again unlocks (its bit = done)
 INV = 32 | 1 << UNLOCK_LINE            # lines whose bit set means ON (off by default)
 VIS = 10                               # lines shown at a time: the list scrolls with the cursor
@@ -93,8 +95,17 @@ TABS = [('COMP', [22, 19, 3, 7, 6, 17, 4, 20, 15, 9, 10]),        # v67: the rac
         ('AIR', [13, 0, 24, 28]),                                  # v81: + JUMP AT MAX (Big Air Master)                                     # in each mode)
         ('PIPE', [1, 25, 29]),
         ('PARK', [16, 26, 30]),
-        ('GAME', [11, 12, 8, 14, 2, 5, 18])]
+        ('GAME', [11, 12, 8, 14, 2, 5, 32, 18])]
 # mode select cursor (0 COMP, 1 BIG AIR, 2 HALFPIPE, 3 FREE STYLE, 4 BOARD PARK, else as FREE) -> (REAR VIEW, AIR CONTROL) bits
+# v84: the title screen's signature (remix/title.py `sign`, always in the picture) switched in the game. No bit is free
+# in the switches' word: line 32 is bit 15 of the riders mask 0x80057440 (saved, cleared by a new game; the game and
+# the mods only test its bits 0..9), set = off. The title picture is shown by MODE_SEL from its copies in RAM (scene
+# slots 0x801FFFA4 / 0x801FFFA8, re-sent to VRAM each time the title comes back): every frame of the mode select screen
+# `sgn` takes the signature's rows out of them while the switch is off (saved first at SIGN_BK), puts them back when
+# it is on again. At boot the title comes before the save is loaded: it is always signed then.
+SIGN_LINE, SIGN_WORD, SIGN_BIT = 32, 0x80057440, 0x8000
+SIGN_SLOTS = 0x801FFFA4
+SIGN_BK, SIGN_MAGIC, SIGN_MAGIC_V = 0x801E4000, 0x801E7FE0, 0x53494742   # free menu RAM (after wearprev's copies)
 REAR_RT = 0x8005744E                     # v81: the REAR VIEW of the mode under the cursor (unsaved byte; read by remix/rear.py)
 PMT = [(22, 3), (24, 28), (25, 29), (23, 27), (26, 30), (23, 27), (23, 27), (23, 27)]
 TAB_X0, TAB_X1 = -132, 136               # the tabs' names (menu font, 8 pixels a letter): v67 from the lines' left edge to
@@ -224,7 +235,9 @@ def routines(D):
          'po5:', *sw('t6', 'tab'), *sw('t7', 'item'), f'andi t5, t2, {CROSS}', 'beqz t5, pwz', 'nop',
          'sll t5, t6, 4', 'addu t5, t5, t7', *la('t8', D['tabl']), 'addu t8, t8, t5', 'lbu t5, 0(t8)',
          f'lui t0, {H(FLAGS)}', f'lw t9, {L(FLAGS)}(t0)', f'addiu t8, zero, {UNLOCK_LINE}', 'bne t5, t8, po6', 'nop', 'j ounl', 'nop',
-         'po6:', 'addiu t8, zero, 1', 'sllv t8, t8, t5', 'xor t9, t9, t8', f'sw t9, {L(FLAGS)}(t0)',
+         'po6:', 'slti t8, t5, 32', 'bnez t8, po7', 'nop', f'lhu t8, {SIGN_WORD & 0xffff:#x}(t0)', 'nop', f'xori t8, t8, {SIGN_BIT}',
+         f'sh t8, {SIGN_WORD & 0xffff:#x}(t0)', 'j pwz', 'nop',
+         'po7:', 'addiu t8, zero, 1', 'sllv t8, t8, t5', 'xor t9, t9, t8', f'sw t9, {L(FLAGS)}(t0)',
          # v81: 16:9 switched on -> its note under the list (conf 2), off -> none
          f'addiu t8, zero, {WIDE_LINE}', 'bne t5, t8, pwz', f'andi t8, t9, {1 << WIDE_LINE}', f'srl t8, t8, {WIDE_LINE - 1}', *sw('t8', 'conf'),
          'pwz:', f'lui t1, {H(PADV)}'] + [f'sh zero, {L(PADV) + k}(t1)' for k in range(0, 12, 2)] + \
@@ -240,7 +253,7 @@ def routines(D):
     # opt (the TV function's GetClut call, every frame of the mode select screen): switches applied, the switches'
     # block installed, then the REMIX label (or the screen)
     S += ['opt:', 'addiu sp, sp, -0x50', 'sw ra, 0x4c(sp)', 'sw s5, 0x40(sp)', 'sw s6, 0x44(sp)', 'sw s7, 0x48(sp)',
-          f'jal {HOOK_FN}', 'nop', 'sw v0, 0x34(sp)', 'jal pmd', 'nop', 'jal oap', 'nop', 'jal tins', 'nop',
+          f'jal {HOOK_FN}', 'nop', 'sw v0, 0x34(sp)', 'jal pmd', 'nop', 'jal oap', 'nop', 'jal tins', 'nop', 'jal sgn', 'nop',
           'addiu t0, zero, 2', *sw('t0', 'alive'),
           'sll v1, s1, 2', 'addu v1, v1, s1', 'sll v1, v1, 2', 'addu v1, v1, s4', 'lw s5, 4(v1)', 'sll v0, s1, 13',
           f'lui s6, {H(PRIMS)}', 'addu s6, s6, v0', f'addiu s6, s6, {L(PRIMS)}',
@@ -302,7 +315,8 @@ def routines(D):
           'di2:', 'jal drw', 'nop',
           'j di4', 'nop', 'di4:',            # v61: two blocks (room in the caves)
           'lw t3, 0x24(sp)', f'lui t1, {H(FLAGS)}', f'lw t0, {L(FLAGS)}(t1)', f'lui t1, {INV >> 16:#x}', f'ori t1, t1, {INV & 0xffff:#x}',
-          'xor t0, t0, t1', 'srlv t0, t0, t3', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']), 'beqz t0, di3', 'nop',
+          'xor t0, t0, t1', 'slti t1, t3, 32', 'bnez t1, di5', 'lui t1, 0x8005', f'lhu t0, {SIGN_WORD & 0xffff:#x}(t1)', 'addiu t3, t3, -17',
+          'di5:', 'srlv t0, t0, t3', 'andi t0, t0, 1', *la('t6', D['on']), *la('t7', D['rgbon']), 'beqz t0, di3', 'nop',
           *la('t6', D['off']), *la('t7', D['rgboff']),
           'di3:', 'addiu t4, zero, 112', 'lw t5, 0x28(sp)', 'jal drw', 'nop',
           'lw s7, 0x30(sp)', 'nop', 'addiu s7, s7, 1', 'j di1', 'nop']
@@ -334,6 +348,27 @@ def routines(D):
           'addu t2, t2, t1', 'lbu t3, 0(t2)', 'lbu t4, 1(t2)', f'lui t0, {H(FLAGS)}', f'lw t5, {L(FLAGS)}(t0)', 'nop',
           'srlv t6, t5, t3', 'andi t6, t6, 1', 'srlv t7, t5, t4', 'andi t7, t7, 1',
           f'sb t6, {L(REAR_RT)}(t0)', 'andi t8, t5, 0xf7', 'sll t7, t7, 3', 'or t8, t8, t7', *sw('t8', 'fx'), 'jr ra', 'nop']
+    import title
+    sm = title.sign_mask(); SH, SW = sm.shape; SX = (title.W - SW) // 2
+    assert sm[0, 0] >= 40                       # the probe: the first pixel of the signature is ink
+    OFF = title.HDR + title.SIGN_Y * title.W + SX
+    S += ['sgn:', 'lui t0, 0x8005', f'lhu t7, {SIGN_WORD & 0xffff:#x}(t0)', *la('t5', SIGN_BK), *la('t8', SIGN_SLOTS), 'addiu t6, zero, 2',
+          f'andi t7, t7, {SIGN_BIT}',
+          'sg1:', 'lw v0, 0(t8)', 'nop', 'srl t1, v0, 24', 'addiu t1, t1, -0x80', 'bnez t1, sg8', 'nop',
+          'lw t1, 0(v0)', 'lui t2, 1', 'ori t2, t2, 0x4246', 'bne t1, t2, sg8', f'lui t1, {OFF >> 16}', f'ori t1, t1, {OFF & 0xffff}',
+          'addu v0, v0, t1', 'lbu t1, 0(v0)', 'lbu t2, -2(v0)', 'move t0, t5', f'addiu v1, zero, {SH}', 'beqz t7, sgon', 'nop',
+          'beq t1, t2, sg8', 'nop',
+          'sgr:', 'lbu t3, -2(v0)', 'move t4, zero',
+          'sgc:', 'addu t1, v0, t4', 'lbu t2, 0(t1)', 'addu at, t0, t4', 'sb t2, 0(at)', 'sb t3, 0(t1)', 'addiu t4, t4, 1',
+          f'slti at, t4, {SW}', 'bnez at, sgc', 'nop', f'addiu v0, v0, {title.W}', 'addiu v1, v1, -1', 'bnez v1, sgr', f'addiu t0, t0, {SW}',
+          f'lui at, {H(SIGN_MAGIC)}', f'lui t1, {SIGN_MAGIC_V >> 16:#x}', f'ori t1, t1, {SIGN_MAGIC_V & 0xffff:#x}', 'j sg8', f'sw t1, {L(SIGN_MAGIC)}(at)',
+          'sgon:', 'bne t1, t2, sg8', f'lui at, {H(SIGN_MAGIC)}', f'lw t1, {L(SIGN_MAGIC)}(at)', f'lui t2, {SIGN_MAGIC_V >> 16:#x}',
+          f'ori t2, t2, {SIGN_MAGIC_V & 0xffff:#x}', 'bne t1, t2, sg8', 'nop',
+          'sgs:', 'move t4, zero',
+          'sgd:', 'addu at, t0, t4', 'lbu t2, 0(at)', 'addu t1, v0, t4', 'sb t2, 0(t1)', 'addiu t4, t4, 1',
+          f'slti at, t4, {SW}', 'bnez at, sgd', 'nop', f'addiu v0, v0, {title.W}', 'addiu v1, v1, -1', 'bnez v1, sgs', f'addiu t0, t0, {SW}',
+          'sg8:', 'addiu t8, t8, 4', 'addiu t6, t6, -1', 'bnez t6, sg1', f'addiu t5, t5, {SH * SW}',
+          'jr ra', 'nop']
     S += ['oap:', *lw('t6', 'fx'), *la('t0', D['ptab']), f'addiu t5, t0, {16 * len(PATCH)}', 'move t9, zero',
           'oa1:', 'lw t1, 0(t0)', 'lw t2, 4(t0)', 'lw t3, 8(t0)', 'lw t4, 12(t0)', 'lw t7, 0(t1)', 'and t4, t4, t6', 'beqz t4, oa2', 'move t8, t2',
           'move t8, t3', 'oa2:', 'beq t7, t8, oa3', 'nop', 'beq t7, t2, oa4', 'nop', 'bne t7, t3, oa3', 'nop',
@@ -342,7 +377,7 @@ def routines(D):
     return S
 
 
-TOP = {'pw', 'ounl', 'opt', 'pmd', 'pga', 'dpg', 'drs', 'di1', 'di4', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk', 'dtri'}
+TOP = {'pw', 'ounl', 'opt', 'pmd', 'sgn', 'pga', 'dpg', 'drs', 'di1', 'di4', 'dh', 'drw', 'box', 'out', 'oap', 'tins', 'dlogo', 'dlnk', 'dtri'}
 
 
 def place(S, tables, extra=()):
