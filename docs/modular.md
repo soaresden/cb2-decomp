@@ -796,3 +796,19 @@ pixels, remplacées par le fond) quand le réglage est coupé, après les avoir 
 les remet quand il est réactivé. Au démarrage le titre vient avant le chargement de la sauvegarde : il est toujours
 signé. MODE_SEL grandit d'un secteur (86, `toggles.SCREEN` 0x1800 ; voices.RESERVE = 96). Vérifié : réglage coupé puis
 Triangle → titre sans signature ; réactivé → signature revenue.
+
+v85 : **fin de la Compétition avec Boss, Gray ou Snowman** (mod `riders`, `remix/endvoice.py`). L'annonce du champion
+(ENDING) joue dans la banque VOENDING (jeu de sons 42, 16 kHz) le son n° g_rider (0..3 : Yaggi, Jin, Cindy, Irin) puis
+le n° g_rider + 7 (7..10 : leurs célébrations « yaaah », « yoshaa », « what did you expect », « yahoo » ; 4..6 =
+« first / second / third », identifiés à l'oreille par le joueur). Boss, Gray, Snowman (4..6) tombaient sur « first /
+second / third » puis sur des sons inexistants. Maintenant VOENDING reçoit 4 sons de plus, copiés du disque du joueur :
+le « great » du commentateur (SBC2ND0 n° 12) et un cri de chacun (Big Air : Boss n° 38 « yeah », Gray n° 33, Snowman
+n° 33), joués à 6 kHz (hauteur 0x22D de leurs banques ; les vitesses des banques sont lues dans la table 0x80047C0C).
+Le dernier mot de la table de positions de VOENDING (dans l'exe) devient la nouvelle taille (envoyée au SPU) ; `endn` /
+`endc` (fonctions mortes func_80061544 et, pour les données, func_80062664 d'ENDING) jouent « great » à la place du
+nom et le cri à la place de la célébration, en échangeant le temps de l'appel la table D_800592E0 et la hauteur
+D_80058300 de la banque. Sans cadre de pile : la pile de la fin descend jusqu'aux données de Snowman (TOD à
+0x801F4000) ; 32 octets de plus faisaient planter le podium avec Snowman (relevé dans l'émulateur). Le fichier agrandi
+va avant le TOD de Snowman à la fin du générique (raccourci d'environ 0,2 s de plus). Vérifié : avec Boss, Gray,
+Snowman et Yaggi, les deux appels (nom, célébration) passent par la routine, sans plantage, table et hauteur rendues ;
+« great » entendu dans l'enregistrement à la place du nom. Jicchi, Nick et Kelly ne sont pas jouables en Compétition.

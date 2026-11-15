@@ -26,7 +26,7 @@ PITCH_VAR, OFFS_VAR = 0x80058300, 0x800592E0
 CAVE, CAVE_END = 0x80061544, 0x80061544 + 168          # dead function of ENDING (no call, jump or pointer to it or its labels)
 DCAVE, DCAVE_END = 0x80062664, 0x80062664 + 140        # another: the extras' offsets and pitches
 # (sound set, sample): the announcer's "great", then Boss, Gray, Snowman's cries (riders 4, 5, 6)
-EXTRA = [(35, 12), (32, 33), (33, 33), (34, 33)]
+EXTRA = [(35, 12), (32, 38), (33, 33), (34, 33)]   # v85: Boss's « yeah » 38, Gray's and Snowman's 33 (chosen by ear)
 PITCH = 0x22D                            # 6 kHz, the pitch of those sets
 
 
@@ -61,22 +61,26 @@ def bank(disc):
 
 
 def code(xoff):
-    D = DCAVE                                             # data: offsets, then pitches
-    XO, PT = D, D + 4 * len(xoff)
+    D = DCAVE                                             # data: offsets, then pitches, then the saved pitch / table
+    XO, PT, SV = D, D + 4 * len(xoff), D + 6 * len(xoff) + 2
+    SV = (SV + 3) & ~3
     S = ['endn:', 'slti t0, a1, 4', 'bnez t0, eap', 'nop', 'j exp', 'move t1, zero',
          'endc:', 'slti t0, a1, 11', 'bnez t0, eap', 'nop', 'addiu t1, a1, -10',
-         'exp:', 'addiu sp, sp, -0x20', 'sw ra, 0x1c(sp)', f'lui t2, {H(PITCH_VAR)}', f'lhu t3, {L(PITCH_VAR)}(t2)', f'lui t4, {H(OFFS_VAR)}',
-         f'lw t5, {L(OFFS_VAR)}(t4)', 'sw t3, 0x10(sp)', 'sw t5, 0x14(sp)',
+         # no stack frame: the ending's stack runs down to the data under it (Snowman's packed TOD at 0x801F4000,
+         # remix/snowtod.py): 32 bytes more crashed the podium with Snowman (checked in the emulator)
+         'exp:', f'lui t8, {H(SV)}', f'sw ra, {L(SV) + 8}(t8)', f'lui t2, {H(PITCH_VAR)}', f'lhu t3, {L(PITCH_VAR)}(t2)', f'lui t4, {H(OFFS_VAR)}',
+         f'lw t5, {L(OFFS_VAR)}(t4)', f'lui t8, {H(SV)}', f'sw t3, {L(SV)}(t8)', f'sw t5, {L(SV) + 4}(t8)',
          f'lui t6, {H(PT)}', f'addiu t6, t6, {L(PT)}', 'sll t7, t1, 1', 'addu t6, t6, t7', 'lhu t6, 0(t6)', f'lui t7, {H(XO)}',
          f'addiu t7, t7, {L(XO)}', f'sh t6, {L(PITCH_VAR)}(t2)', f'sw t7, {L(OFFS_VAR)}(t4)',
          f'jal {EA4:#x}', 'move a1, t1',
-         'lw t3, 0x10(sp)', 'lw t5, 0x14(sp)', f'lui t2, {H(PITCH_VAR)}', f'sh t3, {L(PITCH_VAR)}(t2)', f'lui t4, {H(OFFS_VAR)}',
-         f'sw t5, {L(OFFS_VAR)}(t4)', 'lw ra, 0x1c(sp)', 'jr ra', 'addiu sp, sp, 0x20',
+         f'lui t8, {H(SV)}', f'lw t3, {L(SV)}(t8)', f'lw t5, {L(SV) + 4}(t8)', f'lui t2, {H(PITCH_VAR)}', f'sh t3, {L(PITCH_VAR)}(t2)', f'lui t4, {H(OFFS_VAR)}',
+         f'sw t5, {L(OFFS_VAR)}(t4)', f'lw ra, {L(SV) + 8}(t8)', 'nop', 'jr ra', 'nop',
          'eap:', f'j {EA4:#x}', 'nop']
     c, l = asm(S, CAVE)
-    assert c[-1][0] < CAVE_END and D + 6 * len(xoff) <= DCAVE_END, hex(c[-1][0])
+    assert c[-1][0] < CAVE_END and SV + 12 <= DCAVE_END, hex(c[-1][0])
     data = struct.pack(f'<{len(xoff)}I', *xoff) + struct.pack(f'<{len(xoff)}H', *[PITCH] * len(xoff))
-    return c + [(D + i, struct.unpack_from('<I', data + bytes(-len(data) % 4), i)[0]) for i in range(0, len(data), 4)], l
+    data += bytes(SV - D - len(data)) + bytes(12)
+    return c + [(D + i, struct.unpack_from('<I', data, i)[0]) for i in range(0, len(data), 4)], l
 
 
 def ops(disc):
